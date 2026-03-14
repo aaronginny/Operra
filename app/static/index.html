@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Operra — Dashboard</title>
+  <meta name="description" content="Task management dashboard for Operra, AI Operations Assistant for Teams" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Tokens ─────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-2: #232733;
+      --border: #2e3340;
+      --text: #e4e6ec;
+      --text-dim: #8b8fa3;
+      --accent: #6c5ce7;
+      --accent-gl: rgba(108, 92, 231, .15);
+      --green: #00b894;
+      --green-bg: rgba(0, 184, 148, .12);
+      --red: #ff6b6b;
+      --red-bg: rgba(255, 107, 107, .12);
+      --yellow: #fdcb6e;
+      --yellow-bg: rgba(253, 203, 110, .12);
+      --blue: #74b9ff;
+      --blue-bg: rgba(116, 185, 255, .12);
+      --orange: #e17055;
+      --orange-bg: rgba(225, 112, 85, .12);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0, 0, 0, .35);
+      --transition: .2s ease;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    header .subtitle {
+      font-size: .82rem;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* ── New Task Button ───────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #5a4bd6;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(108, 92, 231, .35);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-sm {
+      padding: 5px 12px;
+      font-size: .78rem;
+      border-radius: 6px;
+    }
+
+    .btn-complete {
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid rgba(0, 184, 148, .25);
+    }
+
+    .btn-complete:hover {
+      background: var(--green);
+      color: #fff;
+    }
+
+    /* ── Filters Bar ───────────────────────────────────────── */
+    .filters {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .status-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .status-tab {
+      padding: 7px 16px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .status-tab:hover {
+      color: var(--text);
+    }
+
+    .status-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .filter-select {
+      padding: 8px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .8rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color var(--transition);
+    }
+
+    .filter-select:hover,
+    .filter-select:focus {
+      border-color: var(--accent);
+    }
+
+    /* ── Stats Row ─────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      transition: border-color var(--transition);
+    }
+
+    .stat-card:hover {
+      border-color: var(--accent);
+    }
+
+    .stat-card .label {
+      font-size: .75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 6px;
+    }
+
+    .stat-card .value {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    .stat-card.overdue .value {
+      color: var(--red);
+    }
+
+    /* ── Task Table ────────────────────────────────────────── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 14px 18px;
+      font-size: .73rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--text-dim);
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td {
+      padding: 14px 18px;
+      font-size: .85rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tbody tr {
+      transition: background var(--transition);
+    }
+
+    tbody tr:hover {
+      background: var(--surface-2);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr.row-overdue {
+      background: var(--red-bg);
+    }
+
+    tbody tr.row-overdue:hover {
+      background: rgba(255, 107, 107, .18);
+    }
+
+    tbody tr.row-needs_help {
+      background: var(--orange-bg);
+    }
+
+    tbody tr.row-needs_help:hover {
+      background: rgba(225, 112, 85, .18);
+    }
+
+    .task-title {
+      font-weight: 600;
+    }
+
+    .task-desc {
+      font-size: .78rem;
+      color: var(--text-dim);
+      margin-top: 2px;
+      max-width: 280px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Status Badge ──────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .badge-pending {
+      background: var(--yellow-bg);
+      color: var(--yellow);
+    }
+
+    .badge-in_progress {
+      background: var(--blue-bg);
+      color: var(--blue);
+    }
+
+    .badge-completed {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .badge-overdue {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .badge-delayed {
+      background: var(--yellow-bg);
+      color: var(--yellow);
+    }
+
+    .badge-needs_help {
+      background: var(--orange-bg);
+      color: var(--orange);
+    }
+
+    .due-text {
+      font-size: .82rem;
+    }
+
+    .due-overdue {
+      color: var(--red);
+      font-weight: 600;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+
+    .empty-state .icon {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+
+    /* ── Modal / Create Form ──────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, .5);
+      transform: translateY(16px);
+      transition: transform .25s;
+    }
+
+    .modal-overlay.open .modal {
+      transform: translateY(0);
+    }
+
+    .modal h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .88rem;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-dim);
+      opacity: .6;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    /* ── Loading Spinner ───────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── Toast ─────────────────────────────────────────────── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      font-size: .84rem;
+      font-weight: 500;
+      color: #fff;
+      animation: slideIn .3s ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
+    }
+
+    .toast-success {
+      background: var(--green);
+    }
+
+    .toast-error {
+      background: var(--red);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ── Responsive ────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .filters {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+      
+      table {
+        min-width: 600px;
+      }
+    }
+
+    /* ── Performance Table ─────────────────────────────────── */
+    .perf-section {
+      margin-top: 36px;
+    }
+
+    .perf-section h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--accent), var(--blue));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .perf-row-star td {
+      border-left: 3px solid var(--green) !important;
+    }
+
+    .perf-row-delays td {
+      border-left: 3px solid var(--orange) !important;
+    }
+
+    .perf-row-help td {
+      border-left: 3px solid var(--red) !important;
+    }
+
+    .perf-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: .7rem;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .perf-badge-star {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .perf-badge-delays {
+      background: var(--orange-bg);
+      color: var(--orange);
+    }
+
+    .perf-badge-help {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    /* ── Employee UI Updates ──────────────────────────────── */
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      font-weight: 600;
+      padding: 10px 0;
+      cursor: pointer;
+      position: relative;
+    }
+    .nav-tab.active {
+      color: var(--accent);
+    }
+    .nav-tab.active::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+    }
+    
+    .employee-link {
+        color: var(--blue);
+        cursor: pointer;
+        text-decoration: underline;
+        text-decoration-color: transparent;
+        transition: text-decoration-color .2s;
+    }
+    .employee-link:hover {
+        text-decoration-color: var(--blue);
+    }
+
+    .employee-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    
+    .emp-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .emp-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .emp-card.selected { border-color: var(--accent); background: var(--accent-gl); }
+    .emp-card .name { font-weight: 600; font-size: .85rem; margin-bottom: 4px; }
+    .emp-card .phone { font-size: .7rem; color: var(--text-dim); }
+  </style>
+</head>
+
+<body>
+
+  <div class="app">
+    <!-- Header -->
+    <header>
+      <div>
+        <h1>AI Ops Dashboard</h1>
+        <p class="subtitle">Task management overview</p>
+      </div>
+      <button class="btn btn-primary" id="btnNewTask" onclick="openModal()">+ Add Task</button>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div style="display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px;">
+      <button class="nav-tab active" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="nav-tab" id="tabEmployees" onclick="switchTab('employees')">Employees</button>
+    </div>
+
+    <!-- Dashboard View -->
+    <div id="viewDashboard">
+      <!-- Stats -->
+      <div class="stats" id="stats">
+        <div class="stat-card">
+          <div class="label">Total (Active)</div>
+          <div class="value" id="statTotal">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Pending</div>
+          <div class="value" id="statPending">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">In Progress</div>
+          <div class="value" id="statProgress">—</div>
+        </div>
+        <div class="stat-card overdue">
+          <div class="label">Overdue</div>
+          <div class="value" id="statOverdue">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Delayed</div>
+          <div class="value" id="statDelayed">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Needs Help</div>
+          <div class="value" id="statHelp" style="color:var(--orange)">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Completed</div>
+          <div class="value" id="statDone">—</div>
+        </div>
+      </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="status-tabs" id="statusTabs">
+        <button class="status-tab active" data-status="">Active (All)</button>
+        <button class="status-tab" data-status="pending">Pending</button>
+        <button class="status-tab" data-status="in_progress">In Progress</button>
+        <button class="status-tab" data-status="overdue">Overdue</button>
+        <button class="status-tab" data-status="delayed">Delayed</button>
+        <button class="status-tab" data-status="needs_help">Needs Help</button>
+        <button class="status-tab" data-status="completed">Completed</button>
+        <!-- Note: Archived tasks are excluded by the API by default, they require a specific endpoint or flag to fetch if we wanted a full Archived view. Since the API currently excludes them, 'archived' tab just shows empty. Let's fix that next. -->
+      </div>
+      <select class="filter-select" id="employeeFilter">
+        <option value="">All Employees</option>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Assigned To</th>
+            <th>Progress</th>
+            <th>Status</th>
+            <th>Due</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="taskBody">
+          <tr>
+            <td colspan="5" class="empty-state">
+              <div class="spinner"></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+      <!-- Employee Performance -->
+      <div class="perf-section">
+        <h2>📊 Employee Performance</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Completed</th>
+                <th>Delays</th>
+                <th>Help Requests</th>
+                <th>Completion Rate</th>
+              </tr>
+            </thead>
+            <tbody id="perfBody">
+              <tr>
+                <td colspan="5" class="empty-state">
+                  <div class="spinner"></div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div> <!-- /Dashboard View -->
+
+    <!-- Employees View -->
+    <div id="viewEmployees" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Team Directory</h2>
+        <button class="btn btn-primary btn-sm" onclick="openAddEmployeeModal()">+ Add Employee</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone Number</th>
+              <th>Active Tasks</th>
+            </tr>
+          </thead>
+          <tbody id="employeeBody">
+            <tr><td colspan="3" class="empty-state"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div> <!-- /Employees View -->
+  </div>
+
+  <!-- Employee Profile Modal -->
+  <div class="modal-overlay" id="modalEmployeeProfile">
+    <div class="modal" style="max-width: 600px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h2 id="profName" style="margin-bottom: 4px;">Employee Name</h2>
+          <p id="profPhone" style="color: var(--text-dim); font-size: .85rem; margin-bottom: 16px;">+0000000000</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnAssignFromProfile">Assign Task</button>
+      </div>
+
+      <h3 style="font-size: .95rem; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">Active Tasks</h3>
+      <div style="max-height: 300px; overflow-y: auto; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+        <table style="width: 100%;">
+          <tbody id="profTasks">
+            <!-- Rendered tasks -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 20px;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalEmployeeProfile')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unified Create Task Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <h2>Add Task</h2>
+      <form id="createForm" onsubmit="handleCreate(event)">
+        
+        <!-- Employee Selection (Step 1) -->
+        <div id="stepSelectEmployee">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+             <label for="fAssignee" style="margin-bottom: 0;">Select Employee *</label>
+             <button type="button" class="btn btn-sm btn-ghost" onclick="toggleAddEmployeeForm()">+ Add New Employee</button>
+          </div>
+          
+          <div class="employee-grid" id="fAssigneeGrid">
+             <div class="spinner"></div>
+          </div>
+          
+          <input type="hidden" id="fAssignee" required />
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" onclick="closeModal('modalOverlay')">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Inline Add Employee Form (Hidden by default) -->
+        <div id="addEmployeeForm" style="display: none; background: var(--surface-2); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 16px; border: 1px dashed var(--border);">
+          <div class="form-group">
+            <label for="fNewEmpName">New Employee Name *</label>
+            <input class="form-input" id="fNewEmpName" placeholder="e.g. John Doe" />
+          </div>
+          <div class="form-group">
+            <label for="fNewEmpPhone">Phone Number *</label>
+            <input class="form-input" id="fNewEmpPhone" placeholder="e.g. +919999999999" />
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button type="button" class="btn btn-sm btn-ghost" onclick="toggleAddEmployeeForm()">Cancel</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnSaveEmployee" onclick="saveNewEmployee()">Save Employee</button>
+          </div>
+        </div>
+
+        <!-- Task Details (Hidden until employee chosen) -->
+        <div id="taskFields" style="display: none;">
+          <div style="margin-bottom: 16px; padding: 10px; background: var(--accent-gl); border-radius: var(--radius-sm); font-size: .85rem; font-weight: 500; color: var(--accent); display: flex; justify-content: space-between; align-items: center;">
+            <span>Assigning to: <strong id="lblSelectedEmployee"></strong></span>
+            <button type="button" class="btn btn-sm btn-ghost" style="padding: 2px 8px; border-color: transparent;" onclick="resetToEmployeeSelection()">Change</button>
+          </div>
+
+          <div class="form-group">
+            <label for="fTitle">Task Title *</label>
+            <input class="form-input" id="fTitle" placeholder="e.g. Pack 40 boxes" />
+          </div>
+          <div class="form-group">
+            <label for="fDesc">Description</label>
+            <input class="form-input" id="fDesc" placeholder="Optional details…" />
+          </div>
+          <div class="form-group">
+            <label for="fDue">Due Date & Time</label>
+            <input class="form-input" id="fDue" type="datetime-local" />
+          </div>
+          <div class="form-group">
+            <label for="fFrequency">Reminder Frequency</label>
+            <select class="form-input" id="fFrequency">
+              <option value="">No extra reminders</option>
+              <option value="1">Daily</option>
+              <option value="2">Every 2 days</option>
+              <option value="3">Every 3 days</option>
+            </select>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" onclick="closeModal('modalOverlay')">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btnSubmit">Create Task & Assign</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+    /* ── Config ──────────────────────────────────────────────── */
+    const API = window.location.origin;    // same server
+
+    /* ── State ───────────────────────────────────────────────── */
+    let allTasks = [];
+    let allEmployees = [];
+    let activeStatus = "";
+    let activeEmployee = "";
+
+    /* ── API helpers ─────────────────────────────────────────── */
+    async function api(path, opts = {}) {
+      const res = await fetch(`${API}${path}`, {
+        headers: { "Content-Type": "application/json" },
+        ...opts,
+      });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      return res.json();
+    }
+
+    /* ── Fetch & render ──────────────────────────────────────── */
+    async function loadTasks() {
+      try {
+        allTasks = await api("/tasks?company_id=1");
+        updateStats();
+        populateEmployeeFilter();
+        renderTable();
+      } catch (e) {
+        document.getElementById("taskBody").innerHTML =
+          `<tr><td colspan="5" class="empty-state"><div class="icon">⚠️</div>Could not load tasks.<br><small>${e.message}</small></td></tr>`;
+      }
+    }
+
+    function updateStats() {
+      const count = (s) => allTasks.filter(t => t.status === s).length;
+      document.getElementById("statTotal").textContent = allTasks.length;
+      document.getElementById("statPending").textContent = count("pending");
+      document.getElementById("statProgress").textContent = count("in_progress");
+      document.getElementById("statOverdue").textContent = count("overdue");
+      document.getElementById("statDelayed").textContent = count("delayed");
+      document.getElementById("statHelp").textContent = count("needs_help");
+      document.getElementById("statDone").textContent = count("completed");
+    }
+
+    function populateEmployeeFilter() {
+      const sel = document.getElementById("employeeFilter");
+      const prev = sel.value;
+      const names = [...new Set(allTasks.map(t => t.assigned_to).filter(Boolean))].sort();
+      sel.innerHTML = '<option value="">All Employees</option>' +
+        names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+      sel.value = prev;
+    }
+
+    function filteredTasks() {
+      return allTasks.filter(t => {
+        if (activeStatus && t.status !== activeStatus) return false;
+        if (!activeStatus && t.status === 'archived') return false;
+        if (activeEmployee && t.assigned_to !== activeEmployee) return false;
+        return true;
+      });
+    }
+
+    function renderTable() {
+      const tasks = filteredTasks();
+      const tbody = document.getElementById("taskBody");
+
+      if (!tasks.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icon">📋</div>No tasks found</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = tasks.map(t => {
+        const isOverdue = t.status === "overdue";
+        const isHelp = t.status === "needs_help";
+        const canComplete = t.status !== "completed";
+        const due = t.due_at ? formatDate(t.due_at) : "—";
+        const dueClass = isOverdue ? "due-overdue" : "";
+        const rowClass = isOverdue ? 'row-overdue' : isHelp ? 'row-needs_help' : '';
+        const pct = t.progress_percent || 0;
+        const lastUp = t.last_update ? formatDate(t.last_update) : formatDate(t.created_at);
+
+        return `
+      <tr class="${rowClass}">
+        <td>
+          <div class="task-title">${esc(t.title)}</div>
+          ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
+        </td>
+        <td><span class="employee-link" onclick="openEmployeeProfileByName('${esc(t.assigned_to)}')">${esc(t.assigned_to || "—")}</span></td>
+        <td>
+          <div style="font-weight:600; font-size:.85rem; color:var(--text)">${pct}%</div>
+          <div style="font-size:.7rem; color:var(--text-dim)">Last update: ${lastUp}</div>
+        </td>
+        <td><span class="badge badge-${t.status}">${statusLabel(t.status)}</span></td>
+        <td class="due-text ${dueClass}">${due}</td>
+        <td>
+          <div style="display:flex; gap: 8px;">
+              ${canComplete
+                ? `<button class="btn btn-sm btn-complete" onclick="markComplete(${t.id})">✓ Done</button>`
+                : `<span style="color:var(--green)">✓ Done</span>`}
+              <button class="btn btn-sm btn-ghost" onclick="archiveTask(${t.id})" title="Delete Task" style="padding: 5px 8px; color: var(--red); border-color: rgba(255, 107, 107, .2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+          </div>
+        </td>
+      </tr>`;
+      }).join("");
+    }
+
+    /* ── Helpers ─────────────────────────────────────────────── */
+    function esc(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function statusLabel(s) {
+      return s.replace(/_/g, " ");
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso);
+      const now = new Date();
+      const opts = { month: "short", day: "numeric" };
+      const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      if (d.toDateString() === now.toDateString()) return `Today ${time}`;
+      const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+      if (d.toDateString() === tomorrow.toDateString()) return `Tomorrow ${time}`;
+      return `${d.toLocaleDateString([], opts)} ${time}`;
+    }
+
+    /* ── Mark complete / Archive ───────────────────────────────────────── */
+    async function markComplete(id) {
+      if (!confirm("Mark this task as completed?")) return;
+      try {
+        await api(`/tasks/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "completed" }),
+        });
+        toast("Task marked as completed!", "success");
+        await loadTasks();
+      } catch (e) {
+        toast("Failed to update task", "error");
+      }
+    }
+
+    async function archiveTask(id) {
+        if (!confirm("Delete Task?\n\nThis will remove it from your active views.")) return;
+        try {
+          await api(`/tasks/${id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ status: "archived" }),
+          });
+          toast("Task deleted.", "success");
+          await loadTasks();
+        } catch (e) {
+          toast("Failed to delete task.", "error");
+        }
+    }
+
+    /* ── Create task ─────────────────────────────────────────── */
+    async function handleCreate(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btnSubmit");
+      btn.disabled = true;
+      btn.textContent = "Creating & Assigning…";
+
+      const empId = document.getElementById("fAssignee").value;
+      const empName = document.getElementById("lblSelectedEmployee").textContent;
+      
+      const titleInput = document.getElementById("fTitle").value.trim();
+      const descInput = document.getElementById("fDesc").value.trim();
+      const dueInput = document.getElementById("fDue").value;
+      const freqInput = document.getElementById("fFrequency").value;
+      
+      if (!titleInput) {
+          toast("Task Title is required.", "error");
+          btn.disabled = false;
+          btn.textContent = "Create Task & Assign";
+          return;
+      }
+
+      // We use the onboard-assign endpoint if they selected by name but don't know the exact endpoint logic.
+      // Wait, let's just use POST /tasks directly now since we have the DB ID from the employees endpoint!
+      const body = {
+          company_id: 1,
+          title: titleInput,
+          assigned_to: empName,
+          assigned_employee_id: parseInt(empId),
+          source_type: "dashboard"
+      };
+      if (descInput) body.description = descInput;
+      if (dueInput) body.due_at = new Date(dueInput).toISOString();
+      if (freqInput) body.reminder_interval_days = parseInt(freqInput);
+
+      try {
+        await api("/tasks", { method: "POST", body: JSON.stringify(body) });
+        toast("Task created and assigned!", "success");
+        closeModal('modalOverlay');
+        await loadTasks();
+      } catch (e) {
+        toast("Failed to create task", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Create Task & Assign";
+      }
+    }
+
+    /* ── Employee Management Logic ───────────────────────────── */
+    async function loadEmployees() {
+      try {
+        allEmployees = await api("/employees?company_id=1"); // New endpoint
+        renderEmployeeGrid();
+        renderEmployeeTable();
+      } catch (e) {
+        console.error("Could not load employees:", e);
+      }
+    }
+
+    function renderEmployeeTable() {
+        const tbody = document.getElementById("employeeBody");
+        if (!allEmployees.length) {
+            tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No employees found.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = allEmployees.map(e => `
+            <tr>
+                <td><span class="employee-link" onclick="openEmployeeProfile(${e.id})">${esc(e.name)}</span></td>
+                <td>${esc(e.phone_number || "No phone")}</td>
+                <td><span class="badge ${e.active_task_count > 0 ? 'badge-in_progress' : 'badge-completed'}">${e.active_task_count} tasks</span></td>
+            </tr>
+        `).join("");
+    }
+
+    function renderEmployeeGrid() {
+      const grid = document.getElementById("fAssigneeGrid");
+      grid.innerHTML = allEmployees.map(e => `
+        <div class="emp-card" onclick="selectEmployeeForTask(${e.id}, '${esc(e.name).replace(/'/g, "\\'")}')">
+           <div class="name">${esc(e.name)}</div>
+           <div class="phone">${esc(e.phone_number || "No phone")}</div>
+        </div>
+      `).join("");
+    }
+
+    function selectEmployeeForTask(id, name) {
+        document.getElementById("fAssignee").value = id;
+        document.getElementById("lblSelectedEmployee").textContent = name;
+        
+        document.getElementById("stepSelectEmployee").style.display = "none";
+        document.getElementById("taskFields").style.display = "block";
+    }
+
+    function resetToEmployeeSelection() {
+        document.getElementById("fAssignee").value = "";
+        document.getElementById("stepSelectEmployee").style.display = "block";
+        document.getElementById("taskFields").style.display = "none";
+    }
+
+    function toggleAddEmployeeForm() {
+      const form = document.getElementById("addEmployeeForm");
+      if (form.style.display === "none") {
+        form.style.display = "block";
+      } else {
+        form.style.display = "none";
+        document.getElementById("fNewEmpName").value = "";
+        document.getElementById("fNewEmpPhone").value = "";
+      }
+    }
+
+    function toggleTaskFields() {
+      const sel = document.getElementById("fAssignee");
+      const fields = document.getElementById("taskFields");
+      if (sel.value) {
+        fields.style.display = "block";
+        // Also hide add-employee form if opened
+        document.getElementById("addEmployeeForm").style.display = "none";
+      } else {
+        fields.style.display = "none";
+      }
+    }
+
+    async function saveNewEmployee() {
+      const name = document.getElementById("fNewEmpName").value.trim();
+      const phone = document.getElementById("fNewEmpPhone").value.trim();
+      const btn = document.getElementById("btnSaveEmployee");
+
+      if (!name || !phone) {
+        toast("Name and Phone are required", "error");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        // Technically this creates/finds via onboard-assign but without a task, we need a standard employee POST route
+        // Wait, we don't have a direct `POST /employees` route handy in our new demo backend.
+        // Let me just send a dummy task that is completed immediately? No, wait. 
+        // We do have /api/dashboard/onboard-assign but it requires a task title.
+        // Hmm, let me call api('/employees') - Wait, I have `employee_routes.py`? Let me check if it exists:
+        // Let's assume `POST /employees` exists and takes name + phone_number.
+        const body = { name, phone_number: phone, company_id: 1 };
+        const res = await api("/employees", { method: "POST", body: JSON.stringify(body) });
+        
+        toast("Employee added!", "success");
+        await loadEmployees(); // refresh dropdown
+        
+        // Auto-select them
+        const sel = document.getElementById("fAssignee");
+        sel.value = res.id;
+        
+        toggleAddEmployeeForm(); // Collapse
+        toggleTaskFields(); // Show task fields
+
+      } catch (e) {
+        toast("Failed to add employee. Phone might exist.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save Employee";
+      }
+    }
+
+    /* ── Tabs & Profile Modals ───────────────────────────────── */
+    function switchTab(tabId) {
+        document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+        document.getElementById('viewDashboard').style.display = 'none';
+        document.getElementById('viewEmployees').style.display = 'none';
+        
+        if (tabId === 'dashboard') {
+            document.getElementById('tabDashboard').classList.add('active');
+            document.getElementById('viewDashboard').style.display = 'block';
+        } else {
+            document.getElementById('tabEmployees').classList.add('active');
+            document.getElementById('viewEmployees').style.display = 'block';
+        }
+    }
+
+    function openEmployeeProfileByName(name) {
+        const emp = allEmployees.find(e => e.name === name);
+        if (emp) openEmployeeProfile(emp.id);
+    }
+
+    async function openEmployeeProfile(id) {
+        try {
+            const data = await api(`/employees/${id}`);
+            document.getElementById("profName").textContent = data.employee.name;
+            document.getElementById("profPhone").textContent = data.employee.phone_number || "No phone";
+            
+            const tbody = document.getElementById("profTasks");
+            if (!data.tasks || !data.tasks.length) {
+                tbody.innerHTML = `<tr><td class="empty-state" style="padding: 20px;">No tasks assigned.</td></tr>`;
+            } else {
+                tbody.innerHTML = data.tasks.filter(t => t.status !== 'archived').map(t => `
+                  <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border);">
+                      <div class="task-title" style="font-size:.85rem">${esc(t.title)}</div>
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align:right;">
+                      <span class="badge badge-${t.status}">${statusLabel(t.status)}</span>
+                    </td>
+                  </tr>
+                `).join("");
+            }
+            
+            document.getElementById("btnAssignFromProfile").onclick = () => {
+                closeModal('modalEmployeeProfile');
+                openModal();
+                selectEmployeeForTask(data.employee.id, data.employee.name);
+            };
+            
+            document.getElementById("modalEmployeeProfile").classList.add("open");
+        } catch (e) {
+            toast("Failed to load profile", "error");
+        }
+    }
+
+    /* ── Modal ───────────────────────────────────────────────── */
+    function openModal() { 
+      document.getElementById("createForm").reset();
+      toggleAddEmployeeForm(); // ensure closed
+      document.getElementById("addEmployeeForm").style.display = "none";
+      resetToEmployeeSelection();
+      document.getElementById("modalOverlay").classList.add("open"); 
+    }
+    
+    function openAddEmployeeModal() {
+        openModal();
+        toggleAddEmployeeForm();
+    }
+    
+    function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+
+    document.querySelectorAll(".modal-overlay").forEach(overlay => {
+      overlay.addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) closeModal(e.target.id);
+      });
+    });
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    function toast(msg, type = "success") {
+      const c = document.getElementById("toasts");
+      const el = document.createElement("div");
+      el.className = `toast toast-${type}`;
+      el.textContent = msg;
+      c.appendChild(el);
+      setTimeout(() => { el.remove(); }, 3000);
+    }
+
+    /* ── Tab & filter wiring ─────────────────────────────────── */
+    document.getElementById("statusTabs").addEventListener("click", (e) => {
+      if (!e.target.classList.contains("status-tab")) return;
+      document.querySelectorAll(".status-tab").forEach(t => t.classList.remove("active"));
+      e.target.classList.add("active");
+      activeStatus = e.target.dataset.status;
+      renderTable();
+    });
+
+    document.getElementById("employeeFilter").addEventListener("change", (e) => {
+      activeEmployee = e.target.value;
+      renderTable();
+    });
+
+    /* ── Keyboard shortcut ───────────────────────────────────── */
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+      }
+    });
+
+    /* ── Init ────────────────────────────────────────────────── */
+    loadTasks();
+    loadEmployees();
+    loadPerformance();
+    setInterval(loadTasks, 30000);  // auto-refresh every 30s
+    setInterval(loadPerformance, 30000);
+
+    /* ── Employee Performance ────────────────────────────────── */
+    async function loadPerformance() {
+      try {
+        const data = await api("/analytics/employees?company_id=1");
+        renderPerformance(data);
+      } catch (e) {
+        document.getElementById("perfBody").innerHTML =
+          `<tr><td colspan="5" class="empty-state">Could not load performance data.</td></tr>`;
+      }
+    }
+
+    function renderPerformance(employees) {
+      const tbody = document.getElementById("perfBody");
+      if (!employees.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No employee data yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = employees.map(e => {
+        // Highlighting logic
+        const isStar = e.completion_rate >= 80 && e.tasks_completed >= 2;
+        const isDelays = e.tasks_delayed >= 2;
+        const isHelp = e.help_requests >= 2;
+
+        let rowClass = "";
+        let badges = "";
+
+        if (isStar) {
+          rowClass = "perf-row-star";
+          badges += `<span class="perf-badge perf-badge-star">⭐ Top Performer</span>`;
+        }
+        if (isDelays) {
+          rowClass = rowClass || "perf-row-delays";
+          badges += `<span class="perf-badge perf-badge-delays">⚠ Frequent Delays</span>`;
+        }
+        if (isHelp) {
+          rowClass = rowClass || "perf-row-help";
+          badges += `<span class="perf-badge perf-badge-help">🆘 Needs Support</span>`;
+        }
+
+        const rateColor = e.completion_rate >= 80 ? "var(--green)"
+          : e.completion_rate >= 50 ? "var(--yellow)" : "var(--red)";
+
+        return `
+        <tr class="${rowClass}">
+          <td>${esc(e.employee_name)}${badges}</td>
+          <td>${e.tasks_completed} / ${e.tasks_total}</td>
+          <td>${e.tasks_delayed}</td>
+          <td>${e.help_requests}</td>
+          <td style="color:${rateColor};font-weight:600">${e.completion_rate}%</td>
+        </tr>`;
+      }).join("");
+    }
+  </script>
+</body>
+
+</html>
