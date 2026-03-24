@@ -46,12 +46,17 @@ async def create_task_endpoint(
                 f"HELP\n"
                 f"UPDATE <progress>"
             )
-            await send_whatsapp_message(employee.phone_number, task_notification)
-            task.notification_sent = True
+            sent = await send_whatsapp_message(employee.phone_number, task_notification)
+            task.notification_sent = sent
             await db.flush()
 
             logger.info("Task created via dashboard")
-            logger.info("Notification sent to %s at %s", employee.name, employee.phone_number)
+            if sent:
+                logger.info("Notification sent to %s at %s", employee.name, employee.phone_number)
+            else:
+                logger.warning("Notification not sent to %s at %s", employee.name, employee.phone_number)
+        else:
+            logger.warning("No phone found for assigned employee id=%s", task.assigned_employee_id)
 
     return task
 

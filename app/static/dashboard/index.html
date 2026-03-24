@@ -1069,13 +1069,21 @@
           return;
       }
 
+        const parsedEmpId = Number.parseInt(empId, 10);
+        if (!Number.isInteger(parsedEmpId) || parsedEmpId <= 0 || !empName.trim()) {
+          toast("Please select an employee before creating a task.", "error");
+          btn.disabled = false;
+          btn.textContent = "Create Task & Assign";
+          return;
+        }
+
       // We use the onboard-assign endpoint if they selected by name but don't know the exact endpoint logic.
       // Wait, let's just use POST /tasks directly now since we have the DB ID from the employees endpoint!
       const body = {
           company_id: 1,
           title: titleInput,
           assigned_to: empName,
-          assigned_employee_id: parseInt(empId),
+          assigned_employee_id: parsedEmpId,
           source_type: "dashboard"
       };
       if (descInput) body.description = descInput;
@@ -1141,6 +1149,7 @@
 
     function resetToEmployeeSelection() {
         document.getElementById("fAssignee").value = "";
+      document.getElementById("lblSelectedEmployee").textContent = "";
         document.getElementById("stepSelectEmployee").style.display = "block";
         document.getElementById("taskFields").style.display = "none";
     }
