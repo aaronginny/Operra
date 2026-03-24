@@ -1,0 +1,2 @@
+email-validator installed: 2.3.0
+EmailStr import OK

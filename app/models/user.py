@@ -11,7 +11,7 @@ from app.database import Base
 class UserRole(str, enum.Enum):
     founder = "founder"
     employee = "employee"
-
+    ceo = "ceo"
 
 class User(Base):
     __tablename__ = "users"
@@ -25,4 +25,5 @@ class User(Base):
         Enum(UserRole), nullable=False, default=UserRole.employee
     )
     whatsapp_number: Mapped[str] = mapped_column(String(20), nullable=True)
-    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)

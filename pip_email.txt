@@ -1,0 +1,11 @@
+Requirement already satisfied: pydantic[email] in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (2.12.5)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (from pydantic[email]) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (from pydantic[email]) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (from pydantic[email]) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (from pydantic[email]) (0.4.2)
+Requirement already satisfied: email-validator>=2.0.0 in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (from pydantic[email]) (2.3.0)
+Requirement already satisfied: dnspython>=2.0.0 in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (from email-validator>=2.0.0->pydantic[email]) (2.8.0)
+Requirement already satisfied: idna>=2.0.0 in c:\users\aaron panikulam\appdata\local\python\pythoncore-3.14-64\lib\site-packages (from email-validator>=2.0.0->pydantic[email]) (3.11)
+
+[notice] A new release of pip is available: 25.3 -> 26.0.1
+[notice] To update, run: C:\Users\Aaron Panikulam\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pip install --upgrade pip

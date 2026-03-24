@@ -3,6 +3,11 @@
 
 <head>
   <meta charset="UTF-8" />
+  <script>
+    if (!localStorage.getItem("company_id")) {
+      window.location.replace("/static/login.html");
+    }
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Operra — Dashboard</title>
   <meta name="description" content="Task management dashboard for Operra, AI Operations Assistant for Teams" />
@@ -885,7 +890,8 @@
 
   <script>
     /* ── Config ──────────────────────────────────────────────── */
-    const API = window.location.origin;    // same server
+    const API = window.location.origin;
+      if (!localStorage.getItem("token")) window.location.replace("/static/login.html");    // same server
 
     /* ── State ───────────────────────────────────────────────── */
     let allTasks = [];
@@ -896,7 +902,7 @@
     /* ── API helpers ─────────────────────────────────────────── */
     async function api(path, opts = {}) {
       const res = await fetch(`${API}${path}`, {
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + localStorage.getItem("token") },
         ...opts,
       });
       if (!res.ok) throw new Error(`API ${res.status}`);
@@ -906,7 +912,7 @@
     /* ── Fetch & render ──────────────────────────────────────── */
     async function loadTasks() {
       try {
-        allTasks = await api("/tasks?company_id=1");
+        allTasks = await api("/tasks");
         updateStats();
         populateEmployeeFilter();
         renderTable();
@@ -1092,7 +1098,7 @@
     /* ── Employee Management Logic ───────────────────────────── */
     async function loadEmployees() {
       try {
-        allEmployees = await api("/employees?company_id=1"); // New endpoint
+        allEmployees = await api("/employees"); // New endpoint
         renderEmployeeGrid();
         renderEmployeeTable();
       } catch (e) {
@@ -1320,7 +1326,7 @@
     /* ── Employee Performance ────────────────────────────────── */
     async function loadPerformance() {
       try {
-        const data = await api("/analytics/employees?company_id=1");
+        const data = await api("/analytics/employees");
         renderPerformance(data);
       } catch (e) {
         document.getElementById("perfBody").innerHTML =

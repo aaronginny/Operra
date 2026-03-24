@@ -17,8 +17,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    
+    # ── Security ──────────────────────────────────────────────
+    secret_key: str = "super_secret_dev_key_operra_123!"
+    cors_origins: list[str] = ["*"]
+    
     # ── Database ──────────────────────────────────────────────
-    database_url: str = "sqlite+aiosqlite:///./ai_ops.db"
+
+    database_url: str = "sqlite+aiosqlite:///./ai_ops_v2.db"
 
     # ── OpenAI ────────────────────────────────────────────────
     openai_api_key: str | None = None

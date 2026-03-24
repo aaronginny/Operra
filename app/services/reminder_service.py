@@ -130,7 +130,7 @@ async def _check_and_remind() -> None:
                             await send_whatsapp_message(emp.phone_number, "Daily Update\n\nWhat progress did you make today?")
                 _last_checkin_date = today
 
-        await db.commit()()
+        await db.commit()
 
 
 def _cooldown_ok(last_sent: datetime | None, now: datetime) -> bool:

@@ -1,0 +1,150 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Operra - AI Operations Assistant</title>
+    <style>
+        body { font-family: system-ui; background: #0f172a; color: white; display: flex; center; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: #1e293b; padding: 2rem; border-radius: 8px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h1 { text-align: center; margin-bottom: 0.5rem; }
+        p.subtitle { text-align: center; color: #94a3b8; margin-bottom: 2rem; }
+        .tabs { display: flex; border-bottom: 1px solid #334155; margin-bottom: 1rem; }
+        .tab { flex: 1; text-align: center; padding: 0.5rem; cursor: pointer; color: #94a3b8; }
+        .tab.active { color: white; border-bottom: 2px solid #3b82f6; font-weight: bold; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; color: #94a3b8; }
+        input { width: 100%; padding: 0.5rem; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 0.75rem; background: #3b82f6; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 1rem; }
+        button:hover { background: #2563eb; }
+        .hidden { display: none; }
+        .error { color: #f87171; text-align: center; margin-top: 1rem; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Operra</h1>
+        <p class="subtitle">AI Operations Platform</p>
+
+        <div class="tabs">
+            <div class="tab" id="tabLogin" onclick="switchTab('login')">Login</div>
+            <div class="tab active" id="tabSignup" onclick="switchTab('signup')">Sign Up (CEO)</div>
+        </div>
+
+        <form id="loginForm" class="hidden" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="loginEmail" required />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" required />
+            </div>
+            <button type="submit">Login</button>
+            <div id="loginError" class="error"></div>
+        </form>
+
+        <form id="signupForm" onsubmit="handleSignup(event)">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="signupName" required />
+            </div>
+            <div class="form-group">
+                <label>Company Name</label>
+                <input type="text" id="signupCompany" required />
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="signupEmail" required />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="signupPassword" required />
+            </div>
+            <button type="submit">Create Company Account</button>
+            <div id="signupError" class="error"></div>
+        </form>
+    </div>
+
+    <script>
+        const API = window.location.origin;
+
+        // If already logged in, go to dashboard
+        if (localStorage.getItem("company_id")) {
+            window.location.href = "/static/dashboard/index.html"; 
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+            document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
+            document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+            document.getElementById('signupForm').classList.toggle('hidden', tab !== 'signup');
+            document.getElementById('loginError').innerText = '';
+            document.getElementById('signupError').innerText = '';
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            const err = document.getElementById('loginError');
+            btn.textContent = "Loading...";
+
+            fetch("/auth/login", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: document.getElementById('loginEmail').value,
+                    password: document.getElementById('loginPassword').value
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    localStorage.setItem("company_id", data.company_id);
+                    localStorage.setItem("token", data.access_token);
+                    window.location.href = "/static/dashboard/index.html";
+                } else {
+                    err.innerText = data.detail || "Login failed";
+                    btn.textContent = "Login";
+                }
+            })
+            .catch(error => {
+                err.innerText = "An error occurred";
+                btn.textContent = "Login";
+            });
+        }
+
+        function handleSignup(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            const err = document.getElementById('signupError');
+            btn.textContent = "Loading...";
+
+            fetch("/auth/signup", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('signupName').value,
+                    company_name: document.getElementById('signupCompany').value,
+                    email: document.getElementById('signupEmail').value,
+                    password: document.getElementById('signupPassword').value
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    localStorage.setItem("company_id", data.company_id);
+                    localStorage.setItem("token", data.access_token);
+                    window.location.href = "/static/dashboard/index.html";
+                } else {
+                    err.innerText = data.error || "Signup failed";
+                    btn.textContent = "Create Company Account";
+                }
+            })
+            .catch(error => {
+                err.innerText = "An error occurred";
+                btn.textContent = "Create Company Account";
+            });
+        }
+    </script>
+</body>
+</html>

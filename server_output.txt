@@ -1,0 +1,1 @@
+D:\Operra project\ai_ops_assistant\.venv\Scripts\python.exe: No module named uvicorn

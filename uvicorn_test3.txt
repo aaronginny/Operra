@@ -1,0 +1,106 @@
+INFO:     Will watch for changes in these directories: ['D:\\Operra project\\ai_ops_assistant']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [3604] using WatchFiles
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\networks.py", line 965, in import_email_validator
+    import email_validator
+ModuleNotFoundError: No module named 'email_validator'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Aaron Panikulam\AppData\Local\Python\pythoncore-3.14-64\Lib\multiprocessing\process.py", line 320, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Users\Aaron Panikulam\AppData\Local\Python\pythoncore-3.14-64\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    ~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\uvicorn\server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "C:\Users\Aaron Panikulam\AppData\Local\Python\pythoncore-3.14-64\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\Aaron Panikulam\AppData\Local\Python\pythoncore-3.14-64\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Aaron Panikulam\AppData\Local\Python\pythoncore-3.14-64\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\uvicorn\server.py", line 79, in serve
+    await self._serve(sockets)
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\uvicorn\server.py", line 86, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\uvicorn\config.py", line 441, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "C:\Users\Aaron Panikulam\AppData\Local\Python\pythoncore-3.14-64\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1398, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1342, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 938, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 759, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "D:\Operra project\ai_ops_assistant\app\main.py", line 17, in <module>
+    from app.routes import tasks as tasks_router
+  File "D:\Operra project\ai_ops_assistant\app\routes\tasks.py", line 15, in <module>
+    from app.dependencies import get_current_user
+  File "D:\Operra project\ai_ops_assistant\app\dependencies.py", line 6, in <module>
+    from app.schemas.auth_schema import CurrentUser
+  File "D:\Operra project\ai_ops_assistant\app\schemas\auth_schema.py", line 3, in <module>
+    class UserCreate(BaseModel):
+    ...<3 lines>...
+        company_name: str
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_model_construction.py", line 255, in __new__
+    complete_model_class(
+    ~~~~~~~~~~~~~~~~~~~~^
+        cls,
+        ^^^^
+    ...<3 lines>...
+        create_model_module=_create_model_module,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_model_construction.py", line 648, in complete_model_class
+    schema = gen_schema.generate_schema(cls)
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 729, in generate_schema
+    schema = self._generate_schema_inner(obj)
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 1023, in _generate_schema_inner
+    return self._model_schema(obj)
+           ~~~~~~~~~~~~~~~~~~^^^^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 856, in _model_schema
+    {k: self._generate_md_field_schema(k, v, decorators) for k, v in fields.items()},
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 1228, in _generate_md_field_schema
+    schema, metadata = self._common_field_schema(name, field_info, decorators)
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 1282, in _common_field_schema
+    schema = self._apply_annotations(
+        source_type,
+        annotations + validators_from_decorators,
+    )
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 2227, in _apply_annotations
+    schema = get_inner_schema(source_type)
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_schema_generation_shared.py", line 83, in __call__
+    schema = self._handler(source_type)
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 2203, in inner_handler
+    schema = self._generate_schema_from_get_schema_method(obj, source_type)
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py", line 919, in _generate_schema_from_get_schema_method
+    schema = get_schema(
+        source, CallbackGetCoreSchemaHandler(self._generate_schema_inner, self, ref_mode=ref_mode)
+    )
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\networks.py", line 1005, in __get_pydantic_core_schema__
+    import_email_validator()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\Operra project\ai_ops_assistant\.venv\Lib\site-packages\pydantic\networks.py", line 967, in import_email_validator
+    raise ImportError("email-validator is not installed, run `pip install 'pydantic[email]'`") from e
+ImportError: email-validator is not installed, run `pip install 'pydantic[email]'`
+INFO:     Stopping reloader process [3604]

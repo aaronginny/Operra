@@ -60,20 +60,26 @@ async def send_whatsapp_message(phone_number: str, message: str) -> None:
         return
 
     try:
-        client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
+        # Clean phone number for E.164 format (remove spaces, hyphens)
+        clean_phone = phone_number.strip().replace(" ", "").replace("-", "")
+        # If it doesn't have a plus, assume it needs one. (Twilio requires E.164)
+        if not clean_phone.startswith("+"):
+            clean_phone = f"+{clean_phone}"
 
+        client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
+        
         # Twilio's WhatsApp API is synchronous; run in a thread to keep the
         # event loop unblocked.
         sent = await asyncio.to_thread(
             client.messages.create,
             body=message,
             from_=f"whatsapp:{settings.twilio_whatsapp_number}",
-            to=f"whatsapp:{phone_number}",
+            to=f"whatsapp:{clean_phone}",
         )
 
         logger.info(
             "WhatsApp message sent to %s (SID: %s)",
-            phone_number,
+            clean_phone,
             sent.sid,
         )
     except Exception:
