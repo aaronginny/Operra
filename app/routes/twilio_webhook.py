@@ -68,7 +68,10 @@ async def twilio_webhook(
         task_title = result.get("task_title", "")
         return _twiml_response(f'Task created: "{task_title}".')
 
-    if status in ("usage_hint", "error"):
-        return _twiml_response("Command processed.")
+    if status == "usage_hint":
+        return _twiml_response(result.get("detail", "Command processed."))
+
+    if status == "error":
+        return _twiml_response(result.get("detail", "Something went wrong. Please try again."))
 
     return _twiml_response("Message received by Operra.")

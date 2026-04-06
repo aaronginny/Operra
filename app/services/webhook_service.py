@@ -361,21 +361,23 @@ async def process_incoming_message(
         if active_task:
             analysis = await analyze_progress_update(text, active_task.title)
             if analysis.get("type") in ["progress_update", "task_completion"]:
-                pct = analysis.get("progress_percent")
+                is_completion = analysis.get("type") == "task_completion"
+                pct = 100 if is_completion else analysis.get("progress_percent")
                 if pct is not None:
                     active_task.progress_percent = pct
-                
+
                 active_task.last_update = datetime.now()
-                active_task.status = TaskStatus.completed if analysis.get("type") == "task_completion" else TaskStatus.in_progress
+                active_task.status = TaskStatus.completed if is_completion else TaskStatus.in_progress
                 if active_task.status == TaskStatus.completed:
                     active_task.completed_at = datetime.now()
                 elif active_task.status == TaskStatus.in_progress and not active_task.started_at:
                     active_task.started_at = datetime.now()
-                    
+
                 await db.flush()
-                
+
                 logger.info('Employee %s updated progress for "%s" to %s%%.', employee_for_update.name, active_task.title, pct)
-                await send_whatsapp_message(sender, f"Progress updated: {pct}%. Keep it up!")
+                confirm_msg = "Task marked complete!" if is_completion else f"Progress updated: {pct}%. Keep it up!"
+                await send_whatsapp_message(sender, confirm_msg)
                 
                 return {
                     "status": "task_updated",

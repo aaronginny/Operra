@@ -359,7 +359,7 @@ async def analyze_progress_update(text: str, task_title: str) -> dict:
             return {"type": "task_completion", "progress_percent": 100}
         
         # Rule based fallback for UPDATE <progress>
-        match = re.search(r"update\s+(\d+)", text_lower)
+        match = re.search(r"update\s+(\d+)\s*%?", text_lower)
         if match:
             return {"type": "progress_update", "progress_percent": int(match.group(1))}
         return {"type": "no_progress", "progress_percent": None}

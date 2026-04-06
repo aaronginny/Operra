@@ -71,5 +71,5 @@ async def receive_message(
         db=db,
         sender=payload.sender,
         text=payload.message,
-        company_id=payload.company_id,
+        force_company_id=payload.company_id,
     )

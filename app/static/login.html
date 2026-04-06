@@ -27,7 +27,7 @@
 
         <div class="tabs">
             <div class="tab" id="tabLogin" onclick="switchTab('login')">Login</div>
-            <div class="tab active" id="tabSignup" onclick="switchTab('signup')">Sign Up (CEO)</div>
+            <div class="tab active" id="tabSignup" onclick="switchTab('signup')">Sign Up</div>
         </div>
 
         <form id="loginForm" class="hidden" onsubmit="handleLogin(event)">
@@ -103,7 +103,7 @@
                     localStorage.setItem("token", data.access_token);
                     window.location.href = "/static/dashboard/index.html";
                 } else {
-                    err.innerText = data.detail || "Login failed";
+                    err.innerText = data.error || "Login failed";
                     btn.textContent = "Login";
                 }
             })
