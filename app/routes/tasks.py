@@ -36,27 +36,39 @@ async def create_task_endpoint(
             due_str = (
                 task.due_at.strftime("%I:%M %p").lstrip("0") if task.due_at else "No deadline"
             )
+            desc_str = task.description or "No description"
             task_notification = (
-                f"New Task Assigned\n\n"
+                f"Operra - New Task Assigned\n\n"
                 f"Task: {task.title}\n"
-                f"Deadline: {due_str}\n\n"
-                f"Reply:\n"
-                f"DONE\n"
-                f"DELAY 30\n"
-                f"HELP\n"
-                f"UPDATE <progress>"
+                f"Description: {desc_str}\n"
+                f"Due: {due_str}\n\n"
+                f"Reply with:\n"
+                f"DONE - mark complete\n"
+                f"DELAY 30 - delay by minutes\n"
+                f"HELP - request assistance\n"
+                f"UPDATE <text> - send progress"
+            )
+            logger.info(
+                "Sending task notification to %s (%s) for task '%s'",
+                employee.name, employee.phone_number, task.title,
             )
             sent = await send_whatsapp_message(employee.phone_number, task_notification)
             task.notification_sent = sent
             await db.flush()
 
-            logger.info("Task created via dashboard")
             if sent:
                 logger.info("Notification sent to %s at %s", employee.name, employee.phone_number)
             else:
-                logger.warning("Notification not sent to %s at %s", employee.name, employee.phone_number)
+                logger.error(
+                    "NOTIFICATION FAILED for %s at %s — check Render logs for Twilio errors",
+                    employee.name, employee.phone_number,
+                )
         else:
-            logger.warning("No phone found for assigned employee id=%s", task.assigned_employee_id)
+            logger.warning(
+                "Cannot notify employee id=%s — %s",
+                task.assigned_employee_id,
+                "no phone number" if employee else "employee not found in DB",
+            )
 
     return task
 

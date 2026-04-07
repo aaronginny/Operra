@@ -64,36 +64,46 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
     console instead so the scheduler never crashes.
     """
     if not _twilio_configured():
-        logger.warning(
-            "Twilio credentials not configured (set Render env vars) — logging message instead.\n"
-            "[WhatsApp → %s]\n%s",
-            phone_number,
-            message,
+        logger.error(
+            "TWILIO NOT CONFIGURED — missing one of TWILIO_ACCOUNT_SID / "
+            "TWILIO_AUTH_TOKEN / TWILIO_WHATSAPP_NUMBER. "
+            "SID=%s, TOKEN=%s, NUMBER=%s",
+            "set" if settings.twilio_account_sid else "MISSING",
+            "set" if settings.twilio_auth_token else "MISSING",
+            "set" if settings.twilio_whatsapp_number else "MISSING",
         )
         return False
 
     try:
         clean_phone = _normalize_whatsapp_phone(phone_number)
+        from_number = _normalize_whatsapp_phone(settings.twilio_whatsapp_number)
+
+        logger.info(
+            "Sending WhatsApp: from=%s to=%s length=%d",
+            from_number, clean_phone, len(message),
+        )
 
         client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
-        
+
         # Twilio's WhatsApp API is synchronous; run in a thread to keep the
         # event loop unblocked.
         sent = await asyncio.to_thread(
             client.messages.create,
             body=message,
-            from_=f"whatsapp:{settings.twilio_whatsapp_number}",
+            from_=f"whatsapp:{from_number}",
             to=f"whatsapp:{clean_phone}",
         )
 
         logger.info(
-            "WhatsApp message sent to %s (SID: %s)",
-            clean_phone,
-            sent.sid,
+            "WhatsApp message sent to %s (SID: %s, status: %s)",
+            clean_phone, sent.sid, sent.status,
         )
         return True
     except Exception:
-        logger.exception("Failed to send WhatsApp message to %s", phone_number)
+        logger.exception(
+            "TWILIO SEND FAILED to %s — check SID, token, and that the "
+            "number is registered in the Twilio sandbox", phone_number,
+        )
         return False
 
 

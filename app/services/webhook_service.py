@@ -482,15 +482,17 @@ async def process_incoming_message(
 
     # ── Notify the assigned employee ─────────────────────────────
     if employee and employee.phone_number:
+        desc_str = task.description or "No description"
         task_notification = (
-            f"New Task Assigned\n\n"
+            f"Operra - New Task Assigned\n\n"
             f"Task: {task.title}\n"
-            f"Deadline: {due_str}\n\n"
-            f"Reply:\n"
-            f"DONE\n"
-            f"DELAY 30\n"
-            f"HELP\n"
-            f"UPDATE <progress>"
+            f"Description: {desc_str}\n"
+            f"Due: {due_str}\n\n"
+            f"Reply with:\n"
+            f"DONE - mark complete\n"
+            f"DELAY 30 - delay by minutes\n"
+            f"HELP - request assistance\n"
+            f"UPDATE <text> - send progress"
         )
         await send_whatsapp_message(employee.phone_number, task_notification)
         task.notification_sent = True
