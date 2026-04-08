@@ -1,5 +1,5 @@
-# Operra
-**AI Operations Assistant for Teams**
+# Foreman AI
+**Smart Task Management for Teams**
 
 Backend API that captures WhatsApp messages, extracts tasks via AI, tracks them, and sends reminders through WhatsApp and email.
 

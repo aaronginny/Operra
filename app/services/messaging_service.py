@@ -157,7 +157,7 @@ async def send_email(email: str, message: str, subject: str = "Task Reminder") -
 # ---------------------------------------------------------------------------
 
 WELCOME_TEXT = (
-    "Welcome to Task Assistant.\n"
+    "Welcome to Foreman AI.\n"
     "\n"
     "You will receive task reminders here.\n"
     "\n"

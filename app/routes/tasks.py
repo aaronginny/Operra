@@ -38,7 +38,7 @@ async def create_task_endpoint(
             )
             desc_str = task.description or "No description"
             task_notification = (
-                f"Operra - New Task Assigned\n\n"
+                f"Foreman AI - New Task Assigned\n\n"
                 f"Task: {task.title}\n"
                 f"Description: {desc_str}\n"
                 f"Due: {due_str}\n\n"

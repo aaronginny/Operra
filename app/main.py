@@ -4,12 +4,11 @@ Run with:  uvicorn app.main:app --reload
 """
 
 import logging
-import pathlib
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -49,8 +48,8 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="Operra",
-    description="Backend API that captures WhatsApp messages, extracts tasks via LLM, and tracks them. Operra - AI Operations Assistant for Teams",
+    title="Foreman AI",
+    description="Backend API that captures WhatsApp messages, extracts tasks via LLM, and tracks them. Foreman AI - Smart Task Management for Teams",
     version="0.2.0",
     lifespan=lifespan,
 )
@@ -64,37 +63,6 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────
-from pydantic import BaseModel, EmailStr
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends
-from app.models.user import User
-from app.services.auth_service import verify_password, create_access_token
-from app.database import get_db
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-@app.post("/auth/login")
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
-    logger.info("[Operra] Login attempt for: %s", payload.email)
-
-    stmt = select(User).where(User.email == payload.email)
-    result = await db.execute(stmt)
-    user = result.scalars().first()
-
-    if not user or not verify_password(payload.password, user.password_hash):
-        logger.warning("[Operra] Login FAILED for: %s", payload.email)
-        return {"success": False, "error": "Invalid email or password"}
-
-    token = create_access_token(
-        {"sub": user.email, "user_id": user.id, "company_id": user.company_id, "role": user.role.value}
-    )
-    
-    logger.info("[Operra] Login OK for: %s  |  company_id=%s", payload.email, user.company_id)
-    return {"success": True, "access_token": token, "company_id": user.company_id}
-
 app.include_router(auth_router.router)
 app.include_router(webhook_router.router)
 app.include_router(twilio_router.router)
