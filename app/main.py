@@ -41,6 +41,15 @@ async def lifespan(application: FastAPI):
     start_scheduler()
     logger.info("Reminder scheduler started.")
 
+    # ── Twilio config check ───────────────────────────────────
+    from app.config import settings as _s
+    logger.info(
+        "Twilio config: SID=%s  TOKEN=%s  NUMBER=%s",
+        "set" if _s.twilio_account_sid else "MISSING",
+        "set" if _s.twilio_auth_token else "MISSING",
+        _s.twilio_whatsapp_number or "MISSING",
+    )
+
     yield
 
     # --- Shutdown ---

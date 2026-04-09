@@ -36,7 +36,7 @@ async def create_task_endpoint(
         employee = await db.get(Employee, task.assigned_employee_id)
         if employee and employee.phone_number:
             due_str = (
-                task.due_at.strftime("%I:%M %p").lstrip("0") if task.due_at else "No deadline"
+                task.due_at.strftime("%b %d %I:%M %p").lstrip("0") if task.due_at else "No deadline"
             )
             desc_str = task.description or "No description"
             task_notification = (
@@ -50,8 +50,8 @@ async def create_task_endpoint(
                 f"UPDATE <text> - send progress"
             )
             logger.info(
-                "Sending task notification to %s (%s) for task '%s'",
-                employee.name, employee.phone_number, task.title,
+                "=== TASK NOTIFY === employee=%r phone_raw=%r task_id=%s title=%r",
+                employee.name, employee.phone_number, task.id, task.title,
             )
             sent = await send_whatsapp_message(employee.phone_number, task_notification)
             task.notification_sent = sent

@@ -65,24 +65,24 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
     """
     if not _twilio_configured():
         logger.error(
-            "TWILIO NOT CONFIGURED — missing one of TWILIO_ACCOUNT_SID / "
-            "TWILIO_AUTH_TOKEN / TWILIO_WHATSAPP_NUMBER. "
-            "SID=%s, TOKEN=%s, NUMBER=%s",
+            "=== TWILIO NOT CONFIGURED === "
+            "SID=%s  TOKEN=%s  NUMBER=%s — message to %r NOT sent.",
             "set" if settings.twilio_account_sid else "MISSING",
             "set" if settings.twilio_auth_token else "MISSING",
             "set" if settings.twilio_whatsapp_number else "MISSING",
+            phone_number,
         )
         return False
 
+    clean_phone = _normalize_whatsapp_phone(phone_number)
+    from_number = _normalize_whatsapp_phone(settings.twilio_whatsapp_number)
+
+    logger.info(
+        "=== TWILIO SEND ATTEMPT === raw_to=%r  normalized_to=%s  from=%s",
+        phone_number, clean_phone, from_number,
+    )
+
     try:
-        clean_phone = _normalize_whatsapp_phone(phone_number)
-        from_number = _normalize_whatsapp_phone(settings.twilio_whatsapp_number)
-
-        logger.info(
-            "Sending WhatsApp: from=%s to=%s length=%d",
-            from_number, clean_phone, len(message),
-        )
-
         client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
 
         # Twilio's WhatsApp API is synchronous; run in a thread to keep the
@@ -94,16 +94,28 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
             to=f"whatsapp:{clean_phone}",
         )
 
+        if sent.status in ("failed", "undelivered"):
+            logger.error(
+                "=== TWILIO DELIVERY FAILED === to=%s SID=%s status=%s error_code=%s",
+                clean_phone, sent.sid, sent.status, sent.error_code,
+            )
+            return False
+
         logger.info(
-            "WhatsApp message sent to %s (SID: %s, status: %s)",
+            "=== TWILIO SENT OK === to=%s SID=%s status=%s",
             clean_phone, sent.sid, sent.status,
         )
         return True
-    except Exception:
-        logger.exception(
-            "TWILIO SEND FAILED to %s — check SID, token, and that the "
-            "number is registered in the Twilio sandbox", phone_number,
+
+    except Exception as exc:
+        # Extract Twilio error code if present (TwilioRestException has .code)
+        error_code = getattr(exc, "code", None)
+        error_msg = getattr(exc, "msg", None) or str(exc)
+        logger.error(
+            "=== TWILIO SEND FAILED === to=%s error_code=%s msg=%s",
+            clean_phone, error_code, error_msg,
         )
+        logger.debug("Twilio exception detail:", exc_info=True)
         return False
 
 
@@ -207,11 +219,10 @@ def format_urgent_reminder(task_title: str) -> str:
 def format_deadline_alert(task_title: str) -> str:
     """Deadline reached — final alert."""
     return (
-        f"⚠ Deadline reached\n\n"
+        f"Foreman AI - Deadline Reached\n\n"
         f"Task: {task_title}\n\n"
         f"Please reply with:\n"
-        f"DONE\n"
-        f"DELAY 30\n"
-        f"HELP"
+        f"DONE - mark complete\n"
+        f"HELP - request assistance"
     )
 
