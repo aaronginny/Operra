@@ -89,6 +89,9 @@ class Task(Base):
     last_update: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    last_update_summary: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
 
     # Relationships
     assigned_employee = relationship("Employee", back_populates="tasks")

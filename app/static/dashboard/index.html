@@ -1037,7 +1037,10 @@
         <td><span class="employee-link" onclick="openEmployeeProfileByName('${esc(t.assigned_to)}')">${esc(t.assigned_to || "—")}</span></td>
         <td>
           <div style="font-weight:600; font-size:.85rem; color:var(--text)">${pct}%</div>
-          <div style="font-size:.7rem; color:var(--text-dim)">Last update: ${lastUp}</div>
+          ${t.last_update_summary
+            ? `<div style="font-size:.75rem; color:var(--accent); margin:2px 0">${esc(t.last_update_summary)}</div>`
+            : ""}
+          <div style="font-size:.7rem; color:var(--text-dim)">Updated: ${lastUp}</div>
         </td>
         <td><span class="badge badge-${t.status}">${statusLabel(t.status)}</span></td>
         <td class="due-text ${dueClass}" id="due-cell-${t.id}">

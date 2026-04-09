@@ -342,35 +342,74 @@ def _rule_based_extract(text: str, known_names: list[str] | None = None) -> dict
         "owner": owner,
         "due_date": due_date,
     }
-import json
-from app.config import settings
-import httpx
 
+# ---------------------------------------------------------------------------
+# Progress-update analyser
+# ---------------------------------------------------------------------------
 
-import json
-from app.config import settings
-import httpx
-import re
+_PROGRESS_SYSTEM_PROMPT = """You are analyzing an employee's WhatsApp message about their task: '{task_title}'.
 
-async def analyze_progress_update(text: str, task_title: str) -> dict:        
-    if not settings.openai_api_key or settings.openai_api_key.startswith("sk-your"):
-        text_lower = text.lower()
-        if "done" in text_lower or "completed" in text_lower:
-            return {"type": "task_completion", "progress_percent": 100}
-        
-        # Rule based fallback for UPDATE <progress>
-        match = re.search(r"update\s+(\d+)\s*%?", text_lower)
-        if match:
-            return {"type": "progress_update", "progress_percent": int(match.group(1))}
-        return {"type": "no_progress", "progress_percent": None}
-
-    sys_prompt = f"""You are analyzing an employee's progress update for the task: '{task_title}'.
-Parse the message and return ONLY valid JSON with keys:
+Determine if this is a progress update, task completion, or unrelated message.
+Return ONLY valid JSON with these keys:
   "type": one of ["progress_update", "task_completion", "no_progress"]
-  "progress_percent": an integer from 0 to 100, or null if no progress or completion
+  "progress_percent": integer 0-100 (estimate from context clues — e.g. "almost done" ≈ 85, "just started" ≈ 10, "halfway" ≈ 50). Use 100 for completions. null if no_progress.
+  "summary": a short one-line summary of the update for the manager's dashboard (e.g. "70% complete - finishing final details"). null if no_progress.
+
+Examples:
+- "almost done, just finishing the corners" → {{"type":"progress_update","progress_percent":85,"summary":"85% — finishing corners"}}
+- "done with everything" → {{"type":"task_completion","progress_percent":100,"summary":"Completed"}}
+- "having trouble with the paint" → {{"type":"progress_update","progress_percent":null,"summary":"Blocked — issue with paint"}}
+- "ok thanks" → {{"type":"no_progress","progress_percent":null,"summary":null}}
 """
+
+# Simple keyword→percent map for the rule-based fallback
+_PROGRESS_KEYWORDS = [
+    ({"done", "completed", "finished", "all done"}, 100, "task_completion"),
+    ({"almost done", "nearly done", "almost finished", "nearly finished", "almost complete"}, 85, "progress_update"),
+    ({"halfway", "half done", "50%", "half way"}, 50, "progress_update"),
+    ({"just started", "starting now", "beginning"}, 10, "progress_update"),
+    ({"working on it", "in progress", "on it"}, 30, "progress_update"),
+    ({"mostly done", "most of it"}, 75, "progress_update"),
+]
+
+
+async def analyze_progress_update(text: str, task_title: str) -> dict:
+    """Analyze a free-text message to extract progress info and a short summary.
+
+    Returns dict with keys: type, progress_percent, summary.
+    """
+    if not settings.openai_api_key or settings.openai_api_key.startswith("sk-your"):
+        return _rule_based_progress(text)
+
+    return await _openai_progress(text, task_title)
+
+
+def _rule_based_progress(text: str) -> dict:
+    """Fallback when no OpenAI key is set."""
+    text_lower = text.lower().strip()
+
+    # Explicit UPDATE <number> command
+    match = re.search(r"update\s+(\d+)\s*%?", text_lower)
+    if match:
+        pct = min(int(match.group(1)), 100)
+        if pct >= 100:
+            return {"type": "task_completion", "progress_percent": 100, "summary": "Completed"}
+        return {"type": "progress_update", "progress_percent": pct, "summary": f"{pct}% complete"}
+
+    # Keyword matching
+    for keywords, pct, update_type in _PROGRESS_KEYWORDS:
+        if any(kw in text_lower for kw in keywords):
+            summary = "Completed" if update_type == "task_completion" else f"{pct}% — {text_lower[:60]}"
+            return {"type": update_type, "progress_percent": pct, "summary": summary}
+
+    return {"type": "no_progress", "progress_percent": None, "summary": None}
+
+
+async def _openai_progress(text: str, task_title: str) -> dict:
+    """Call OpenAI to interpret the progress update."""
+    sys_prompt = _PROGRESS_SYSTEM_PROMPT.format(task_title=task_title)
     payload = {
-        "model": getattr(settings, 'openai_model', 'gpt-4o-mini'),
+        "model": settings.openai_model,
         "messages": [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": text},
@@ -388,8 +427,14 @@ Parse the message and return ONLY valid JSON with keys:
                 json=payload,
             )
             response.raise_for_status()
-        
-        j = json.loads(response.json()["choices"][0]["message"]["content"])     
-        return j
+
+        result = json.loads(response.json()["choices"][0]["message"]["content"])
+        # Ensure all expected keys exist
+        return {
+            "type": result.get("type", "no_progress"),
+            "progress_percent": result.get("progress_percent"),
+            "summary": result.get("summary"),
+        }
     except Exception:
-        return {"type": "no_progress", "progress_percent": None}
+        logger.exception("OpenAI progress analysis failed — falling back to rule-based")
+        return _rule_based_progress(text)

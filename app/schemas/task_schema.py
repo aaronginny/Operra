@@ -53,6 +53,7 @@ class TaskResponse(BaseModel):
     reminder_interval_days: int | None = None
     progress_percent: int
     last_update: datetime | None = None
+    last_update_summary: str | None = None
 
     model_config = {"from_attributes": True}
 
