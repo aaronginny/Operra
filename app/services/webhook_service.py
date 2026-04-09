@@ -138,12 +138,15 @@ async def handle_reply(
         return None  # Not a command
 
     # Look up employee by phone number
+    logger.info("handle_reply: looking up employee for phone=%r command=%r", sender, text)
     employee = await get_employee_by_phone(db, sender)
     if not employee:
+        logger.warning("handle_reply: NO employee found for phone=%r", sender)
         return {
             "status": "error",
             "detail": f"No employee found for phone number {sender}",
         }
+    logger.info("handle_reply: found employee id=%s name=%r", employee.id, employee.name)
 
     # Find most recent pending/in_progress task for this employee
     stmt = (
@@ -159,6 +162,10 @@ async def handle_reply(
     task = result.scalars().first()
 
     if not task:
+        logger.warning(
+            "handle_reply: no pending/in-progress task for employee id=%s name=%r",
+            employee.id, employee.name,
+        )
         await send_whatsapp_message(
             sender,
             f"You have no pending or in-progress tasks at the moment, {employee.name}.",
@@ -167,6 +174,7 @@ async def handle_reply(
             "status": "error",
             "detail": f"No pending/in-progress task found for {employee.name}",
         }
+    logger.info("handle_reply: updating task id=%s %r → %s", task.id, task.title, new_status)
 
     # Apply the status change + intelligence tracking
     task.status = new_status

@@ -113,11 +113,37 @@ async def get_employee_by_phone(
     db: AsyncSession,
     phone_number: str,
 ) -> Employee | None:
-    """Look up an employee by phone number."""
+    """Look up an employee by phone number.
+
+    Tries exact normalized match first, then a suffix match to handle
+    stored numbers that are missing the + prefix or country code.
+    """
     normalized = normalize_phone_number(phone_number)
+    logger.info("get_employee_by_phone: raw=%r normalized=%r", phone_number, normalized)
+
+    # Exact match
     stmt = select(Employee).where(Employee.phone_number == normalized)
     result = await db.execute(stmt)
-    return result.scalars().first()
+    employee = result.scalars().first()
+    if employee:
+        logger.info("get_employee_by_phone: exact match id=%s name=%r", employee.id, employee.name)
+        return employee
+
+    # Fallback: match on the last 10 digits (handles +91XXXXXXXXXX vs 91XXXXXXXXXX vs XXXXXXXXXX)
+    suffix = re.sub(r"\D", "", normalized)[-10:]
+    if len(suffix) == 10:
+        stmt2 = select(Employee).where(Employee.phone_number.like(f"%{suffix}"))
+        result2 = await db.execute(stmt2)
+        employee2 = result2.scalars().first()
+        if employee2:
+            logger.info(
+                "get_employee_by_phone: suffix-match id=%s name=%r (stored=%r vs incoming=%r)",
+                employee2.id, employee2.name, employee2.phone_number, normalized,
+            )
+            return employee2
+
+    logger.warning("get_employee_by_phone: NO match for normalized=%r", normalized)
+    return None
 
 
 async def get_all_employee_names(db: AsyncSession) -> list[str]:

@@ -41,10 +41,13 @@ async def twilio_webhook(
     This endpoint processes the message and returns a TwiML XML reply.
     """
     # Strip the "whatsapp:" prefix Twilio adds to numbers
-    sender = From.replace("whatsapp:", "")
+    sender = From.replace("whatsapp:", "").strip()
     message = Body.strip()
 
-    logger.info("Incoming message from %s: %s", sender, message)
+    logger.info(
+        "=== TWILIO WEBHOOK === Raw From=%r | Stripped sender=%r | Body=%r | To=%r | SID=%s",
+        From, sender, Body, To, MessageSid,
+    )
 
     if not message:
         return _twiml_response("No message received.")

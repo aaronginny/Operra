@@ -1,5 +1,7 @@
 ﻿"""Employee CRUD routes."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +13,9 @@ from app.schemas.employee_schema import EmployeeCreate, EmployeeResponse
 from app.schemas.task_schema import TaskResponse
 from app.dependencies import get_current_user
 from app.schemas.auth_schema import CurrentUser
+from app.services.employee_service import normalize_phone_number
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -33,7 +38,7 @@ async def create_or_update_employee(
     if employee:
         # Update fields
         if payload.phone_number is not None:
-            employee.phone_number = payload.phone_number
+            employee.phone_number = normalize_phone_number(payload.phone_number)
         if payload.email is not None:
             employee.email = payload.email
         employee.is_active = payload.is_active
@@ -42,9 +47,11 @@ async def create_or_update_employee(
         return employee
 
     # Create new
+    normalized_phone = normalize_phone_number(payload.phone_number) if payload.phone_number else None
+    logger.info("Creating employee: %s / %s", payload.name.strip(), normalized_phone)
     employee = Employee(
         name=payload.name.strip(),
-        phone_number=payload.phone_number,
+        phone_number=normalized_phone,
         email=payload.email,
         company_id=current_user.company_id,
         is_active=payload.is_active,
