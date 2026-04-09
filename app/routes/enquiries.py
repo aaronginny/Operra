@@ -1,6 +1,7 @@
 """Enquiry CRUD routes."""
 
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -40,7 +41,7 @@ class EnquiryResponse(BaseModel):
     service_requested: str | None = None
     notes: str | None = None
     status: str
-    created_at: str
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
