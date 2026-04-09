@@ -405,6 +405,133 @@ def _rule_based_progress(text: str) -> dict:
     return {"type": "no_progress", "progress_percent": None, "summary": None}
 
 
+# ---------------------------------------------------------------------------
+# Enquiry extraction
+# ---------------------------------------------------------------------------
+
+_ENQUIRY_SYSTEM_PROMPT = (
+    "You are analyzing a WhatsApp message to determine if it's a client enquiry.\n"
+    "A client enquiry is when someone reports a new potential client or customer asking about services.\n"
+    "Examples: 'new client enquiry from John for painting', 'got a new client Raj wants plumbing work',\n"
+    "'ENQUIRY Priya needs electrical work for her shop'\n\n"
+    "Return ONLY valid JSON with these keys:\n"
+    '  "is_enquiry": true/false,\n'
+    '  "client_name": name of the potential client or null,\n'
+    '  "service_requested": what service they want or null,\n'
+    '  "notes": any extra details or null\n'
+    "If this is NOT an enquiry, return "
+    '{"is_enquiry": false, "client_name": null, "service_requested": null, "notes": null}.'
+)
+
+_ENQUIRY_EMPTY = {"is_enquiry": False, "client_name": None, "service_requested": None, "notes": None}
+
+# Regex for explicit ENQUIRY command
+_ENQUIRY_COMMAND_PATTERN = re.compile(
+    r"^ENQUIRY\s+(.+)", re.IGNORECASE
+)
+
+# Keywords that suggest an enquiry in natural language
+_ENQUIRY_KEYWORDS = {"enquiry", "enquire", "new client", "got a new client", "client asking", "customer asking", "new customer"}
+
+
+def _is_enquiry_message(text: str) -> bool:
+    """Quick check if a message might be an enquiry."""
+    text_lower = text.lower().strip()
+    if text_lower.startswith("enquiry"):
+        return True
+    return any(kw in text_lower for kw in _ENQUIRY_KEYWORDS)
+
+
+async def extract_enquiry_from_message(text: str) -> dict:
+    """Extract enquiry details from a message.
+
+    Returns dict with: is_enquiry, client_name, service_requested, notes.
+    """
+    if not _is_enquiry_message(text):
+        return _ENQUIRY_EMPTY
+
+    if not settings.openai_api_key or settings.openai_api_key.startswith("sk-your"):
+        return _rule_based_enquiry(text)
+
+    return await _openai_enquiry(text)
+
+
+def _rule_based_enquiry(text: str) -> dict:
+    """Fallback enquiry extraction without OpenAI."""
+    # Try explicit ENQUIRY command first
+    match = _ENQUIRY_COMMAND_PATTERN.match(text.strip())
+    if match:
+        rest = match.group(1).strip()
+        # Try to parse "ClientName for/wants/needs Service"
+        parts = re.split(r'\s+(?:for|wants|needs|requesting|about)\s+', rest, maxsplit=1, flags=re.IGNORECASE)
+        client_name = parts[0].strip() if parts else rest
+        service = parts[1].strip() if len(parts) > 1 else None
+        return {
+            "is_enquiry": True,
+            "client_name": client_name,
+            "service_requested": service,
+            "notes": text,
+        }
+
+    # Natural language: try to extract client name after trigger keywords
+    text_lower = text.lower()
+    for kw in ["new client", "got a new client", "new customer"]:
+        if kw in text_lower:
+            after = text[text_lower.index(kw) + len(kw):].strip().lstrip("- :,")
+            parts = re.split(r'\s+(?:for|wants|needs|requesting|about)\s+', after, maxsplit=1, flags=re.IGNORECASE)
+            client_name = parts[0].strip() if parts else after
+            service = parts[1].strip() if len(parts) > 1 else None
+            if client_name:
+                return {
+                    "is_enquiry": True,
+                    "client_name": client_name[:100],
+                    "service_requested": service,
+                    "notes": text,
+                }
+
+    # Generic enquiry keyword match — mark as enquiry but with minimal extraction
+    return {
+        "is_enquiry": True,
+        "client_name": "Unknown Client",
+        "service_requested": None,
+        "notes": text,
+    }
+
+
+async def _openai_enquiry(text: str) -> dict:
+    """Call OpenAI to extract enquiry details."""
+    payload = {
+        "model": settings.openai_model,
+        "messages": [
+            {"role": "system", "content": _ENQUIRY_SYSTEM_PROMPT},
+            {"role": "user", "content": text},
+        ],
+        "temperature": 0.0,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            response.raise_for_status()
+
+        result = json.loads(response.json()["choices"][0]["message"]["content"])
+        return {
+            "is_enquiry": result.get("is_enquiry", False),
+            "client_name": result.get("client_name"),
+            "service_requested": result.get("service_requested"),
+            "notes": result.get("notes"),
+        }
+    except Exception:
+        logger.exception("OpenAI enquiry extraction failed — falling back to rule-based")
+        return _rule_based_enquiry(text)
+
+
 async def _openai_progress(text: str, task_title: str) -> dict:
     """Call OpenAI to interpret the progress update."""
     sys_prompt = _PROGRESS_SYSTEM_PROMPT.format(task_title=task_title)

@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.employee import Employee
 from app.models.message_log import MessageLog
+from app.models.enquiry import Enquiry
 from app.models.task import Task, TaskStatus, SourceType
-from app.services.ai_service import extract_task_from_message
+from app.services.ai_service import extract_enquiry_from_message, extract_task_from_message
 from app.services.employee_service import (
     find_employee_by_name,
     get_all_employee_names,
@@ -295,6 +296,40 @@ async def process_incoming_message(
     if reply_result is not None:
         reply_result["message_log_id"] = log.id
         return reply_result
+
+    # ── Check for enquiry ──────────────────────────────────────
+    enquiry_result = await extract_enquiry_from_message(text)
+    if enquiry_result.get("is_enquiry"):
+        enquiry = Enquiry(
+            company_id=company_id,
+            client_name=enquiry_result.get("client_name") or "Unknown Client",
+            service_requested=enquiry_result.get("service_requested"),
+            notes=enquiry_result.get("notes"),
+        )
+        db.add(enquiry)
+        await db.flush()
+        await db.refresh(enquiry)
+
+        logger.info(
+            "Enquiry saved: %s — %s",
+            enquiry.client_name,
+            enquiry.service_requested or "(no service)",
+        )
+
+        confirm_msg = (
+            f"Enquiry saved for {enquiry.client_name}"
+            + (f" - {enquiry.service_requested}" if enquiry.service_requested else "")
+        )
+        if sender != "unknown":
+            await send_whatsapp_message(sender, confirm_msg)
+
+        return {
+            "status": "enquiry_created",
+            "message_log_id": log.id,
+            "enquiry_id": enquiry.id,
+            "client_name": enquiry.client_name,
+            "service_requested": enquiry.service_requested,
+        }
 
     # ── Extract task via AI ──────────────────────────────────────
     # Fetch real employee names (phone-number placeholders are filtered out)

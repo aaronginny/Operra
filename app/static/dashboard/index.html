@@ -716,6 +716,7 @@
     <div style="display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px;">
       <button class="nav-tab active" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
       <button class="nav-tab" id="tabEmployees" onclick="switchTab('employees')">Employees</button>
+      <button class="nav-tab" id="tabEnquiries" onclick="switchTab('enquiries')">Enquiries</button>
     </div>
 
     <!-- Dashboard View -->
@@ -839,6 +840,31 @@
         </table>
       </div>
     </div> <!-- /Employees View -->
+
+    <!-- Enquiries View -->
+    <div id="viewEnquiries" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Client Enquiries</h2>
+        <button class="btn btn-primary btn-sm" onclick="openEnquiryModal()">+ Add Enquiry</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Client</th>
+              <th>Service</th>
+              <th>Notes</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="enquiryBody">
+            <tr><td colspan="6" class="empty-state"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div> <!-- /Enquiries View -->
   </div>
 
   <!-- Employee Profile Modal -->
@@ -938,6 +964,40 @@
             <button type="button" class="btn btn-ghost" onclick="closeModal('modalOverlay')">Cancel</button>
             <button type="submit" class="btn btn-primary" id="btnSubmit">Create Task & Assign</button>
           </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Enquiry Modal -->
+  <div class="modal-overlay" id="modalEnquiry">
+    <div class="modal" style="max-width: 500px;">
+      <h2 id="enquiryModalTitle">Add Enquiry</h2>
+      <form id="enquiryForm" onsubmit="handleEnquirySubmit(event)">
+        <input type="hidden" id="eqId" />
+        <div class="form-group">
+          <label for="eqClient">Client Name *</label>
+          <input class="form-input" id="eqClient" placeholder="e.g. Raj Kumar" required />
+        </div>
+        <div class="form-group">
+          <label for="eqService">Service Requested</label>
+          <input class="form-input" id="eqService" placeholder="e.g. Painting, Plumbing" />
+        </div>
+        <div class="form-group">
+          <label for="eqNotes">Notes</label>
+          <textarea class="form-input" id="eqNotes" rows="3" placeholder="Any extra details..." style="resize: vertical;"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="eqStatus">Status</label>
+          <select class="form-input" id="eqStatus">
+            <option value="new">New</option>
+            <option value="assigned">Assigned</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('modalEnquiry')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnEnquirySubmit">Save Enquiry</button>
         </div>
       </form>
     </div>
@@ -1330,13 +1390,18 @@
         document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
         document.getElementById('viewDashboard').style.display = 'none';
         document.getElementById('viewEmployees').style.display = 'none';
-        
+        document.getElementById('viewEnquiries').style.display = 'none';
+
         if (tabId === 'dashboard') {
             document.getElementById('tabDashboard').classList.add('active');
             document.getElementById('viewDashboard').style.display = 'block';
-        } else {
+        } else if (tabId === 'employees') {
             document.getElementById('tabEmployees').classList.add('active');
             document.getElementById('viewEmployees').style.display = 'block';
+        } else if (tabId === 'enquiries') {
+            document.getElementById('tabEnquiries').classList.add('active');
+            document.getElementById('viewEnquiries').style.display = 'block';
+            loadEnquiries();
         }
     }
 
@@ -1447,6 +1512,126 @@
       } catch (e) {
         document.getElementById("perfBody").innerHTML =
           `<tr><td colspan="5" class="empty-state">Could not load performance data.</td></tr>`;
+      }
+    }
+
+    /* ── Enquiries ───────────────────────────────────────────── */
+    let allEnquiries = [];
+
+    async function loadEnquiries() {
+      try {
+        allEnquiries = await api("/enquiries");
+        renderEnquiryTable();
+      } catch (e) {
+        document.getElementById("enquiryBody").innerHTML =
+          `<tr><td colspan="6" class="empty-state"><div class="icon">⚠️</div>Could not load enquiries.<br><small>${e.message}</small></td></tr>`;
+      }
+    }
+
+    function enquiryStatusBadge(s) {
+      const map = {
+        new: "badge-pending",
+        assigned: "badge-in_progress",
+        done: "badge-completed",
+      };
+      return map[s] || "badge-pending";
+    }
+
+    function renderEnquiryTable() {
+      const tbody = document.getElementById("enquiryBody");
+      if (!allEnquiries.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icon">📋</div>No enquiries yet</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = allEnquiries.map(eq => {
+        const date = formatDate(eq.created_at);
+        return `
+        <tr id="eq-row-${eq.id}">
+          <td style="white-space:nowrap">${date}</td>
+          <td>${esc(eq.client_name)}</td>
+          <td>${esc(eq.service_requested || "—")}</td>
+          <td style="max-width:200px; white-space:normal; font-size:.82rem; color:var(--text-dim)">${esc(eq.notes || "—")}</td>
+          <td><span class="badge ${enquiryStatusBadge(eq.status)}">${esc(eq.status)}</span></td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="editEnquiry(${eq.id})" title="Edit">✏️</button>
+              <button class="btn btn-sm btn-ghost" onclick="deleteEnquiry(${eq.id})" title="Delete" style="color:var(--red);">🗑️</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join("");
+    }
+
+    function openEnquiryModal(eq = null) {
+      document.getElementById("enquiryForm").reset();
+      document.getElementById("eqId").value = "";
+
+      if (eq) {
+        document.getElementById("enquiryModalTitle").textContent = "Edit Enquiry";
+        document.getElementById("eqId").value = eq.id;
+        document.getElementById("eqClient").value = eq.client_name || "";
+        document.getElementById("eqService").value = eq.service_requested || "";
+        document.getElementById("eqNotes").value = eq.notes || "";
+        document.getElementById("eqStatus").value = eq.status || "new";
+        document.getElementById("btnEnquirySubmit").textContent = "Update Enquiry";
+      } else {
+        document.getElementById("enquiryModalTitle").textContent = "Add Enquiry";
+        document.getElementById("btnEnquirySubmit").textContent = "Save Enquiry";
+      }
+
+      document.getElementById("modalEnquiry").classList.add("open");
+    }
+
+    function editEnquiry(id) {
+      const eq = allEnquiries.find(e => e.id === id);
+      if (eq) openEnquiryModal(eq);
+    }
+
+    async function handleEnquirySubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btnEnquirySubmit");
+      btn.disabled = true;
+
+      const eqId = document.getElementById("eqId").value;
+      const body = {
+        client_name: document.getElementById("eqClient").value.trim(),
+        service_requested: document.getElementById("eqService").value.trim() || null,
+        notes: document.getElementById("eqNotes").value.trim() || null,
+        status: document.getElementById("eqStatus").value,
+      };
+
+      if (!body.client_name) {
+        toast("Client name is required.", "error");
+        btn.disabled = false;
+        return;
+      }
+
+      try {
+        if (eqId) {
+          await api(`/enquiries/${eqId}`, { method: "PATCH", body: JSON.stringify(body) });
+          toast("Enquiry updated!", "success");
+        } else {
+          await api("/enquiries", { method: "POST", body: JSON.stringify(body) });
+          toast("Enquiry added!", "success");
+        }
+        closeModal("modalEnquiry");
+        await loadEnquiries();
+      } catch (err) {
+        toast("Failed to save enquiry.", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteEnquiry(id) {
+      if (!confirm("Delete this enquiry?")) return;
+      try {
+        await api(`/enquiries/${id}`, { method: "DELETE" });
+        toast("Enquiry deleted.", "success");
+        await loadEnquiries();
+      } catch (e) {
+        toast("Failed to delete enquiry.", "error");
       }
     }
 
