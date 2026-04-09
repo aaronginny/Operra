@@ -5,6 +5,7 @@ Every module should use ``from app.config import settings`` instead of
 calling ``os.getenv()`` directly.
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,8 +24,19 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
     
     # ── Database ──────────────────────────────────────────────
-
+    # Render sets DATABASE_URL as postgresql:// or postgres://
+    # SQLAlchemy asyncpg driver requires postgresql+asyncpg://
     database_url: str = "sqlite+aiosqlite:///./ai_ops_v2.db"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def fix_async_db_url(cls, v: str) -> str:
+        """Rewrite sync postgres:// URLs to the asyncpg driver scheme."""
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     # ── OpenAI ────────────────────────────────────────────────
     openai_api_key: str | None = None
