@@ -26,7 +26,7 @@ class Enquiry(Base):
     service_requested: Mapped[str | None] = mapped_column(String(500), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[EnquiryStatus] = mapped_column(
-        Enum(EnquiryStatus), nullable=False, default=EnquiryStatus.new
+        Enum(EnquiryStatus, native_enum=False), nullable=False, default=EnquiryStatus.new
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

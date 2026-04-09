@@ -34,9 +34,16 @@ logger = logging.getLogger(__name__)
 async def lifespan(application: FastAPI):
     """Create tables on startup, start scheduler, and clean up on shutdown."""
     # --- Startup ---
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created / verified.")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created / verified.")
+    except Exception:
+        logger.exception(
+            "FATAL: create_all failed — tables may be missing. "
+            "Check DATABASE_URL and PostgreSQL permissions."
+        )
+        raise
 
     start_scheduler()
     logger.info("Reminder scheduler started.")

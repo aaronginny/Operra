@@ -48,18 +48,26 @@ async def create_or_update_employee(
 
     # Create new
     normalized_phone = normalize_phone_number(payload.phone_number) if payload.phone_number else None
-    logger.info("Creating employee: %s / %s", payload.name.strip(), normalized_phone)
-    employee = Employee(
-        name=payload.name.strip(),
-        phone_number=normalized_phone,
-        email=payload.email,
-        company_id=current_user.company_id,
-        is_active=payload.is_active,
+    logger.info(
+        "Creating employee: name=%r phone=%r company_id=%s",
+        payload.name.strip(), normalized_phone, current_user.company_id,
     )
-    db.add(employee)
-    await db.flush()
-    await db.refresh(employee)
-    return employee
+    try:
+        employee = Employee(
+            name=payload.name.strip(),
+            phone_number=normalized_phone,
+            email=payload.email,
+            company_id=current_user.company_id,
+            is_active=payload.is_active,
+        )
+        db.add(employee)
+        await db.flush()
+        await db.refresh(employee)
+        logger.info("Employee created OK: id=%s name=%r", employee.id, employee.name)
+        return employee
+    except Exception as exc:
+        logger.exception("Employee creation FAILED for name=%r phone=%r", payload.name, normalized_phone)
+        raise HTTPException(status_code=500, detail=f"Employee creation failed: {exc}") from exc
 
 
 @router.get("", response_model=list[EmployeeResponse])

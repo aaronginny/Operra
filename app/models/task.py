@@ -47,10 +47,10 @@ class Task(Base):
         DateTime(timezone=True), nullable=True
     )
     status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus), nullable=False, default=TaskStatus.pending
+        Enum(TaskStatus, native_enum=False), nullable=False, default=TaskStatus.pending
     )
     source_type: Mapped[SourceType] = mapped_column(
-        Enum(SourceType), nullable=False, default=SourceType.whatsapp
+        Enum(SourceType, native_enum=False), nullable=False, default=SourceType.whatsapp
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

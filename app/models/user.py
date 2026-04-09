@@ -22,7 +22,7 @@ class User(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole), nullable=False, default=UserRole.employee
+        Enum(UserRole, native_enum=False), nullable=False, default=UserRole.employee
     )
     whatsapp_number: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
