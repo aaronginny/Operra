@@ -31,8 +31,8 @@ def format_reminder(employee_name: str, task_title: str, deadline: str | None) -
         f"\n"
         f"Reply with:\n"
         f"  DONE\n"
-        f"  DELAY 30\n"
-        f"  STARTED"
+        f"  STARTED\n"
+        f"  HELP"
     )
 
 
@@ -164,7 +164,7 @@ WELCOME_TEXT = (
     "Reply commands:\n"
     "DONE → mark task complete\n"
     "STARTED → mark task in progress\n"
-    "DELAY 30 → delay task by 30 minutes"
+    "HELP → request assistance"
 )
 
 
@@ -188,7 +188,6 @@ def format_progress_check(employee_name: str, task_title: str, deadline: str) ->
         f"Reply:\n"
         f"STARTED\n"
         f"DONE\n"
-        f"DELAY 30\n"
         f"HELP"
     )
 
@@ -201,7 +200,6 @@ def format_urgent_reminder(task_title: str) -> str:
         f"Please update status:\n"
         f"DONE\n"
         f"STARTED\n"
-        f"DELAY 30\n"
         f"HELP"
     )
 

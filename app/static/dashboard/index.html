@@ -357,6 +357,64 @@
       font-weight: 600;
     }
 
+    .due-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-edit-due {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+      opacity: 0.5;
+      transition: opacity var(--transition), color var(--transition);
+    }
+
+    .btn-edit-due:hover {
+      opacity: 1;
+      color: var(--accent);
+    }
+
+    .due-editor {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .due-editor input[type="datetime-local"] {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 3px 6px;
+      font-size: .78rem;
+    }
+
+    .due-editor .btn-save-due {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 3px 8px;
+      font-size: .78rem;
+      cursor: pointer;
+    }
+
+    .due-editor .btn-cancel-due {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      border-radius: var(--radius-sm);
+      padding: 3px 8px;
+      font-size: .78rem;
+      cursor: pointer;
+    }
+
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -982,7 +1040,14 @@
           <div style="font-size:.7rem; color:var(--text-dim)">Last update: ${lastUp}</div>
         </td>
         <td><span class="badge badge-${t.status}">${statusLabel(t.status)}</span></td>
-        <td class="due-text ${dueClass}">${due}</td>
+        <td class="due-text ${dueClass}" id="due-cell-${t.id}">
+          <div class="due-cell">
+            <span class="due-label">${due}</span>
+            <button class="btn-edit-due" onclick="openDueEditor(${t.id}, '${t.due_at || ''}')" title="Change due date">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
+        </td>
         <td>
           <div style="display:flex; gap: 8px;">
               ${canComplete
@@ -1045,6 +1110,45 @@
         } catch (e) {
           toast("Failed to delete task.", "error");
         }
+    }
+
+    /* ── Change due date ─────────────────────────────────────── */
+    function openDueEditor(taskId, currentDueIso) {
+      const cell = document.getElementById(`due-cell-${taskId}`);
+      if (!cell) return;
+
+      // Format current date for the datetime-local input (YYYY-MM-DDTHH:MM)
+      let defaultValue = "";
+      if (currentDueIso) {
+        const d = new Date(currentDueIso);
+        const pad = n => String(n).padStart(2, "0");
+        defaultValue = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+
+      cell.innerHTML = `
+        <div class="due-editor">
+          <input type="datetime-local" id="due-input-${taskId}" value="${defaultValue}" />
+          <button class="btn-save-due" onclick="saveDueDate(${taskId})">Save</button>
+          <button class="btn-cancel-due" onclick="renderTable()">✕</button>
+        </div>`;
+    }
+
+    async function saveDueDate(taskId) {
+      const input = document.getElementById(`due-input-${taskId}`);
+      if (!input || !input.value) {
+        toast("Please pick a date and time.", "error");
+        return;
+      }
+      try {
+        await api(`/tasks/${taskId}/due-date`, {
+          method: "PATCH",
+          body: JSON.stringify({ due_at: new Date(input.value).toISOString() }),
+        });
+        toast("Due date updated — employee notified.", "success");
+        await loadTasks();
+      } catch (e) {
+        toast("Failed to update due date.", "error");
+      }
     }
 
     /* ── Create task ─────────────────────────────────────────── */

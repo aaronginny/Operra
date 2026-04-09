@@ -1,8 +1,10 @@
 ﻿"""Task CRUD routes."""
 
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -44,7 +46,6 @@ async def create_task_endpoint(
                 f"Due: {due_str}\n\n"
                 f"Reply with:\n"
                 f"DONE - mark complete\n"
-                f"DELAY 30 - delay by minutes\n"
                 f"HELP - request assistance\n"
                 f"UPDATE <text> - send progress"
             )
@@ -104,10 +105,50 @@ async def update_task_endpoint(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Partially update a task (e.g. mark as completed)."""
-    # Verify ownership
     task = await get_task(db, task_id)
     if task is None or task.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Task not found")
-        
+
     updated_task = await update_task(db, task_id, payload)
     return updated_task
+
+
+class DueDateUpdate(BaseModel):
+    due_at: datetime
+
+
+@router.patch("/{task_id}/due-date", response_model=TaskResponse)
+async def update_due_date(
+    task_id: int,
+    payload: DueDateUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Update a task's due date and notify the assigned employee via WhatsApp."""
+    task = await get_task(db, task_id)
+    if task is None or task.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task.due_at = payload.due_at
+    await db.flush()
+    await db.refresh(task)
+
+    # Notify the employee if they have a phone number
+    if task.assigned_employee_id:
+        employee = await db.get(Employee, task.assigned_employee_id)
+        if employee and employee.phone_number:
+            due_str = payload.due_at.strftime("%b %d, %Y %I:%M %p").lstrip("0")
+            msg = (
+                f"Foreman AI - Task Update\n\n"
+                f"Task: {task.title}\n"
+                f"Your deadline has been updated.\n"
+                f"New due date: {due_str}\n\n"
+                f"Please plan accordingly."
+            )
+            sent = await send_whatsapp_message(employee.phone_number, msg)
+            if sent:
+                logger.info("Due-date update notification sent to %s", employee.phone_number)
+            else:
+                logger.warning("Due-date notification FAILED for employee id=%s", task.assigned_employee_id)
+
+    return task

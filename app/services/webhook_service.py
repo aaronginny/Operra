@@ -6,7 +6,7 @@ call into this service so business logic is never duplicated.
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,9 +25,6 @@ from app.services.employee_service import (
 from app.services.messaging_service import send_welcome_message, send_whatsapp_message
 
 logger = logging.getLogger(__name__)
-
-# Regex to detect DELAY <minutes> command
-_DELAY_PATTERN = re.compile(r"^DELAY\s+(\d+)$", re.IGNORECASE)
 
 # Regex to detect ADD <name> <phone_number> command
 _ADD_EMPLOYEE_PATTERN = re.compile(
@@ -123,7 +120,7 @@ async def handle_add_employee(
 async def handle_reply(
     db: AsyncSession, sender: str, command: str
 ) -> dict | None:
-    """Check if the message is a reply command (DONE / STARTED / DELAY N / HELP).
+    """Check if the message is a reply command (DONE / STARTED / HELP).
 
     Returns a response dict if handled, None otherwise.
     """
@@ -132,27 +129,12 @@ async def handle_reply(
     # Determine action
     if text == "DONE":
         new_status = TaskStatus.completed
-        delay_minutes = 0
     elif text == "STARTED":
         new_status = TaskStatus.in_progress
-        delay_minutes = 0
     elif text == "HELP":
         new_status = TaskStatus.needs_help
-        delay_minutes = 0
-    elif text == "DELAY":
-        # Bare DELAY without a number — send usage instructions
-        await send_whatsapp_message(
-            sender,
-            "Usage: DELAY <minutes>\n\nExample: DELAY 30\n\nThis will extend your task deadline by 30 minutes.",
-        )
-        return {"status": "usage_hint", "detail": "DELAY requires a number of minutes."}
     else:
-        match = _DELAY_PATTERN.match(command.strip())
-        if match:
-            new_status = TaskStatus.delayed
-            delay_minutes = int(match.group(1))
-        else:
-            return None  # Not a command
+        return None  # Not a command
 
     # Look up employee by phone number
     employee = await get_employee_by_phone(db, sender)
@@ -191,10 +173,6 @@ async def handle_reply(
         task.completed_at = datetime.now()
     elif new_status == TaskStatus.in_progress:
         task.started_at = datetime.now()
-    elif new_status == TaskStatus.delayed:
-        task.delayed_count = (task.delayed_count or 0) + 1
-        if delay_minutes > 0 and task.due_at:
-            task.due_at = task.due_at + timedelta(minutes=delay_minutes)
     elif new_status == TaskStatus.needs_help:
         task.help_requested = True
 
@@ -202,21 +180,7 @@ async def handle_reply(
 
     # Log the action and send confirmations
     status_label = new_status.value
-    if new_status == TaskStatus.delayed:
-        logger.info(
-            'Employee %s delayed task "%s" by %d minutes.',
-            employee.name, task.title, delay_minutes,
-        )
-        new_deadline_str = (
-            task.due_at.strftime("%I:%M %p").lstrip("0") if task.due_at else "No deadline"
-        )
-        delay_confirm = (
-            f"⏳ Task delayed.\n\n"
-            f"Task: {task.title}\n"
-            f"New deadline: {new_deadline_str}"
-        )
-        await send_whatsapp_message(sender, delay_confirm)
-    elif new_status == TaskStatus.completed:
+    if new_status == TaskStatus.completed:
         logger.info(
             'Employee %s marked task "%s" as completed.',
             employee.name, task.title,
@@ -490,7 +454,6 @@ async def process_incoming_message(
             f"Due: {due_str}\n\n"
             f"Reply with:\n"
             f"DONE - mark complete\n"
-            f"DELAY 30 - delay by minutes\n"
             f"HELP - request assistance\n"
             f"UPDATE <text> - send progress"
         )
