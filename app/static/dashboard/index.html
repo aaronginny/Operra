@@ -857,13 +857,14 @@
               <th>Date</th>
               <th>Client</th>
               <th>Service</th>
+              <th>Assigned To</th>
+              <th>Stage</th>
               <th>Notes</th>
-              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="enquiryBody">
-            <tr><td colspan="6" class="empty-state"><div class="spinner"></div></td></tr>
+            <tr><td colspan="7" class="empty-state"><div class="spinner"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -989,6 +990,12 @@
         <div class="form-group">
           <label for="eqNotes">Notes</label>
           <textarea class="form-input" id="eqNotes" rows="3" placeholder="Any extra details..." style="resize: vertical;"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="eqEmployee">Assign Employee</label>
+          <select class="form-input" id="eqEmployee">
+            <option value="">— None —</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="eqStatus">Status</label>
@@ -1543,41 +1550,90 @@
     /* ── Enquiries ───────────────────────────────────────────── */
     let allEnquiries = [];
 
+    const STAGE_LABELS = {
+      follow_up: "Follow Up",
+      send_options: "Send Options",
+      close_deal: "Close Deal",
+      payment_received: "Payment Received",
+      done: "Done",
+    };
+
+    const STAGE_COLORS = {
+      follow_up: "var(--blue)",
+      send_options: "var(--yellow)",
+      close_deal: "var(--orange)",
+      payment_received: "var(--green)",
+      done: "var(--text-dim)",
+    };
+
+    const STAGE_BG = {
+      follow_up: "var(--blue-bg)",
+      send_options: "var(--yellow-bg)",
+      close_deal: "var(--orange-bg)",
+      payment_received: "var(--green-bg)",
+      done: "rgba(139,143,163,.12)",
+    };
+
+    const STAGE_ORDER = ["follow_up", "send_options", "close_deal", "payment_received", "done"];
+
+    function nextStageLabel(currentStage) {
+      if (!currentStage) return STAGE_LABELS.follow_up;
+      const idx = STAGE_ORDER.indexOf(currentStage);
+      if (idx < 0 || idx >= STAGE_ORDER.length - 1) return null;
+      return STAGE_LABELS[STAGE_ORDER[idx + 1]];
+    }
+
     async function loadEnquiries() {
       try {
         allEnquiries = await api("/enquiries");
         renderEnquiryTable();
       } catch (e) {
         document.getElementById("enquiryBody").innerHTML =
-          `<tr><td colspan="6" class="empty-state"><div class="icon">⚠️</div>Could not load enquiries.<br><small>${e.message}</small></td></tr>`;
+          `<tr><td colspan="7" class="empty-state"><div class="icon">⚠️</div>Could not load enquiries.<br><small>${e.message}</small></td></tr>`;
       }
-    }
-
-    function enquiryStatusBadge(s) {
-      const map = {
-        new: "badge-pending",
-        assigned: "badge-in_progress",
-        done: "badge-completed",
-      };
-      return map[s] || "badge-pending";
     }
 
     function renderEnquiryTable() {
       const tbody = document.getElementById("enquiryBody");
       if (!allEnquiries.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icon">📋</div>No enquiries yet</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icon">📋</div>No enquiries yet</td></tr>`;
         return;
       }
 
       tbody.innerHTML = allEnquiries.map(eq => {
         const date = formatDate(eq.created_at);
+        const stage = eq.stage;
+        const stageLabel = stage ? STAGE_LABELS[stage] || stage : "Not started";
+        const stageColor = stage ? (STAGE_COLORS[stage] || "var(--text-dim)") : "var(--text-dim)";
+        const stageBg = stage ? (STAGE_BG[stage] || "transparent") : "transparent";
+        const nextLabel = nextStageLabel(stage);
+        const empName = eq.assigned_employee_name || "";
+
+        // Build employee assignment dropdown
+        const empOptions = allEmployees.map(e =>
+          `<option value="${e.id}" ${e.id === eq.assigned_employee_id ? "selected" : ""}>${esc(e.name)}</option>`
+        ).join("");
+
         return `
         <tr id="eq-row-${eq.id}">
-          <td style="white-space:nowrap">${date}</td>
-          <td>${esc(eq.client_name)}</td>
+          <td style="white-space:nowrap; font-size:.82rem">${date}</td>
+          <td style="font-weight:600">${esc(eq.client_name)}</td>
           <td>${esc(eq.service_requested || "—")}</td>
-          <td style="max-width:200px; white-space:normal; font-size:.82rem; color:var(--text-dim)">${esc(eq.notes || "—")}</td>
-          <td><span class="badge ${enquiryStatusBadge(eq.status)}">${esc(eq.status)}</span></td>
+          <td>
+            <select class="form-input" style="padding:4px 8px; font-size:.78rem; min-width:120px;" onchange="assignEnquiryEmployee(${eq.id}, this.value)">
+              <option value="">— Assign —</option>
+              ${empOptions}
+            </select>
+          </td>
+          <td>
+            <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
+              <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:.75rem; font-weight:600; background:${stageBg}; color:${stageColor};">${stageLabel}</span>
+              ${nextLabel && stage !== "done"
+                ? `<button class="btn btn-sm btn-primary" style="padding:3px 10px; font-size:.72rem;" onclick="advanceStage(${eq.id})" ${!eq.assigned_employee_id ? 'disabled title="Assign an employee first"' : ''}>${nextLabel} &rarr;</button>`
+                : ""}
+            </div>
+          </td>
+          <td style="max-width:160px; white-space:normal; font-size:.8rem; color:var(--text-dim)">${esc(eq.notes || "—")}</td>
           <td>
             <div style="display:flex; gap:6px;">
               <button class="btn btn-sm btn-ghost" onclick="editEnquiry(${eq.id})" title="Edit">✏️</button>
@@ -1588,9 +1644,42 @@
       }).join("");
     }
 
+    async function assignEnquiryEmployee(eqId, empId) {
+      if (!empId) return;
+      try {
+        await api(`/enquiries/${eqId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ assigned_employee_id: parseInt(empId) }),
+        });
+        toast("Employee assigned to enquiry.", "success");
+        await loadEnquiries();
+      } catch (e) {
+        toast("Failed to assign employee: " + e.message, "error");
+      }
+    }
+
+    async function advanceStage(eqId) {
+      const eq = allEnquiries.find(e => e.id === eqId);
+      const next = nextStageLabel(eq?.stage);
+      if (!confirm(`Advance to "${next}" and notify employee via WhatsApp?`)) return;
+      try {
+        const res = await api(`/enquiries/${eqId}/advance-stage`, { method: "POST" });
+        const sentMsg = res.whatsapp_sent ? " — WhatsApp sent!" : " (no WhatsApp sent)";
+        toast(`Stage advanced to ${STAGE_LABELS[res.stage] || res.stage}${sentMsg}`, "success");
+        await loadEnquiries();
+      } catch (e) {
+        toast("Failed to advance stage: " + e.message, "error");
+      }
+    }
+
     function openEnquiryModal(eq = null) {
       document.getElementById("enquiryForm").reset();
       document.getElementById("eqId").value = "";
+
+      // Populate employee dropdown
+      const empSel = document.getElementById("eqEmployee");
+      empSel.innerHTML = '<option value="">— None —</option>' +
+        allEmployees.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
 
       if (eq) {
         document.getElementById("enquiryModalTitle").textContent = "Edit Enquiry";
@@ -1599,6 +1688,7 @@
         document.getElementById("eqService").value = eq.service_requested || "";
         document.getElementById("eqNotes").value = eq.notes || "";
         document.getElementById("eqStatus").value = eq.status || "new";
+        empSel.value = eq.assigned_employee_id || "";
         document.getElementById("btnEnquirySubmit").textContent = "Update Enquiry";
       } else {
         document.getElementById("enquiryModalTitle").textContent = "Add Enquiry";
@@ -1619,12 +1709,14 @@
       btn.disabled = true;
 
       const eqId = document.getElementById("eqId").value;
+      const empVal = document.getElementById("eqEmployee").value;
       const body = {
         client_name: document.getElementById("eqClient").value.trim(),
         service_requested: document.getElementById("eqService").value.trim() || null,
         notes: document.getElementById("eqNotes").value.trim() || null,
         status: document.getElementById("eqStatus").value,
       };
+      if (empVal) body.assigned_employee_id = parseInt(empVal);
 
       if (!body.client_name) {
         toast("Client name is required.", "error");
@@ -1643,7 +1735,7 @@
         closeModal("modalEnquiry");
         await loadEnquiries();
       } catch (err) {
-        toast("Failed to save enquiry.", "error");
+        toast("Failed to save enquiry: " + err.message, "error");
       } finally {
         btn.disabled = false;
       }
