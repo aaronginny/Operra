@@ -900,8 +900,9 @@
   <!-- Unified Create Task Modal -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
-      <h2>Add Task</h2>
+      <h2 id="taskModalTitle">Add Task</h2>
       <form id="createForm" onsubmit="handleCreate(event)">
+        <input type="hidden" id="fSourceEnquiryId" />
         
         <!-- Employee Selection (Step 1) -->
         <div id="stepSelectEmployee">
@@ -1282,9 +1283,22 @@
 
       try {
         await api("/tasks", { method: "POST", body: JSON.stringify(body) });
+
+        // If this was converted from an enquiry, mark it as assigned
+        const sourceEqId = document.getElementById("fSourceEnquiryId").value;
+        if (sourceEqId) {
+          try {
+            await api(`/enquiries/${sourceEqId}`, {
+              method: "PATCH",
+              body: JSON.stringify({ status: "assigned" }),
+            });
+          } catch (_) { /* non-fatal */ }
+        }
+
         toast("Task created and assigned!", "success");
         closeModal('modalOverlay');
         await loadTasks();
+        if (sourceEqId) await loadEnquiries();
       } catch (e) {
         toast("Failed to create task", "error");
       } finally {
@@ -1468,12 +1482,36 @@
     }
 
     /* ── Modal ───────────────────────────────────────────────── */
-    function openModal() { 
+    function openModal() {
       document.getElementById("createForm").reset();
+      document.getElementById("fSourceEnquiryId").value = "";
+      document.getElementById("taskModalTitle").textContent = "Add Task";
       toggleAddEmployeeForm(); // ensure closed
       document.getElementById("addEmployeeForm").style.display = "none";
       resetToEmployeeSelection();
-      document.getElementById("modalOverlay").classList.add("open"); 
+      document.getElementById("modalOverlay").classList.add("open");
+    }
+
+    function convertToTask(eqId) {
+      const eq = allEnquiries.find(e => e.id === eqId);
+      if (!eq) return;
+
+      // Open the modal fresh first
+      openModal();
+
+      // Pre-fill title and description, then jump straight to task fields
+      const title = [eq.client_name, eq.service_requested].filter(Boolean).join(" — ");
+      document.getElementById("fTitle").value = title;
+      document.getElementById("fDesc").value = eq.notes || "";
+
+      // Store source enquiry so we can mark it assigned after save
+      document.getElementById("fSourceEnquiryId").value = eqId;
+      document.getElementById("taskModalTitle").textContent = "Convert Enquiry to Task";
+
+      // Skip the employee-selection step only if an employee is already assigned
+      if (eq.assigned_employee_id && eq.assigned_employee_name) {
+        selectEmployeeForTask(eq.assigned_employee_id, eq.assigned_employee_name);
+      }
     }
     
     function openAddEmployeeModal() {
@@ -1635,7 +1673,8 @@
           </td>
           <td style="max-width:160px; white-space:normal; font-size:.8rem; color:var(--text-dim)">${esc(eq.notes || "—")}</td>
           <td>
-            <div style="display:flex; gap:6px;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-sm btn-ghost" onclick="convertToTask(${eq.id})" title="Convert to Task" style="color:var(--accent); border-color:rgba(108,92,231,.3);">→ Task</button>
               <button class="btn btn-sm btn-ghost" onclick="editEnquiry(${eq.id})" title="Edit">✏️</button>
               <button class="btn btn-sm btn-ghost" onclick="deleteEnquiry(${eq.id})" title="Delete" style="color:var(--red);">🗑️</button>
             </div>
