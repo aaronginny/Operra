@@ -709,7 +709,10 @@
         <h1>Foreman AI</h1>
         <p class="subtitle">Smart Task Management for Teams</p>
       </div>
-      <button class="btn btn-primary" id="btnNewTask" onclick="openModal()">+ Add Task</button>
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-primary" id="btnNewTask" onclick="openModal()">+ Add Task</button>
+        <button class="btn btn-ghost" id="btnLogout" onclick="logout()" title="Sign out">🚪 Logout</button>
+      </div>
     </header>
 
     <!-- Navigation Tabs -->
@@ -1500,6 +1503,15 @@
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
       }
     });
+
+    /* ── Logout ──────────────────────────────────────────────── */
+    function logout() {
+      if (confirm("Are you sure you want to sign out?")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("company_id");
+        window.location.replace("/static/login.html");
+      }
+    }
 
     /* ── Init ────────────────────────────────────────────────── */
     loadTasks();
