@@ -13,7 +13,7 @@ from app.schemas.employee_schema import EmployeeCreate, EmployeeResponse
 from app.schemas.task_schema import TaskResponse
 from app.dependencies import get_current_user
 from app.schemas.auth_schema import CurrentUser
-from app.services.employee_service import normalize_phone_number
+from app.services.employee_service import normalize_phone_number, _is_phone_name, get_employee_by_phone
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +44,33 @@ async def create_or_update_employee(
         employee.is_active = payload.is_active
         await db.flush()
         await db.refresh(employee)
+        logger.info("Employee updated: id=%s name=%r", employee.id, employee.name)
         return employee
 
-    # Create new
+    # Not found by name — check by phone to avoid duplicates
+    # (e.g. WhatsApp auto-registered "Employee_6161" with phone +919150016161)
     normalized_phone = normalize_phone_number(payload.phone_number) if payload.phone_number else None
+    if normalized_phone:
+        employee = await get_employee_by_phone(db, normalized_phone)
+        if employee:
+            # Found by phone — if it has a placeholder name, upgrade it to the real name
+            if _is_phone_name(employee.name) or employee.name.startswith("Employee_"):
+                old_name = employee.name
+                employee.name = payload.name.strip()
+                if payload.email is not None:
+                    employee.email = payload.email
+                employee.is_active = payload.is_active
+                await db.flush()
+                await db.refresh(employee)
+                logger.info("Employee name upgraded: id=%s %r → %r", employee.id, old_name, employee.name)
+                return employee
+
+    # Create new (phone normalization already done above in the phone-lookup check)
+    if not normalized_phone:
+        normalized_phone = normalize_phone_number(payload.phone_number) if payload.phone_number else None
+
     logger.info(
-        "Creating employee: name=%r phone=%r company_id=%s",
+        "Creating new employee: name=%r phone=%r company_id=%s",
         payload.name.strip(), normalized_phone, current_user.company_id,
     )
     try:
@@ -63,7 +84,7 @@ async def create_or_update_employee(
         db.add(employee)
         await db.flush()
         await db.refresh(employee)
-        logger.info("Employee created OK: id=%s name=%r", employee.id, employee.name)
+        logger.info("Employee created: id=%s name=%r phone=%r", employee.id, employee.name, normalized_phone)
         return employee
     except Exception as exc:
         logger.exception("Employee creation FAILED for name=%r phone=%r", payload.name, normalized_phone)
