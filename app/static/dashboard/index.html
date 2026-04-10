@@ -1101,7 +1101,16 @@
           <div class="task-title">${esc(t.title)}</div>
           ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
         </td>
-        <td><span class="employee-link" onclick="openEmployeeProfileByName('${esc(t.assigned_to)}')">${esc(t.assigned_to || "—")}</span></td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="employee-link" onclick="openEmployeeProfileByName('${esc(t.assigned_to)}')">${esc(t.assigned_to || "—")}</span>
+            ${t.notification_sent === true
+              ? `<span title="WhatsApp message sent" style="color: var(--green); font-size: .9rem;">✓</span>`
+              : t.notification_sent === false
+              ? `<span title="WhatsApp message failed to send" style="color: var(--red); font-size: .9rem;">✕</span>`
+              : ''}
+          </div>
+        </td>
         <td>
           <div style="font-weight:600; font-size:.85rem; color:var(--text)">${pct}%</div>
           ${t.last_update_summary
