@@ -21,6 +21,7 @@ from app.routes import employee_routes as employee_router
 from app.routes import dashboard_api as dashboard_api_router
 from app.routes import auth_routes as auth_router
 from app.routes import enquiries as enquiries_router
+from app.migrations import run_migrations
 from app.services.reminder_service import start_scheduler, stop_scheduler
 
 # Import models so Base.metadata knows about every table
@@ -44,6 +45,8 @@ async def lifespan(application: FastAPI):
             "Check DATABASE_URL and PostgreSQL permissions."
         )
         raise
+
+    await run_migrations(engine)
 
     start_scheduler()
     logger.info("Reminder scheduler started.")
