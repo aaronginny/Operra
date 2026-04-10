@@ -47,7 +47,7 @@ async def extract_task_from_message(
 
 
 async def _openai_extract(text: str) -> dict:
-    """Real OpenAI chat-completion call."""
+    """Real OpenAI chat-completion call — falls back to rule-based on any failure."""
     headers = {
         "Authorization": f"Bearer {settings.openai_api_key}",
         "Content-Type": "application/json",
@@ -61,20 +61,29 @@ async def _openai_extract(text: str) -> dict:
         "temperature": 0.0,
     }
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
-
-    content = response.json()["choices"][0]["message"]["content"]
     try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        logger.error("LLM returned non-JSON: %s", content)
-        return {"title": None, "description": None, "owner": None, "due_date": None}
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            if not response.is_success:
+                logger.error(
+                    "OpenAI task extraction HTTP %s — body: %s",
+                    response.status_code,
+                    response.text[:300],
+                )
+                return _rule_based_extract(text)
+            content = response.json()["choices"][0]["message"]["content"]
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                logger.error("OpenAI returned non-JSON: %s", content[:200])
+                return _rule_based_extract(text)
+    except Exception as exc:
+        logger.error("OpenAI task extraction failed (%s) — falling back to rule-based", exc)
+        return _rule_based_extract(text)
 
 
 # ---------------------------------------------------------------------------
@@ -553,15 +562,19 @@ async def _openai_progress(text: str, task_title: str) -> dict:
                 },
                 json=payload,
             )
-            response.raise_for_status()
-
-        result = json.loads(response.json()["choices"][0]["message"]["content"])
-        # Ensure all expected keys exist
+            if not response.is_success:
+                logger.error(
+                    "OpenAI progress analysis HTTP %s — body: %s",
+                    response.status_code,
+                    response.text[:300],
+                )
+                return _rule_based_progress(text)
+            result = json.loads(response.json()["choices"][0]["message"]["content"])
         return {
             "type": result.get("type", "no_progress"),
             "progress_percent": result.get("progress_percent"),
             "summary": result.get("summary"),
         }
-    except Exception:
-        logger.exception("OpenAI progress analysis failed — falling back to rule-based")
+    except Exception as exc:
+        logger.error("OpenAI progress analysis failed (%s) — falling back to rule-based", exc)
         return _rule_based_progress(text)

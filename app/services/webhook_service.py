@@ -367,6 +367,14 @@ async def process_incoming_message(
         
         if active_task:
             analysis = await analyze_progress_update(text, active_task.title)
+            # If message starts with "UPDATE", always treat it as a progress update
+            # even if AI couldn't classify it (e.g. "UPDATE i kinda did it...")
+            if analysis.get("type") == "no_progress" and text.strip().upper().startswith("UPDATE"):
+                analysis = {
+                    "type": "progress_update",
+                    "progress_percent": analysis.get("progress_percent"),
+                    "summary": text.strip()[6:].strip()[:120] or "Employee update",
+                }
             if analysis.get("type") in ["progress_update", "task_completion"]:
                 is_completion = analysis.get("type") == "task_completion"
                 pct = 100 if is_completion else analysis.get("progress_percent")
