@@ -7,6 +7,12 @@ basic    — ₹2,000 per project; unlimited tasks per paid project,
            checkpoints + God Mode + morning pulse enabled
 premium  — ₹5,000 / month; unlimited everything, all features
 
+Payment
+-------
+Payment handled manually via UPI — aaronginny@okhdfcbank
+Aaron activates plans after verifying the WhatsApp screenshot
+(9150016161).  No automated payment gateway is used.
+
 Bypass
 ------
 Any user with role='ceo' (or role='founder') is NEVER blocked — they are
@@ -27,9 +33,7 @@ logger = logging.getLogger(__name__)
 
 # ── Tier constants ────────────────────────────────────────────────────────────
 
-FREE_TASK_LIMIT = 3          # max tasks for free tier
-BASIC_PRICE_PAISE = 200_000  # ₹2,000 in paise
-PREMIUM_PRICE_PAISE = 500_000  # ₹5,000 in paise
+FREE_TASK_LIMIT = 3  # max tasks for free tier
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

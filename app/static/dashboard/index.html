@@ -13,7 +13,6 @@
   <meta name="description" content="Task management dashboard for Foreman AI, Smart Task Management for Teams" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     /* ── Reset & Tokens ─────────────────────────────────────── */
     *,
@@ -1184,70 +1183,93 @@
     </div>
   </div>
 
-  <!-- Upgrade Modal -->
+  <!-- Upgrade Modal — UPI Manual Payment -->
   <div class="modal-overlay" id="modalUpgrade">
-    <div class="modal" style="max-width:560px;">
-      <div style="text-align:center; margin-bottom:20px;">
+    <div class="modal" style="max-width:600px;">
+
+      <!-- Header -->
+      <div style="text-align:center; margin-bottom:22px;">
         <div style="font-size:2rem; margin-bottom:8px;">🚀</div>
         <h2 style="background:linear-gradient(135deg,var(--accent),var(--blue)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:6px;">Upgrade Foreman AI</h2>
-        <p style="font-size:.87rem; color:var(--text-dim);">Choose the plan that fits your team.</p>
+        <p style="font-size:.85rem; color:var(--text-dim);">Pay via UPI &nbsp;·&nbsp; Activated within 1 hour</p>
       </div>
 
       <!-- Pricing cards -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;">
 
         <!-- Basic card -->
-        <div id="cardBasic" style="background:var(--surface-2); border:2px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .2s;" onclick="_selectPlan('basic')">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div>
-              <div style="font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--yellow); margin-bottom:4px;">BASIC</div>
-              <div style="font-size:1.6rem; font-weight:700; color:var(--text);">₹2,000</div>
-              <div style="font-size:.75rem; color:var(--text-dim);">per project · one-time</div>
-            </div>
-            <span id="radioBasic" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--border); flex-shrink:0; margin-top:4px;"></span>
+        <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <div style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--yellow); margin-bottom:5px;">Basic Plan</div>
+            <div style="font-size:1.7rem; font-weight:700; color:var(--text); line-height:1;">₹2,000</div>
+            <div style="font-size:.75rem; color:var(--text-dim); margin-top:3px;">per project &nbsp;·&nbsp; one-time</div>
           </div>
-          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:5px; color:var(--text-dim);">
+          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:6px; color:var(--text-dim); margin:0; padding:0;">
             <li>✅ Unlimited tasks for this project</li>
             <li>✅ Smart Checkpoints AI</li>
-            <li>✅ WhatsApp God Mode</li>
-            <li>✅ Morning pulse reminders</li>
+            <li>✅ WhatsApp CEO God Mode</li>
+            <li>✅ AI morning pulse reminders</li>
           </ul>
-          <!-- Project name input (shown when basic selected) -->
-          <div id="basicProjectInput" style="display:none; margin-top:4px;">
-            <input id="basicProjectName" type="text" placeholder="Project name (e.g. House Renovation)"
-              style="width:100%; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:.83rem; box-sizing:border-box;"
-              onclick="event.stopPropagation()" />
+          <!-- UPI instruction -->
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:.76rem; color:var(--text-dim); font-weight:600;">Pay ₹2,000 to UPI ID:</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <code style="font-size:.83rem; color:var(--accent); background:var(--surface-2); padding:4px 8px; border-radius:4px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">aaronginny@okhdfcbank</code>
+              <button id="copyBtnBasic" onclick="copyUPI('basic')"
+                style="font-size:.75rem; padding:4px 10px; border-radius:4px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer; white-space:nowrap; flex-shrink:0;">
+                Copy
+              </button>
+            </div>
+            <div style="font-size:.77rem; color:var(--text-dim); line-height:1.5; border-top:1px solid var(--border); padding-top:8px;">
+              After paying, WhatsApp Aaron on
+              <strong style="color:var(--text);">9150016161</strong>
+              with your payment screenshot and project name.
+              Activated within 1 hour.
+            </div>
           </div>
         </div>
 
-        <!-- Premium card -->
-        <div id="cardPremium" style="background:var(--surface-2); border:2px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .2s;" onclick="_selectPlan('premium')">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div>
-              <div style="font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--green); margin-bottom:4px;">PREMIUM</div>
-              <div style="font-size:1.6rem; font-weight:700; color:var(--text);">₹5,000</div>
-              <div style="font-size:.75rem; color:var(--text-dim);">per month · all features</div>
-            </div>
-            <span id="radioPremium" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--border); flex-shrink:0; margin-top:4px;"></span>
+        <!-- Premium card — highlighted with Most Popular badge -->
+        <div style="background:var(--surface-2); border:2px solid var(--accent); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:12px; position:relative;">
+          <!-- Most Popular badge -->
+          <div style="position:absolute; top:-11px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,var(--accent),var(--blue)); color:#fff; font-size:.68rem; font-weight:700; padding:3px 12px; border-radius:20px; white-space:nowrap; letter-spacing:.4px;">
+            MOST POPULAR
           </div>
-          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:5px; color:var(--text-dim);">
-            <li>✅ Unlimited projects &amp; tasks</li>
-            <li>✅ All Basic features</li>
+          <div>
+            <div style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--green); margin-bottom:5px;">Premium</div>
+            <div style="font-size:1.7rem; font-weight:700; color:var(--text); line-height:1;">₹5,000</div>
+            <div style="font-size:.75rem; color:var(--text-dim); margin-top:3px;">per month &nbsp;·&nbsp; all features</div>
+          </div>
+          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:6px; color:var(--text-dim); margin:0; padding:0;">
+            <li>✅ Everything in Basic</li>
+            <li>✅ Unlimited projects</li>
             <li>✅ Priority support</li>
-            <li>✅ 30-day subscription</li>
+            <li>✅ White-glove onboarding</li>
           </ul>
+          <!-- UPI instruction -->
+          <div style="background:var(--surface); border:1px solid rgba(108,92,231,.35); border-radius:var(--radius-sm); padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:.76rem; color:var(--text-dim); font-weight:600;">Pay ₹5,000 to UPI ID:</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <code style="font-size:.83rem; color:var(--accent); background:var(--surface-2); padding:4px 8px; border-radius:4px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">aaronginny@okhdfcbank</code>
+              <button id="copyBtnPremium" onclick="copyUPI('premium')"
+                style="font-size:.75rem; padding:4px 10px; border-radius:4px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer; white-space:nowrap; flex-shrink:0;">
+                Copy
+              </button>
+            </div>
+            <div style="font-size:.77rem; color:var(--text-dim); line-height:1.5; border-top:1px solid var(--border); padding-top:8px;">
+              After paying, WhatsApp Aaron on
+              <strong style="color:var(--text);">9150016161</strong>
+              with your screenshot. Mention <strong style="color:var(--accent);">PREMIUM</strong>.
+              Activated within 1 hour.
+            </div>
+          </div>
         </div>
 
       </div>
 
-      <!-- Pay button + error -->
-      <div id="upgradeError" style="display:none; font-size:.82rem; color:var(--red); margin-bottom:10px; text-align:center;"></div>
-      <div class="modal-actions" style="justify-content:space-between;">
+      <!-- Footer -->
+      <div class="modal-actions" style="justify-content:center;">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modalUpgrade')">Maybe Later</button>
-        <button type="button" class="btn btn-primary" id="btnPay" onclick="startPayment()"
-          style="background:linear-gradient(135deg,#6c5ce7,#74b9ff); min-width:140px;" disabled>
-          Select a plan
-        </button>
       </div>
     </div>
   </div>
@@ -1350,120 +1372,28 @@
     }
 
     function openUpgradeModal() {
-      // Reset modal state
-      _selectPlan(null);
       document.getElementById("modalUpgrade").classList.add("open");
     }
 
-    /* ── Plan selection helpers ──────────────────────────────── */
-    let _selectedPlan = null;
-
-    function _selectPlan(plan) {
-      _selectedPlan = plan;
-      const cardBasic   = document.getElementById("cardBasic");
-      const cardPremium = document.getElementById("cardPremium");
-      const radioBasic  = document.getElementById("radioBasic");
-      const radioPremium = document.getElementById("radioPremium");
-      const basicInput  = document.getElementById("basicProjectInput");
-      const btnPay      = document.getElementById("btnPay");
-      const upgradeErr  = document.getElementById("upgradeError");
-      if (upgradeErr) upgradeErr.style.display = "none";
-
-      const accentBorder = "2px solid var(--accent)";
-      const defaultBorder = "2px solid var(--border)";
-      const radioOn = "background:var(--accent); border-color:var(--accent);";
-      const radioOff = "";
-
-      if (cardBasic)   cardBasic.style.border   = plan === "basic"   ? accentBorder : defaultBorder;
-      if (cardPremium) cardPremium.style.border  = plan === "premium" ? accentBorder : defaultBorder;
-      if (radioBasic)  radioBasic.style.cssText  = plan === "basic"   ? radioOn : radioOff;
-      if (radioPremium) radioPremium.style.cssText = plan === "premium" ? radioOn : radioOff;
-      if (basicInput)  basicInput.style.display  = plan === "basic"   ? "block" : "none";
-
-      if (btnPay) {
-        if (!plan) {
-          btnPay.textContent = "Select a plan";
-          btnPay.disabled = true;
-        } else if (plan === "basic") {
-          btnPay.textContent = "Pay ₹2,000";
-          btnPay.disabled = false;
-        } else {
-          btnPay.textContent = "Pay ₹5,000 / month";
-          btnPay.disabled = false;
-        }
-      }
-    }
-
-    /* ── Razorpay checkout ───────────────────────────────────── */
-    async function startPayment() {
-      const tier = _selectedPlan;
-      if (!tier) return;
-
-      const projectName = tier === "basic"
-        ? (document.getElementById("basicProjectName")?.value || "").trim()
-        : null;
-
-      if (tier === "basic" && !projectName) {
-        const err = document.getElementById("upgradeError");
-        if (err) { err.textContent = "Please enter a project name."; err.style.display = "block"; }
-        document.getElementById("basicProjectName")?.focus();
-        return;
-      }
-
-      const btnPay = document.getElementById("btnPay");
-      const origText = btnPay.textContent;
-      btnPay.disabled = true;
-      btnPay.textContent = "Creating order…";
-
-      try {
-        const order = await api("/billing/create-order", {
-          method: "POST",
-          body: JSON.stringify({ tier, project_name: projectName }),
-        });
-
-        const rzpOptions = {
-          key: order.razorpay_key_id,
-          amount: order.amount,
-          currency: order.currency,
-          order_id: order.order_id,
-          name: "Foreman AI",
-          description: tier === "basic" ? `Basic — ${projectName}` : "Premium Monthly",
-          theme: { color: "#6c5ce7" },
-          handler: async function(response) {
-            try {
-              const result = await api("/billing/verify-payment", {
-                method: "POST",
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  tier,
-                  project_name: projectName,
-                }),
-              });
-              closeModal("modalUpgrade");
-              await loadBillingStatus();
-              showToast(result.message || "Plan upgraded successfully!", "success");
-            } catch (e) {
-              showToast("Payment received but verification failed. Contact support.", "error");
-            }
-          },
-          modal: {
-            ondismiss: function() {
-              btnPay.disabled = false;
-              btnPay.textContent = origText;
-            }
-          }
-        };
-
-        const rzp = new window.Razorpay(rzpOptions);
-        rzp.open();
-      } catch (e) {
-        const err = document.getElementById("upgradeError");
-        if (err) { err.textContent = e.message || "Failed to create payment order."; err.style.display = "block"; }
-        btnPay.disabled = false;
-        btnPay.textContent = origText;
-      }
+    /* ── UPI copy helper ─────────────────────────────────────── */
+    function copyUPI(plan) {
+      const UPI_ID = "aaronginny@okhdfcbank";
+      const btnId  = plan === "basic" ? "copyBtnBasic" : "copyBtnPremium";
+      navigator.clipboard.writeText(UPI_ID).then(function() {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.textContent = "Copied!";
+        btn.style.color = "var(--green)";
+        btn.style.borderColor = "var(--green)";
+        setTimeout(function() {
+          btn.textContent = "Copy";
+          btn.style.color = "";
+          btn.style.borderColor = "";
+        }, 2000);
+      }).catch(function() {
+        // Fallback for browsers that block clipboard without HTTPS
+        showToast("UPI ID: " + UPI_ID, "info");
+      });
     }
 
     /* ── API helpers ─────────────────────────────────────────── */
