@@ -39,6 +39,14 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS stage_history TEXT DEFAULT NULL;
         """,
     ),
+    # 002 — ensure users.whatsapp_number exists (CEO God Mode needs it)
+    (
+        "users.whatsapp_number",
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(20) DEFAULT NULL;
+        """,
+    ),
 ]
 
 

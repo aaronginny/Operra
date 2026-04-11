@@ -62,6 +62,9 @@ async def twilio_webhook(
     # Build a user-friendly TwiML reply based on what happened
     status = result.get("status", "")
 
+    if status == "ceo_command":
+        return _twiml_response(result.get("reply", "Command processed."))
+
     if status == "task_updated":
         task_title = result.get("task_title", "")
         new_status = result.get("new_status", "")

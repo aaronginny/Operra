@@ -541,6 +541,137 @@ async def _openai_enquiry(text: str) -> dict:
         return _rule_based_enquiry(text)
 
 
+# ---------------------------------------------------------------------------
+# CEO command intent parser
+# ---------------------------------------------------------------------------
+
+_CEO_SYSTEM_PROMPT = """You are parsing a CEO's WhatsApp message to determine what action they want to take on their team's tasks.
+
+The CEO manages employees and tasks. Parse their natural language into a structured command.
+
+Possible intents:
+1. "update_task" — CEO wants to change a task's deadline, description, or other field.
+   Examples: "Tell Ryan the deadline for the plumbing job is now April 20th", "Update Ryan's task description to use copper pipes instead"
+2. "check_status" — CEO wants a status report on a task or employee.
+   Examples: "How is Ryan doing on the plumbing task?", "What's the status of the kitchen remodel?"
+3. "complete_task" — CEO wants to mark a task as completed.
+   Examples: "Mark Ryan's bedroom task as complete", "Close the plumbing job"
+4. "send_message" — CEO wants to send a custom message to an employee.
+   Examples: "Tell Ryan to call me", "Message Priya that the client is happy"
+5. "unknown" — Cannot determine intent.
+
+Known employees: {employee_names}
+
+Return ONLY valid JSON with these keys:
+  "intent": one of ["update_task", "check_status", "complete_task", "send_message", "unknown"]
+  "employee_name": name of the employee mentioned (or null)
+  "task_keyword": keyword(s) to identify the task (e.g. "plumbing", "bedroom painting") or null
+  "changes": object with fields to update, only for update_task intent:
+    - "due_date": ISO-8601 date string if deadline mentioned, else null
+    - "description": new description text if mentioned, else null
+    - "title": new title if mentioned, else null
+  "message": the message to relay to the employee (for send_message intent), or null
+  "summary": a short summary of what the CEO wants (always fill this)
+"""
+
+
+async def parse_ceo_command(text: str, employee_names: list[str]) -> dict:
+    """Parse a CEO's natural-language WhatsApp command into a structured intent.
+
+    Falls back to rule-based parsing if OpenAI is unavailable.
+    """
+    if not settings.openai_api_key or settings.openai_api_key.startswith("sk-your"):
+        return _rule_based_ceo_parse(text, employee_names)
+
+    return await _openai_ceo_parse(text, employee_names)
+
+
+async def _openai_ceo_parse(text: str, employee_names: list[str]) -> dict:
+    """Use OpenAI to parse CEO command intent."""
+    names_str = ", ".join(employee_names) if employee_names else "(none known)"
+    sys_prompt = _CEO_SYSTEM_PROMPT.format(employee_names=names_str)
+
+    payload = {
+        "model": settings.openai_model,
+        "messages": [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": text},
+        ],
+        "temperature": 0.0,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            if not response.is_success:
+                logger.error(
+                    "OpenAI CEO parse HTTP %s — body: %s",
+                    response.status_code, response.text[:300],
+                )
+                return _rule_based_ceo_parse(text, employee_names)
+
+            content = response.json()["choices"][0]["message"]["content"]
+            try:
+                result = json.loads(content)
+                return {
+                    "intent": result.get("intent", "unknown"),
+                    "employee_name": result.get("employee_name"),
+                    "task_keyword": result.get("task_keyword"),
+                    "changes": result.get("changes") or {},
+                    "message": result.get("message"),
+                    "summary": result.get("summary", ""),
+                }
+            except json.JSONDecodeError:
+                logger.error("OpenAI CEO parse returned non-JSON: %s", content[:200])
+                return _rule_based_ceo_parse(text, employee_names)
+    except Exception as exc:
+        logger.error("OpenAI CEO parse failed (%s) — falling back to rule-based", exc)
+        return _rule_based_ceo_parse(text, employee_names)
+
+
+def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
+    """Fallback rule-based CEO command parser."""
+    text_lower = text.lower().strip()
+    result = {
+        "intent": "unknown",
+        "employee_name": None,
+        "task_keyword": None,
+        "changes": {},
+        "message": None,
+        "summary": text[:100],
+    }
+
+    # Try to find an employee name
+    for name in sorted(employee_names, key=len, reverse=True):
+        if name.lower() in text_lower:
+            result["employee_name"] = name
+            break
+
+    # Detect intent
+    if any(kw in text_lower for kw in ["how is", "status", "how's", "progress", "doing on", "update on"]):
+        result["intent"] = "check_status"
+        result["summary"] = f"Check status for {result['employee_name'] or 'unknown employee'}"
+    elif any(kw in text_lower for kw in ["mark", "complete", "close", "finish", "done"]):
+        result["intent"] = "complete_task"
+        result["summary"] = f"Complete task for {result['employee_name'] or 'unknown employee'}"
+    elif any(kw in text_lower for kw in ["tell", "message", "notify", "inform", "say to", "let .* know"]):
+        result["intent"] = "send_message"
+        result["message"] = text
+        result["summary"] = f"Send message to {result['employee_name'] or 'unknown employee'}"
+    elif any(kw in text_lower for kw in ["deadline", "update", "change", "move", "extend", "description"]):
+        result["intent"] = "update_task"
+        result["summary"] = f"Update task for {result['employee_name'] or 'unknown employee'}"
+
+    return result
+
+
 async def _openai_progress(text: str, task_title: str) -> dict:
     """Call OpenAI to interpret the progress update."""
     sys_prompt = _PROGRESS_SYSTEM_PROMPT.format(task_title=task_title)

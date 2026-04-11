@@ -23,6 +23,7 @@ from app.services.employee_service import (
     get_employee_by_phone,
     normalize_phone_number,
 )
+from app.services.ceo_command_service import get_ceo_user, handle_ceo_command
 from app.services.messaging_service import send_welcome_message, send_whatsapp_message
 
 logger = logging.getLogger(__name__)
@@ -292,6 +293,20 @@ async def process_incoming_message(
     )
     db.add(log)
     await db.flush()
+
+    # ── CEO God Mode — check if sender is the CEO ───────────────
+    ceo_user = await get_ceo_user(db, sender)
+    if ceo_user:
+        logger.info("=== CEO DETECTED === user_id=%s name=%r", ceo_user.id, ceo_user.name)
+        # CEO can still use ADD command, but everything else goes to God Mode
+        add_check = await handle_add_employee(db, sender, text, company_id)
+        if add_check is not None:
+            add_check["message_log_id"] = log.id
+            return add_check
+
+        ceo_result = await handle_ceo_command(db, ceo_user, sender, text)
+        ceo_result["message_log_id"] = log.id
+        return ceo_result
 
     # ── Check for ADD employee command ───────────────────────────
     add_result = await handle_add_employee(db, sender, text, company_id)
