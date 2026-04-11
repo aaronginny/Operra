@@ -42,28 +42,37 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
 .error{color:#f87171;text-align:center;margin-top:14px;font-size:.82rem;min-height:20px}
 .hidden{display:none}
 
-/* ── Right Panel (Mockup) ─────────────────────────────────── */
-.right{flex:1.2;background:linear-gradient(135deg,#0f172a 0%,#131c2e 50%,#0f172a 100%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.right::before{content:'';position:absolute;top:-20%;right:-10%;width:500px;height:500px;background:radial-gradient(circle,rgba(245,158,11,.06) 0%,transparent 70%);pointer-events:none}
-.right::after{content:'';position:absolute;bottom:-20%;left:-10%;width:400px;height:400px;background:radial-gradient(circle,rgba(59,130,246,.04) 0%,transparent 70%);pointer-events:none}
+/* ── Right Panel (Laptop Mockup) ──────────────────────────── */
+.right{flex:1.2;background:radial-gradient(ellipse at 50% 40%,#0e0e14,#06060a 70%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 
-.mock-dashboard{width:80%;max-width:480px;position:relative;z-index:1}
-.mock-frame{background:#0b1120;border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.5)}
-.mock-topbar{height:32px;background:#080e1a;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;padding:0 12px;gap:6px}
-.mock-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.06)}
-.mock-content{padding:20px}
-.mock-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.mock-title{font-size:.78rem;font-weight:700;color:#e2e8f0}
-.mock-badge{font-size:.6rem;background:rgba(255,255,255,.08);color:#fff;padding:3px 10px;border-radius:100px;font-weight:600}
-.mock-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
-.mock-stat{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:8px;padding:12px 10px;text-align:center}
-.mock-stat-num{font-size:1.2rem;font-weight:700;color:#fff}
-.mock-stat-label{font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-.mock-tasks{display:flex;flex-direction:column;gap:8px}
-.mock-task{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.03);border-radius:8px}
-.mock-task-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.mock-task-text{font-size:.72rem;color:#94a3b8;flex:1}
-.mock-task-status{font-size:.6rem;padding:2px 8px;border-radius:4px;font-weight:600}
+/* Laptop frame */
+.laptop{width:88%;max-width:520px;position:relative;z-index:1;transform:perspective(1200px) rotateY(-4deg);transition:transform .4s ease}
+.laptop:hover{transform:perspective(1200px) rotateY(0deg)}
+.laptop-screen{background:#0f1117;border:3px solid #1c1c24;border-radius:10px 10px 0 0;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04) inset}
+.laptop-bezel{background:#0f1117;border-bottom:none;padding:6px 0 0}
+.laptop-cam{width:5px;height:5px;border-radius:50%;background:#1a1a24;margin:0 auto 4px}
+.laptop-base{height:14px;background:linear-gradient(180deg,#1c1c24 0%,#141418 100%);border-radius:0 0 4px 4px;margin:0 -4px}
+.laptop-hinge{width:60%;height:5px;background:linear-gradient(180deg,#222228,#1a1a1e);border-radius:0 0 6px 6px;margin:-1px auto 0}
+.laptop-pad{width:28%;height:3px;background:#1a1a1e;border-radius:2px;margin:4px auto 0}
+
+/* Dashboard inside screen */
+.dash{font-family:'Segoe UI',system-ui,sans-serif;padding:12px}
+.dash-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.dash-logo{font-family:Georgia,serif;font-size:.68rem;color:#fff;font-weight:400;letter-spacing:-.02em}
+.dash-addbtn{font-size:.5rem;background:#fff;color:#0a0a08;padding:3px 8px;border-radius:4px;font-weight:700}
+
+.dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px}
+.dash-stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:5px;padding:6px 5px;text-align:center}
+.dash-stat-num{font-size:.72rem;font-weight:700;color:#fff}
+.dash-stat-lbl{font-size:.42rem;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+.dash-table{width:100%;border-collapse:collapse}
+.dash-table th{font-size:.42rem;color:#555;text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:4px 5px;border-bottom:1px solid rgba(255,255,255,.06)}
+.dash-table td{font-size:.5rem;color:#999;padding:5px;border-bottom:1px solid rgba(255,255,255,.03)}
+.dash-table .task-name{color:#ccc;font-weight:500}
+.dash-badge{font-size:.4rem;padding:1px 5px;border-radius:3px;font-weight:600;white-space:nowrap}
+.dash-bar-wrap{width:100%;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.dash-bar-fill{height:100%;border-radius:2px}
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media(max-width:900px){
@@ -125,53 +134,80 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
   </form>
 </div>
 
-<!-- ── Right: Dashboard Mockup ─────────────────────────────── -->
+<!-- ── Right: Laptop Mockup ────────────────────────────────── -->
 <div class="right fade-in">
-  <div class="mock-dashboard">
-    <div class="mock-frame">
-      <div class="mock-topbar">
-        <div class="mock-dot"></div>
-        <div class="mock-dot"></div>
-        <div class="mock-dot"></div>
-      </div>
-      <div class="mock-content">
-        <div class="mock-header">
-          <div class="mock-title">PhantomPilot Dashboard</div>
-          <div class="mock-badge">LIVE</div>
+  <div class="laptop">
+    <!-- Screen -->
+    <div class="laptop-screen">
+      <div class="laptop-bezel"><div class="laptop-cam"></div></div>
+      <div class="dash">
+        <!-- Nav -->
+        <div class="dash-nav">
+          <div class="dash-logo">PhantomPilot</div>
+          <div class="dash-addbtn">+ Add Task</div>
         </div>
-        <div class="mock-stats">
-          <div class="mock-stat">
-            <div class="mock-stat-num">12</div>
-            <div class="mock-stat-label">Active</div>
+        <!-- Stats row 1 -->
+        <div class="dash-stats">
+          <div class="dash-stat">
+            <div class="dash-stat-num">24</div>
+            <div class="dash-stat-lbl">Total</div>
           </div>
-          <div class="mock-stat">
-            <div class="mock-stat-num">47</div>
-            <div class="mock-stat-label">Done</div>
+          <div class="dash-stat">
+            <div class="dash-stat-num">8</div>
+            <div class="dash-stat-lbl">Pending</div>
           </div>
-          <div class="mock-stat">
-            <div class="mock-stat-num">98%</div>
-            <div class="mock-stat-label">On-Time</div>
-          </div>
-        </div>
-        <div class="mock-tasks">
-          <div class="mock-task">
-            <div class="mock-task-dot" style="background:#4ade80"></div>
-            <div class="mock-task-text">Fix plumbing at Site 3</div>
-            <div class="mock-task-status" style="background:rgba(74,222,128,.12);color:#4ade80">Done</div>
-          </div>
-          <div class="mock-task">
-            <div class="mock-task-dot" style="background:#74b9ff"></div>
-            <div class="mock-task-text">Paint walls at Prestige Tower</div>
-            <div class="mock-task-status" style="background:rgba(116,185,255,.12);color:#74b9ff">In Progress</div>
-          </div>
-          <div class="mock-task">
-            <div class="mock-task-dot" style="background:#64748b"></div>
-            <div class="mock-task-text">Inspect wiring at Block C</div>
-            <div class="mock-task-status" style="background:rgba(100,116,139,.12);color:#94a3b8">Pending</div>
+          <div class="dash-stat">
+            <div class="dash-stat-num">6</div>
+            <div class="dash-stat-lbl">In Progress</div>
           </div>
         </div>
+        <!-- Stats row 2 -->
+        <div class="dash-stats" style="margin-bottom:12px">
+          <div class="dash-stat">
+            <div class="dash-stat-num" style="color:#ff6b6b">3</div>
+            <div class="dash-stat-lbl">Overdue</div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-num">2</div>
+            <div class="dash-stat-lbl">Delayed</div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-num">1</div>
+            <div class="dash-stat-lbl">Needs Help</div>
+          </div>
+        </div>
+        <!-- Task table -->
+        <table class="dash-table">
+          <thead>
+            <tr><th>Task</th><th>Employee</th><th>Status</th><th>Progress</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="task-name">Fix plumbing at Site 3</td>
+              <td>Rajesh K.</td>
+              <td><span class="dash-badge" style="background:rgba(74,222,128,.12);color:#4ade80">Completed</span></td>
+              <td><div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:100%;background:#4ade80"></div></div></td>
+            </tr>
+            <tr>
+              <td class="task-name">Paint walls — Prestige Tower</td>
+              <td>Suresh M.</td>
+              <td><span class="dash-badge" style="background:rgba(255,255,255,.06);color:#94a3b8">Pending</span></td>
+              <td><div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:0%;background:#555"></div></div></td>
+            </tr>
+            <tr>
+              <td class="task-name">Inspect wiring at Block C</td>
+              <td>Priya N.</td>
+              <td><span class="dash-badge" style="background:rgba(116,185,255,.12);color:#74b9ff">In Progress</span></td>
+              <td><div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:55%;background:#74b9ff"></div></div></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
+    <!-- Laptop body below screen -->
+    <div class="laptop-base"></div>
+    <div class="laptop-hinge"></div>
+    <div class="laptop-pad"></div>
   </div>
 </div>
 
