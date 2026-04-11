@@ -30,8 +30,8 @@
       --border: #2e3340;
       --text: #e4e6ec;
       --text-dim: #8b8fa3;
-      --accent: #f59e0b;
-      --accent-gl: rgba(245, 158, 11, .15);
+      --accent: #ffffff;
+      --accent-gl: rgba(255, 255, 255, .15);
       --green: #00b894;
       --green-bg: rgba(0, 184, 148, .12);
       --red: #ff6b6b;
@@ -101,13 +101,13 @@
 
     .btn-primary {
       background: var(--accent);
-      color: #fff;
+      color: #0a0a08;
     }
 
     .btn-primary:hover {
-      background: #d97706;
+      background: rgba(255,255,255,.1);
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(245, 158, 11, .35);
+      box-shadow: 0 6px 20px rgba(255,255,255,.2);
     }
 
     .btn-ghost {
@@ -1003,7 +1003,7 @@
           </div>
 
           <!-- Upgrade Button -->
-          <button class="btn btn-primary" id="btnUpgrade" onclick="openUpgradeModal()" style="width:100%; justify-content:center; background: linear-gradient(135deg, #f59e0b, #fbbf24);">
+          <button class="btn btn-primary" id="btnUpgrade" onclick="openUpgradeModal()" style="width:100%; justify-content:center; background: #ffffff; color: #0a0a08;">
             🚀 Upgrade to Premium
           </button>
         </div>
@@ -1247,7 +1247,7 @@
             <li>✅ White-glove onboarding</li>
           </ul>
           <!-- UPI instruction -->
-          <div style="background:var(--surface); border:1px solid rgba(245,158,11,.35); border-radius:var(--radius-sm); padding:12px; display:flex; flex-direction:column; gap:8px;">
+          <div style="background:var(--surface); border:1px solid rgba(255,255,255,.3); border-radius:var(--radius-sm); padding:12px; display:flex; flex-direction:column; gap:8px;">
             <div style="font-size:.76rem; color:var(--text-dim); font-weight:600;">Pay ₹5,000 to UPI ID:</div>
             <div style="display:flex; align-items:center; gap:8px;">
               <code style="font-size:.83rem; color:var(--accent); background:var(--surface-2); padding:4px 8px; border-radius:4px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">aaronginny@okhdfcbank</code>
@@ -2141,7 +2141,7 @@
           <td style="max-width:160px; white-space:normal; font-size:.8rem; color:var(--text-dim)">${esc(eq.notes || "—")}</td>
           <td>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn btn-sm btn-ghost" onclick="convertToTask(${eq.id})" title="Convert to Task" style="color:var(--accent); border-color:rgba(245,158,11,.3);">→ Task</button>
+              <button class="btn btn-sm btn-ghost" onclick="convertToTask(${eq.id})" title="Convert to Task" style="color:var(--accent); border-color:rgba(255,255,255,.3);">→ Task</button>
               <button class="btn btn-sm btn-ghost" onclick="editEnquiry(${eq.id})" title="Edit">✏️</button>
               <button class="btn btn-sm btn-ghost" onclick="deleteEnquiry(${eq.id})" title="Delete" style="color:var(--red);">🗑️</button>
             </div>
