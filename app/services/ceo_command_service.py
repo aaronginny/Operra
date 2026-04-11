@@ -5,6 +5,7 @@ WhatsApp. Commands are parsed by OpenAI into structured intents and executed.
 """
 
 import logging
+import re
 from datetime import datetime
 
 from sqlalchemy import select, func as sa_func
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.employee import Employee
 from app.models.task import Task, TaskStatus
 from app.models.user import User
-from app.services.ai_service import parse_ceo_command
+from app.services.ai_service import parse_ceo_command, _MONTH_NAMES, _extract_date_from_text
 from app.services.employee_service import (
     get_all_employee_names,
     get_employee_by_phone,
@@ -22,6 +23,77 @@ from app.services.employee_service import (
 from app.services.messaging_service import send_whatsapp_message
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Post-parse sanitization — deterministic correction layer
+# ---------------------------------------------------------------------------
+
+# Captures the first word after Tell/Ask/Message/Notify/Inform
+_TELL_NAME_RE = re.compile(
+    r"(?:tell|ask|message|notify|inform)\s+([A-Za-z][A-Za-z'-]{1,30})",
+    re.IGNORECASE,
+)
+
+# Keywords that mean a task field is being changed
+_UPDATE_KEYWORDS = {"deadline", "due date", "is now", "extend", "move the deadline", "description", "change"}
+
+
+def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> dict:
+    """Deterministic post-processing layer applied after AI/rule-based parsing.
+
+    Fixes two known failure modes:
+    1. AI returns a month name ("April") as employee_name instead of the person.
+    2. AI returns "send_message" intent when the message actually contains a
+       deadline/date change ("Tell X the deadline is now April 25th").
+    """
+    text_lower = raw_text.lower()
+    emp = parsed.get("employee_name") or ""
+
+    # ── Fix 1: employee_name is a month name → extract from "Tell <name>" ──
+    if emp.lower() in _MONTH_NAMES or not emp:
+        logger.warning("CEO parse: employee_name=%r looks like a month — re-extracting from text", emp)
+
+        # Try known DB names first (longest match wins, month names excluded)
+        fixed_name = None
+        for name in sorted(employee_names, key=len, reverse=True):
+            if name.lower() in text_lower and name.lower() not in _MONTH_NAMES:
+                fixed_name = name
+                break
+
+        # Fallback: first word after Tell/Ask/Message
+        if not fixed_name:
+            m = _TELL_NAME_RE.search(raw_text)
+            if m:
+                candidate = m.group(1).strip()
+                if candidate.lower() not in _MONTH_NAMES:
+                    fixed_name = candidate.capitalize()
+
+        if fixed_name:
+            logger.info("CEO parse: corrected employee_name %r → %r", emp, fixed_name)
+            parsed = {**parsed, "employee_name": fixed_name}
+
+    # ── Fix 2: intent is send_message but message has deadline/date → update_task ──
+    if parsed.get("intent") == "send_message":
+        has_update_kw = any(kw in text_lower for kw in _UPDATE_KEYWORDS)
+        has_date = bool(_extract_date_from_text(raw_text))
+        if has_update_kw or has_date:
+            logger.info("CEO parse: overriding intent send_message → update_task (deadline/date detected)")
+            date_iso = _extract_date_from_text(raw_text)
+            changes = dict(parsed.get("changes") or {})
+            if date_iso and not changes.get("due_date"):
+                changes["due_date"] = date_iso
+            parsed = {**parsed, "intent": "update_task", "changes": changes}
+
+    # ── Fix 3: update_task but no due_date extracted yet → try from raw text ──
+    if parsed.get("intent") == "update_task":
+        changes = dict(parsed.get("changes") or {})
+        if not changes.get("due_date"):
+            date_iso = _extract_date_from_text(raw_text)
+            if date_iso:
+                changes["due_date"] = date_iso
+                parsed = {**parsed, "changes": changes}
+
+    return parsed
 
 # ---------------------------------------------------------------------------
 # CEO detection
@@ -299,11 +371,19 @@ async def handle_ceo_command(
 
     # Parse intent via AI
     parsed = await parse_ceo_command(text, employee_names)
-    intent = parsed.get("intent", "unknown")
-
     logger.info(
-        "CEO intent parsed: intent=%s employee=%s keyword=%s",
-        intent, parsed.get("employee_name"), parsed.get("task_keyword"),
+        "CEO raw parse: intent=%s employee=%r keyword=%r changes=%r",
+        parsed.get("intent"), parsed.get("employee_name"),
+        parsed.get("task_keyword"), parsed.get("changes"),
+    )
+
+    # Deterministic sanitization — fixes month-as-name and wrong intent
+    parsed = _sanitize_parsed(parsed, text, employee_names)
+    intent = parsed.get("intent", "unknown")
+    logger.info(
+        "CEO final parse: intent=%s employee=%r keyword=%r changes=%r",
+        intent, parsed.get("employee_name"),
+        parsed.get("task_keyword"), parsed.get("changes"),
     )
 
     # Execute the command
