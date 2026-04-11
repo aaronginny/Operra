@@ -549,29 +549,51 @@ _CEO_SYSTEM_PROMPT = """You are parsing a CEO's WhatsApp message to determine wh
 
 The CEO manages employees and tasks. Parse their natural language into a structured command.
 
-Possible intents:
+## CRITICAL RULES FOR employee_name
+- The employee_name is always a PERSON'S NAME (e.g. "Ryan", "Aaron", "Priya").
+- Month names (January, February, March, April, May, June, July, August, September, October, November, December) are NEVER employee names.
+- When the message starts with "Tell [name]" or "Ask [name]" or "Message [name]", the employee_name is the word immediately after "Tell"/"Ask"/"Message" — NOT any word that appears later in the sentence.
+- If the message contains "Tell Aaron the deadline for X is April 25th", employee_name="Aaron" (first word after Tell), NOT "April".
+- Cross-check against Known employees list when possible; if the name appears in that list, prefer the match.
+
+## Possible intents (pick the BEST match):
 1. "update_task" — CEO wants to change a task's deadline, description, or other field.
-   Examples: "Tell Ryan the deadline for the plumbing job is now April 20th", "Update Ryan's task description to use copper pipes instead"
+   Triggers: words like "deadline", "due date", "is now [date]", "change", "update [task field]", "extend", "move the deadline".
+   Examples:
+     "Tell Ryan the deadline for the plumbing job is now April 20th" → update_task, employee=Ryan, keyword=plumbing, due_date=2025-04-20
+     "Tell aaron the deadline for the plumbing task is now April 25th" → update_task, employee=aaron, keyword=plumbing, due_date=2025-04-25
+     "Update Ryan's task description to use copper pipes instead" → update_task, employee=Ryan, keyword=null, description="use copper pipes instead"
 2. "check_status" — CEO wants a status report on a task or employee.
-   Examples: "How is Ryan doing on the plumbing task?", "What's the status of the kitchen remodel?"
+   Triggers: "how is", "how's", "status", "progress", "doing on", "update on".
+   Examples: "How is Ryan doing on the plumbing task?" → check_status, employee=Ryan, keyword=plumbing
 3. "complete_task" — CEO wants to mark a task as completed.
-   Examples: "Mark Ryan's bedroom task as complete", "Close the plumbing job"
-4. "send_message" — CEO wants to send a custom message to an employee.
-   Examples: "Tell Ryan to call me", "Message Priya that the client is happy"
+   Triggers: "mark as complete", "close", "finish".
+   Examples: "Mark Ryan's bedroom task as complete" → complete_task, employee=Ryan, keyword=bedroom
+4. "send_message" — CEO wants to send a short freeform message to an employee (NO deadline/task field change).
+   Triggers: "tell [name] to [action]", "let [name] know", "message [name]".
+   Examples: "Tell Ryan to call me" → send_message, employee=Ryan, message="call me"
 5. "unknown" — Cannot determine intent.
+
+## Priority when "Tell" appears:
+- If the sentence contains "deadline", "due date", "is now [date/time]", "description", or "change" → intent is "update_task".
+- Otherwise if it is just "Tell [name] to [do something]" → intent is "send_message".
+
+## Date parsing for due_date:
+- Convert human dates to ISO-8601 (YYYY-MM-DD). Use the current year (2025) unless another year is mentioned.
+- "April 25th" → "2025-04-25", "April 20th" → "2025-04-20", "next Monday" → nearest upcoming Monday.
 
 Known employees: {employee_names}
 
 Return ONLY valid JSON with these keys:
   "intent": one of ["update_task", "check_status", "complete_task", "send_message", "unknown"]
-  "employee_name": name of the employee mentioned (or null)
+  "employee_name": PERSON name only — never a month or date word (or null)
   "task_keyword": keyword(s) to identify the task (e.g. "plumbing", "bedroom painting") or null
   "changes": object with fields to update, only for update_task intent:
-    - "due_date": ISO-8601 date string if deadline mentioned, else null
+    - "due_date": ISO-8601 date string if a deadline/date is mentioned, else null
     - "description": new description text if mentioned, else null
     - "title": new title if mentioned, else null
   "message": the message to relay to the employee (for send_message intent), or null
-  "summary": a short summary of what the CEO wants (always fill this)
+  "summary": a short human-readable summary of what the CEO wants (always fill this)
 """
 
 
@@ -636,6 +658,64 @@ async def _openai_ceo_parse(text: str, employee_names: list[str]) -> dict:
         return _rule_based_ceo_parse(text, employee_names)
 
 
+# Month names that must never be treated as employee names
+_MONTH_NAMES = {
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+}
+
+# Regex to extract "Tell/Ask/Message <Name>" — captures the first word after the verb
+_TELL_NAME_RE = re.compile(
+    r"(?:tell|ask|message|notify|inform)\s+([A-Za-z][A-Za-z'-]{1,30})",
+    re.IGNORECASE,
+)
+
+# Regex to extract a date phrase like "April 25th", "25 April", "April 25", "Apr 20th"
+_DATE_PHRASE_RE = re.compile(
+    r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+    r"\s+\d{1,2}(?:st|nd|rd|th)?"
+    r"|\b\d{1,2}(?:st|nd|rd|th)?\s+"
+    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)",
+    re.IGNORECASE,
+)
+
+_MONTH_TO_NUM = {
+    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
+    "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6,
+    "jul": 7, "july": 7, "aug": 8, "august": 8, "sep": 9, "september": 9,
+    "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+}
+
+
+def _extract_date_from_text(text: str) -> str | None:
+    """Extract a human date phrase and convert to ISO-8601 YYYY-MM-DD."""
+    match = _DATE_PHRASE_RE.search(text)
+    if not match:
+        return None
+    raw = match.group(0).strip()
+    # Normalise: remove ordinal suffixes
+    cleaned = re.sub(r"(\d+)(?:st|nd|rd|th)", r"\1", raw, flags=re.IGNORECASE).strip()
+    parts = cleaned.split()
+    if not parts:
+        return None
+    try:
+        # "April 25" or "25 April"
+        if parts[0].isdigit():
+            day = int(parts[0])
+            month = _MONTH_TO_NUM.get(parts[1].lower()) if len(parts) > 1 else None
+        else:
+            month = _MONTH_TO_NUM.get(parts[0].lower())
+            day = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+        if month and day:
+            return f"2025-{month:02d}-{day:02d}"
+    except (ValueError, IndexError):
+        pass
+    return None
+
+
 def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
     """Fallback rule-based CEO command parser."""
     text_lower = text.lower().strip()
@@ -648,26 +728,55 @@ def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
         "summary": text[:100],
     }
 
-    # Try to find an employee name
+    # ── Step 1: Extract employee name ────────────────────────────
+    # Priority: known DB names first (longest match wins)
     for name in sorted(employee_names, key=len, reverse=True):
-        if name.lower() in text_lower:
+        if name.lower() in text_lower and name.lower() not in _MONTH_NAMES:
             result["employee_name"] = name
             break
 
-    # Detect intent
-    if any(kw in text_lower for kw in ["how is", "status", "how's", "progress", "doing on", "update on"]):
+    # If still no name, try "Tell/Ask/Message <Name>" pattern
+    if not result["employee_name"]:
+        m = _TELL_NAME_RE.search(text)
+        if m:
+            candidate = m.group(1).strip()
+            if candidate.lower() not in _MONTH_NAMES:
+                result["employee_name"] = candidate.capitalize()
+
+    # ── Step 2: Extract due date ──────────────────────────────────
+    due_date_iso = _extract_date_from_text(text)
+    if due_date_iso:
+        result["changes"]["due_date"] = due_date_iso
+
+    # ── Step 3: Detect intent (order matters) ────────────────────
+    has_deadline_kw = any(kw in text_lower for kw in [
+        "deadline", "due date", "is now", "by", "extend", "move the deadline",
+    ])
+    has_desc_kw = "description" in text_lower
+    has_update_kw = any(kw in text_lower for kw in ["change", "update"])
+
+    if any(kw in text_lower for kw in ["how is", "how's", "status", "progress", "doing on", "update on"]):
         result["intent"] = "check_status"
         result["summary"] = f"Check status for {result['employee_name'] or 'unknown employee'}"
-    elif any(kw in text_lower for kw in ["mark", "complete", "close", "finish", "done"]):
+
+    elif any(kw in text_lower for kw in ["mark", "complete", "close", "finish"]) and "done" not in text_lower[:6]:
         result["intent"] = "complete_task"
         result["summary"] = f"Complete task for {result['employee_name'] or 'unknown employee'}"
-    elif any(kw in text_lower for kw in ["tell", "message", "notify", "inform", "say to", "let .* know"]):
+
+    elif has_deadline_kw or (has_desc_kw and has_update_kw) or due_date_iso:
+        # "Tell Aaron the deadline … is now April 25th" → update_task, not send_message
+        result["intent"] = "update_task"
+        if has_desc_kw:
+            # Extract everything after "description to"
+            m = re.search(r"description\s+to\s+(.+)", text, re.IGNORECASE)
+            if m:
+                result["changes"]["description"] = m.group(1).strip()
+        result["summary"] = f"Update task for {result['employee_name'] or 'unknown employee'}"
+
+    elif any(kw in text_lower for kw in ["tell", "message", "notify", "inform", "let"]):
         result["intent"] = "send_message"
         result["message"] = text
         result["summary"] = f"Send message to {result['employee_name'] or 'unknown employee'}"
-    elif any(kw in text_lower for kw in ["deadline", "update", "change", "move", "extend", "description"]):
-        result["intent"] = "update_task"
-        result["summary"] = f"Update task for {result['employee_name'] or 'unknown employee'}"
 
     return result
 
