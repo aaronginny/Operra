@@ -96,6 +96,10 @@ class Task(Base):
     checkpoints: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )
+    # Project grouping for per-project billing (nullable — tasks can be ungrouped)
+    project_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("projects.id"), nullable=True, index=True
+    )
 
     # Relationships
     assigned_employee = relationship("Employee", back_populates="tasks")

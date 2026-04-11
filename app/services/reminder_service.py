@@ -92,9 +92,17 @@ async def _send_morning_pulse(db) -> None:
         if not emp_tasks[emp_id]:
             del emp_tasks[emp_id]
 
+    from app.services.billing_service import check_can_send_morning_pulse
+
     for emp_id, emp_task_list in emp_tasks.items():
         employee = emp_task_list[0].assigned_employee
         if not employee or not employee.phone_number:
+            continue
+
+        # Morning pulse is a paid feature (basic / premium only)
+        company_id = emp_task_list[0].company_id
+        if not await check_can_send_morning_pulse(db, company_id):
+            logger.debug("Morning pulse skipped for company=%s (free tier)", company_id)
             continue
 
         # Build message — pick the most important task (overdue first, then nearest deadline)

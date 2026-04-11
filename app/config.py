@@ -63,5 +63,9 @@ class Settings(BaseSettings):
     # ── Daily report ──────────────────────────────────────────
     daily_report_time: str = "09:00"
 
+    # ── Razorpay ──────────────────────────────────────────────
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+
 
 settings = Settings()

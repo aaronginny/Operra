@@ -13,6 +13,7 @@
   <meta name="description" content="Task management dashboard for Foreman AI, Smart Task Management for Teams" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     /* ── Reset & Tokens ─────────────────────────────────────── */
     *,
@@ -985,16 +986,16 @@
               <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 4px;">Plan & Billing</h3>
               <p style="font-size: .82rem; color: var(--text-dim);">Manage your Foreman AI subscription.</p>
             </div>
-            <span id="planBadge" style="display:inline-flex; align-items:center; gap:5px; padding: 4px 12px; border-radius: 20px; font-size:.75rem; font-weight:700; background: var(--yellow-bg); color: var(--yellow);">
-              ⚡ BASIC
+            <span id="planBadge" style="display:inline-flex; align-items:center; gap:5px; padding: 4px 12px; border-radius: 20px; font-size:.75rem; font-weight:700; background: var(--surface-2); color: var(--text-dim);">
+              FREE
             </span>
           </div>
 
           <!-- Usage Bar -->
           <div style="margin-bottom: 16px;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-              <span style="font-size:.8rem; font-weight:600; color:var(--text)">Free Projects Used</span>
-              <span id="usageText" style="font-size:.8rem; color:var(--text-dim);">— / 1</span>
+              <span style="font-size:.8rem; font-weight:600; color:var(--text)">Tasks Used</span>
+              <span id="usageText" style="font-size:.8rem; color:var(--text-dim);">0 / 3</span>
             </div>
             <div style="height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden; border:1px solid var(--border);">
               <div id="usageBar" style="height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--blue)); border-radius:4px; transition: width .5s ease;"></div>
@@ -1185,29 +1186,68 @@
 
   <!-- Upgrade Modal -->
   <div class="modal-overlay" id="modalUpgrade">
-    <div class="modal" style="max-width: 420px; text-align: center;">
-      <div style="font-size:2.5rem; margin-bottom:12px;">🚀</div>
-      <h2 style="background: linear-gradient(135deg, var(--accent), var(--blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px;">Go Premium</h2>
-      <p style="font-size:.9rem; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">
-        Unlock <strong style="color:var(--text)">unlimited tasks</strong>, advanced AI reminders, and full team management.
-      </p>
-      <div style="background: var(--surface-2); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; text-align:left;">
-        <div style="font-size:.82rem; color:var(--text-dim); margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;">What you get</div>
-        <ul style="list-style:none; font-size:.85rem; display:flex; flex-direction:column; gap:6px;">
-          <li>✅ Unlimited task projects</li>
-          <li>✅ AI morning pulse reminders</li>
-          <li>✅ CEO blocker alerts</li>
-          <li>✅ Smart checkpoint AI</li>
-          <li>✅ Priority support</li>
-        </ul>
+    <div class="modal" style="max-width:560px;">
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:2rem; margin-bottom:8px;">🚀</div>
+        <h2 style="background:linear-gradient(135deg,var(--accent),var(--blue)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:6px;">Upgrade Foreman AI</h2>
+        <p style="font-size:.87rem; color:var(--text-dim);">Choose the plan that fits your team.</p>
       </div>
-      <div style="background: var(--accent-gl); border: 1px solid rgba(108,92,231,.3); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 20px;">
-        <p style="font-size:.85rem; color:var(--accent); font-weight:600;">Billing system coming soon!</p>
-        <p style="font-size:.8rem; color:var(--text-dim); margin-top:4px;">Contact <strong style="color:var(--text)">Aaron</strong> to upgrade manually right now.</p>
+
+      <!-- Pricing cards -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+
+        <!-- Basic card -->
+        <div id="cardBasic" style="background:var(--surface-2); border:2px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .2s;" onclick="_selectPlan('basic')">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--yellow); margin-bottom:4px;">BASIC</div>
+              <div style="font-size:1.6rem; font-weight:700; color:var(--text);">₹2,000</div>
+              <div style="font-size:.75rem; color:var(--text-dim);">per project · one-time</div>
+            </div>
+            <span id="radioBasic" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--border); flex-shrink:0; margin-top:4px;"></span>
+          </div>
+          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:5px; color:var(--text-dim);">
+            <li>✅ Unlimited tasks for this project</li>
+            <li>✅ Smart Checkpoints AI</li>
+            <li>✅ WhatsApp God Mode</li>
+            <li>✅ Morning pulse reminders</li>
+          </ul>
+          <!-- Project name input (shown when basic selected) -->
+          <div id="basicProjectInput" style="display:none; margin-top:4px;">
+            <input id="basicProjectName" type="text" placeholder="Project name (e.g. House Renovation)"
+              style="width:100%; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:.83rem; box-sizing:border-box;"
+              onclick="event.stopPropagation()" />
+          </div>
+        </div>
+
+        <!-- Premium card -->
+        <div id="cardPremium" style="background:var(--surface-2); border:2px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .2s;" onclick="_selectPlan('premium')">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--green); margin-bottom:4px;">PREMIUM</div>
+              <div style="font-size:1.6rem; font-weight:700; color:var(--text);">₹5,000</div>
+              <div style="font-size:.75rem; color:var(--text-dim);">per month · all features</div>
+            </div>
+            <span id="radioPremium" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--border); flex-shrink:0; margin-top:4px;"></span>
+          </div>
+          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:5px; color:var(--text-dim);">
+            <li>✅ Unlimited projects &amp; tasks</li>
+            <li>✅ All Basic features</li>
+            <li>✅ Priority support</li>
+            <li>✅ 30-day subscription</li>
+          </ul>
+        </div>
+
       </div>
-      <div class="modal-actions" style="justify-content:center;">
+
+      <!-- Pay button + error -->
+      <div id="upgradeError" style="display:none; font-size:.82rem; color:var(--red); margin-bottom:10px; text-align:center;"></div>
+      <div class="modal-actions" style="justify-content:space-between;">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modalUpgrade')">Maybe Later</button>
-        <button type="button" class="btn btn-primary" onclick="closeModal('modalUpgrade')" style="background: linear-gradient(135deg, #6c5ce7, #74b9ff);">Got It!</button>
+        <button type="button" class="btn btn-primary" id="btnPay" onclick="startPayment()"
+          style="background:linear-gradient(135deg,#6c5ce7,#74b9ff); min-width:140px;" disabled>
+          Select a plan
+        </button>
       </div>
     </div>
   </div>
@@ -1240,54 +1280,190 @@
 
     function _renderBillingUI(b) {
       if (!b) return;
+      const tier = (b.tier || b.subscription_level || "free").toLowerCase();
 
       // Plan Badge
       const badge = document.getElementById("planBadge");
       if (badge) {
-        if (b.is_premium) {
+        if (tier === "premium") {
           badge.textContent = "✨ PREMIUM";
           badge.style.background = "var(--green-bg)";
           badge.style.color = "var(--green)";
-        } else {
-          badge.innerHTML = "⚡ BASIC";
+        } else if (tier === "basic") {
+          badge.textContent = "⚡ BASIC";
           badge.style.background = "var(--yellow-bg)";
           badge.style.color = "var(--yellow)";
+        } else {
+          badge.textContent = "FREE";
+          badge.style.background = "var(--surface-2)";
+          badge.style.color = "var(--text-dim)";
         }
       }
 
       // Usage Bar
       const usageText = document.getElementById("usageText");
-      const usageBar = document.getElementById("usageBar");
+      const usageBar  = document.getElementById("usageBar");
       const usageHint = document.getElementById("usageHint");
-      if (usageText) usageText.textContent = `${b.tasks_created_count} / ${b.free_task_limit}`;
+      const unlimited = tier === "premium" || tier === "basic";
+
+      if (usageText) {
+        usageText.textContent = unlimited ? "∞ Unlimited" : `${b.tasks_created_count} / ${b.free_task_limit}`;
+      }
       if (usageBar) {
-        const pct = b.is_premium ? 0 : Math.min((b.tasks_created_count / b.free_task_limit) * 100, 100);
+        const pct = unlimited ? 0 : Math.min((b.tasks_created_count / b.free_task_limit) * 100, 100);
         usageBar.style.width = pct + "%";
         usageBar.style.background = b.limit_reached
           ? "var(--red)"
           : "linear-gradient(90deg, var(--accent), var(--blue))";
       }
       if (usageHint) {
-        if (b.is_premium) {
-          usageHint.textContent = "You're on Premium — unlimited tasks!";
+        if (tier === "premium") {
+          usageHint.textContent = "Premium active — unlimited projects & tasks.";
           usageHint.style.color = "var(--green)";
+        } else if (tier === "basic") {
+          const paid = (b.projects_paid || []).length;
+          usageHint.textContent = `Basic plan — ${paid} project${paid !== 1 ? "s" : ""} unlocked.`;
+          usageHint.style.color = "var(--yellow)";
         } else if (b.limit_reached) {
           usageHint.textContent = "Free limit reached. Upgrade to create more tasks.";
           usageHint.style.color = "var(--red)";
         } else {
           const remaining = b.free_task_limit - b.tasks_created_count;
-          usageHint.textContent = `${remaining} free project${remaining !== 1 ? "s" : ""} remaining.`;
+          usageHint.textContent = `${remaining} free task${remaining !== 1 ? "s" : ""} remaining.`;
           usageHint.style.color = "var(--text-dim)";
         }
       }
 
-      // Upgrade button — hide if already premium
+      // Upgrade button
       const btnUpgrade = document.getElementById("btnUpgrade");
-      if (btnUpgrade) btnUpgrade.style.display = b.is_premium ? "none" : "flex";
+      if (btnUpgrade) {
+        if (tier === "premium") {
+          btnUpgrade.style.display = "none";
+        } else if (tier === "basic") {
+          btnUpgrade.style.display = "flex";
+          btnUpgrade.textContent = "➕ Add More Projects";
+        } else {
+          btnUpgrade.style.display = "flex";
+          btnUpgrade.textContent = "🚀 Upgrade Plan";
+        }
+      }
     }
 
     function openUpgradeModal() {
+      // Reset modal state
+      _selectPlan(null);
       document.getElementById("modalUpgrade").classList.add("open");
+    }
+
+    /* ── Plan selection helpers ──────────────────────────────── */
+    let _selectedPlan = null;
+
+    function _selectPlan(plan) {
+      _selectedPlan = plan;
+      const cardBasic   = document.getElementById("cardBasic");
+      const cardPremium = document.getElementById("cardPremium");
+      const radioBasic  = document.getElementById("radioBasic");
+      const radioPremium = document.getElementById("radioPremium");
+      const basicInput  = document.getElementById("basicProjectInput");
+      const btnPay      = document.getElementById("btnPay");
+      const upgradeErr  = document.getElementById("upgradeError");
+      if (upgradeErr) upgradeErr.style.display = "none";
+
+      const accentBorder = "2px solid var(--accent)";
+      const defaultBorder = "2px solid var(--border)";
+      const radioOn = "background:var(--accent); border-color:var(--accent);";
+      const radioOff = "";
+
+      if (cardBasic)   cardBasic.style.border   = plan === "basic"   ? accentBorder : defaultBorder;
+      if (cardPremium) cardPremium.style.border  = plan === "premium" ? accentBorder : defaultBorder;
+      if (radioBasic)  radioBasic.style.cssText  = plan === "basic"   ? radioOn : radioOff;
+      if (radioPremium) radioPremium.style.cssText = plan === "premium" ? radioOn : radioOff;
+      if (basicInput)  basicInput.style.display  = plan === "basic"   ? "block" : "none";
+
+      if (btnPay) {
+        if (!plan) {
+          btnPay.textContent = "Select a plan";
+          btnPay.disabled = true;
+        } else if (plan === "basic") {
+          btnPay.textContent = "Pay ₹2,000";
+          btnPay.disabled = false;
+        } else {
+          btnPay.textContent = "Pay ₹5,000 / month";
+          btnPay.disabled = false;
+        }
+      }
+    }
+
+    /* ── Razorpay checkout ───────────────────────────────────── */
+    async function startPayment() {
+      const tier = _selectedPlan;
+      if (!tier) return;
+
+      const projectName = tier === "basic"
+        ? (document.getElementById("basicProjectName")?.value || "").trim()
+        : null;
+
+      if (tier === "basic" && !projectName) {
+        const err = document.getElementById("upgradeError");
+        if (err) { err.textContent = "Please enter a project name."; err.style.display = "block"; }
+        document.getElementById("basicProjectName")?.focus();
+        return;
+      }
+
+      const btnPay = document.getElementById("btnPay");
+      const origText = btnPay.textContent;
+      btnPay.disabled = true;
+      btnPay.textContent = "Creating order…";
+
+      try {
+        const order = await api("/billing/create-order", {
+          method: "POST",
+          body: JSON.stringify({ tier, project_name: projectName }),
+        });
+
+        const rzpOptions = {
+          key: order.razorpay_key_id,
+          amount: order.amount,
+          currency: order.currency,
+          order_id: order.order_id,
+          name: "Foreman AI",
+          description: tier === "basic" ? `Basic — ${projectName}` : "Premium Monthly",
+          theme: { color: "#6c5ce7" },
+          handler: async function(response) {
+            try {
+              const result = await api("/billing/verify-payment", {
+                method: "POST",
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  tier,
+                  project_name: projectName,
+                }),
+              });
+              closeModal("modalUpgrade");
+              await loadBillingStatus();
+              showToast(result.message || "Plan upgraded successfully!", "success");
+            } catch (e) {
+              showToast("Payment received but verification failed. Contact support.", "error");
+            }
+          },
+          modal: {
+            ondismiss: function() {
+              btnPay.disabled = false;
+              btnPay.textContent = origText;
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(rzpOptions);
+        rzp.open();
+      } catch (e) {
+        const err = document.getElementById("upgradeError");
+        if (err) { err.textContent = e.message || "Failed to create payment order."; err.style.display = "block"; }
+        btnPay.disabled = false;
+        btnPay.textContent = origText;
+      }
     }
 
     /* ── API helpers ─────────────────────────────────────────── */

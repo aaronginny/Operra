@@ -20,6 +20,7 @@ class TaskCreate(BaseModel):
     progress_percent: int = 0
     last_update: datetime | None = None
     checkpoints: list[str] | None = None  # e.g. ["Check logo", "Buy fabric"]
+    project_id: int | None = None          # optional project grouping for billing
 
 
 class TaskUpdate(BaseModel):
@@ -57,6 +58,7 @@ class TaskResponse(BaseModel):
     last_update: datetime | None = None
     last_update_summary: str | None = None
     checkpoints: str | None = None  # JSON string
+    project_id: int | None = None
 
     model_config = {"from_attributes": True}
 

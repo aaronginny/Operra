@@ -111,6 +111,53 @@ _MIGRATIONS = [
         );
         """,
     ),
+    # 008 — normalize subscription_level to 'free' for non-premium companies
+    #        (old default was 'basic'; new tier vocabulary is free/basic/premium)
+    (
+        "companies.normalize_free_tier",
+        """
+        UPDATE companies
+        SET subscription_level = 'free'
+        WHERE subscription_level = 'basic' AND is_premium = false;
+        """,
+    ),
+    # 009 — tiered billing: premium expiry timestamp
+    (
+        "companies.tier_expires_at",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS tier_expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+        """,
+    ),
+    # 010 — tiered billing: JSON list of paid project IDs (basic per-project)
+    (
+        "companies.projects_paid",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS projects_paid TEXT DEFAULT NULL;
+        """,
+    ),
+    # 011 — projects table (created by create_all; this migration is a safety net
+    #        for existing deployments where the table may not yet exist)
+    (
+        "projects.table",
+        """
+        CREATE TABLE IF NOT EXISTS projects (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    # 012 — project_id FK on tasks (for per-project billing grouping)
+    (
+        "tasks.project_id",
+        """
+        ALTER TABLE tasks
+        ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL DEFAULT NULL;
+        """,
+    ),
 ]
 
 

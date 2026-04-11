@@ -16,6 +16,7 @@ from app.services.messaging_service import send_whatsapp_message
 from app.services.task_service import create_task, get_task, get_tasks, update_task
 from app.services.billing_service import (
     check_can_create_task,
+    check_can_use_checkpoints,
     increment_task_count,
     get_billing_status,
 )
@@ -44,6 +45,7 @@ async def create_task_endpoint(
             user_id=current_user.id,
             user_email=current_user.email,
             user_role=current_user.role,
+            project_id=payload.project_id,
         )
     except ValueError as e:
         logger.warning(
@@ -210,6 +212,14 @@ async def toggle_checkpoint(
     task = await get_task(db, task_id)
     if task is None or task.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    # Checkpoints are a paid feature (basic / premium only)
+    can_use = await check_can_use_checkpoints(db, current_user.company_id, user_role=current_user.role)
+    if not can_use:
+        raise HTTPException(
+            status_code=403,
+            detail="Smart Checkpoints require a Basic or Premium plan. Upgrade to unlock.",
+        )
 
     if not task.checkpoints:
         raise HTTPException(status_code=400, detail="Task has no checkpoints")

@@ -21,6 +21,7 @@ from app.routes import employee_routes as employee_router
 from app.routes import dashboard_api as dashboard_api_router
 from app.routes import auth_routes as auth_router
 from app.routes import enquiries as enquiries_router
+from app.routes import billing as billing_router
 from app.migrations import run_migrations
 from app.services.reminder_service import start_scheduler, stop_scheduler
 
@@ -91,6 +92,7 @@ app.include_router(analytics_router.router)
 app.include_router(employee_router.router)
 app.include_router(dashboard_api_router.router)
 app.include_router(enquiries_router.router)
+app.include_router(billing_router.router)
 
 # ── Static files & root redirect ──────────────────────────────
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
