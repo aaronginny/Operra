@@ -252,25 +252,52 @@ async def process_incoming_message(
     """
     if not text.strip():
         return {"status": "no_text"}
-        
-    # resolve company_id from sender
-    # First, try to find an employee with this phone
+
+    # ── CEO God Mode — must run FIRST, before auto-registration ──
+    # Prevents CEO messages from being treated as employee task updates
+    # or creating the CEO as a placeholder employee record.
+    ceo_user = await get_ceo_user(db, sender)
+    if ceo_user:
+        # Resolve company_id from the CEO user record
+        ceo_company_id = ceo_user.company_id
+
+        # Log raw message for audit trail
+        log = MessageLog(
+            company_id=ceo_company_id,
+            sender=sender,
+            channel="whatsapp",
+            raw_text=text,
+            direction="incoming",
+        )
+        db.add(log)
+        await db.flush()
+
+        logger.info("=== CEO DETECTED === user_id=%s name=%r company=%s", ceo_user.id, ceo_user.name, ceo_company_id)
+
+        # CEO can still use ADD command; everything else is God Mode
+        add_check = await handle_add_employee(db, sender, text, ceo_company_id)
+        if add_check is not None:
+            add_check["message_log_id"] = log.id
+            return add_check
+
+        ceo_result = await handle_ceo_command(db, ceo_user, sender, text)
+        ceo_result["message_log_id"] = log.id
+        return ceo_result
+
+    # ── resolve company_id from sender (employee path) ───────────
     existing_emp = await get_employee_by_phone(db, sender)
-    
+
     if existing_emp:
         company_id = existing_emp.company_id
     elif force_company_id is not None:
         company_id = force_company_id
     else:
-        # Fallback to the first company (admin company) if unknown
-        # In a real SaaS, we might reject the message or put in a 'ghost' company
         company_id = 1
 
     # ── Auto-register employee if first contact ──────────────────
-    # Use a placeholder name — the real name will be set when AI extracts it
     existing = await get_employee_by_phone(db, sender)
     if existing is None and sender != "unknown":
-        placeholder_name = f"Employee_{sender[-4:]}"  # e.g. "Employee_6161"
+        placeholder_name = f"Employee_{sender[-4:]}"
         new_emp = Employee(
             name=placeholder_name,
             phone_number=sender,
@@ -293,20 +320,6 @@ async def process_incoming_message(
     )
     db.add(log)
     await db.flush()
-
-    # ── CEO God Mode — check if sender is the CEO ───────────────
-    ceo_user = await get_ceo_user(db, sender)
-    if ceo_user:
-        logger.info("=== CEO DETECTED === user_id=%s name=%r", ceo_user.id, ceo_user.name)
-        # CEO can still use ADD command, but everything else goes to God Mode
-        add_check = await handle_add_employee(db, sender, text, company_id)
-        if add_check is not None:
-            add_check["message_log_id"] = log.id
-            return add_check
-
-        ceo_result = await handle_ceo_command(db, ceo_user, sender, text)
-        ceo_result["message_log_id"] = log.id
-        return ceo_result
 
     # ── Check for ADD employee command ───────────────────────────
     add_result = await handle_add_employee(db, sender, text, company_id)

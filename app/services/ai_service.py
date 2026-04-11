@@ -561,7 +561,7 @@ The CEO manages employees and tasks. Parse their natural language into a structu
    Triggers: words like "deadline", "due date", "is now [date]", "change", "update [task field]", "extend", "move the deadline".
    Examples:
      "Tell Ryan the deadline for the plumbing job is now April 20th" → update_task, employee=Ryan, keyword=plumbing, due_date=2025-04-20
-     "Tell aaron the deadline for the plumbing task is now April 25th" → update_task, employee=aaron, keyword=plumbing, due_date=2025-04-25
+     "Tell aaron the deadline for the plumbing task is now April 25th" → update_task, employee=aaron, keyword=plumbing, due_date=2026-04-25T17:00:00
      "Update Ryan's task description to use copper pipes instead" → update_task, employee=Ryan, keyword=null, description="use copper pipes instead"
 2. "check_status" — CEO wants a status report on a task or employee.
    Triggers: "how is", "how's", "status", "progress", "doing on", "update on".
@@ -579,8 +579,8 @@ The CEO manages employees and tasks. Parse their natural language into a structu
 - Otherwise if it is just "Tell [name] to [do something]" → intent is "send_message".
 
 ## Date parsing for due_date:
-- Convert human dates to ISO-8601 (YYYY-MM-DD). Use the current year (2025) unless another year is mentioned.
-- "April 25th" → "2025-04-25", "April 20th" → "2025-04-20", "next Monday" → nearest upcoming Monday.
+- Convert human dates to ISO-8601 datetime format YYYY-MM-DDT17:00:00 (5 PM end-of-day). Use the current year (2026) unless another year is mentioned.
+- "April 25th" → "2026-04-25T17:00:00", "April 20th" → "2026-04-20T17:00:00", "next Monday" → nearest upcoming Monday at 17:00.
 
 Known employees: {employee_names}
 
@@ -691,12 +691,16 @@ _MONTH_TO_NUM = {
 
 
 def _extract_date_from_text(text: str) -> str | None:
-    """Extract a human date phrase and convert to ISO-8601 YYYY-MM-DD."""
+    """Extract a human date phrase and convert to ISO-8601 datetime string.
+
+    Returns YYYY-MM-DDT17:00:00 (5 PM end-of-day) so deadlines don't land
+    at midnight. Uses the current calendar year.
+    """
     match = _DATE_PHRASE_RE.search(text)
     if not match:
         return None
     raw = match.group(0).strip()
-    # Normalise: remove ordinal suffixes
+    # Remove ordinal suffixes ("25th" → "25")
     cleaned = re.sub(r"(\d+)(?:st|nd|rd|th)", r"\1", raw, flags=re.IGNORECASE).strip()
     parts = cleaned.split()
     if not parts:
@@ -710,7 +714,8 @@ def _extract_date_from_text(text: str) -> str | None:
             month = _MONTH_TO_NUM.get(parts[0].lower())
             day = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
         if month and day:
-            return f"2025-{month:02d}-{day:02d}"
+            year = datetime.now().year
+            return f"{year}-{month:02d}-{day:02d}T17:00:00"
     except (ValueError, IndexError):
         pass
     return None

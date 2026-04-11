@@ -15,6 +15,7 @@ from app.models.employee import Employee
 from app.models.task import Task, TaskStatus
 from app.models.user import User
 from app.services.ai_service import parse_ceo_command, _MONTH_NAMES, _extract_date_from_text
+from app.config import settings
 from app.services.employee_service import (
     get_all_employee_names,
     get_employee_by_phone,
@@ -101,29 +102,50 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
 
 
 async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
-    """Check if the sender phone matches any User's whatsapp_number.
+    """Check if the sender phone matches a User's whatsapp_number OR the
+    FOUNDER_PHONE env var (fallback for accounts that haven't set their
+    WhatsApp number in Settings yet).
 
-    Returns the User row if found (CEO / founder), None otherwise.
+    Returns the User row if found, None otherwise.
     """
     normalized = normalize_phone_number(sender_phone)
+    logger.info("get_ceo_user: checking sender=%r normalized=%r", sender_phone, normalized)
 
-    # Exact match
+    # 1. Exact match against users.whatsapp_number
     stmt = select(User).where(User.whatsapp_number == normalized)
     result = await db.execute(stmt)
     user = result.scalars().first()
     if user:
+        logger.info("get_ceo_user: exact match user_id=%s", user.id)
         return user
 
-    # Suffix fallback (last 10 digits)
-    import re
+    # 2. Suffix fallback (last 10 digits) — handles +91XXXXXXXXXX vs XXXXXXXXXX mismatches
     suffix = re.sub(r"\D", "", normalized)[-10:]
     if len(suffix) == 10:
         stmt2 = select(User).where(User.whatsapp_number.like(f"%{suffix}"))
         result2 = await db.execute(stmt2)
         user2 = result2.scalars().first()
         if user2:
+            logger.info("get_ceo_user: suffix match user_id=%s", user2.id)
             return user2
 
+    # 3. FOUNDER_PHONE env var fallback — if the CEO hasn't set whatsapp_number yet
+    if settings.founder_phone:
+        founder_normalized = normalize_phone_number(settings.founder_phone)
+        founder_suffix = re.sub(r"\D", "", founder_normalized)[-10:]
+        sender_suffix = re.sub(r"\D", "", normalized)[-10:]
+        if founder_suffix and founder_suffix == sender_suffix:
+            # Phone matches FOUNDER_PHONE — find the first User in the matching company
+            stmt3 = select(User).order_by(User.id.asc()).limit(1)
+            result3 = await db.execute(stmt3)
+            user3 = result3.scalars().first()
+            if user3:
+                logger.info(
+                    "get_ceo_user: FOUNDER_PHONE fallback matched, using user_id=%s", user3.id
+                )
+                return user3
+
+    logger.info("get_ceo_user: no CEO match for sender=%r", sender_phone)
     return None
 
 
@@ -157,8 +179,8 @@ async def _find_task(
         if employee:
             stmt = stmt.where(Task.assigned_employee_id == employee.id)
 
-    # Prefer active tasks
-    stmt = stmt.where(Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]))
+    # Exclude only fully closed tasks — include pending, in_progress, delayed, needs_help, overdue
+    stmt = stmt.where(Task.status.not_in([TaskStatus.completed, TaskStatus.archived]))
 
     # If keyword given, try to match title first
     if task_keyword:
@@ -239,9 +261,13 @@ async def _handle_update_task(
     if changes.get("due_date"):
         try:
             new_due = datetime.fromisoformat(changes["due_date"])
-            old_due = task.due_at
             task.due_at = new_due
-            changes_made.append(f"Deadline → {new_due.strftime('%b %d, %I:%M %p').lstrip('0')}")
+            # Show just date for EOD deadlines, full time otherwise
+            if new_due.hour == 17 and new_due.minute == 0:
+                due_display = new_due.strftime("%B %d").replace(" 0", " ")
+            else:
+                due_display = new_due.strftime("%b %d, %I:%M %p").lstrip("0")
+            changes_made.append(f"Deadline → {due_display}")
         except (ValueError, TypeError):
             pass
 
@@ -263,8 +289,8 @@ async def _handle_update_task(
     if employee and employee.phone_number:
         change_text = "\n".join(f"• {c}" for c in changes_made)
         notification = (
-            f"CEO Update for {task.title}:\n"
-            f"{change_text}\n"
+            f"CEO Update: {change_text} for task:\n"
+            f"{task.title}\n"
             f"Please acknowledge."
         )
         await send_whatsapp_message(employee.phone_number, notification)
@@ -273,7 +299,7 @@ async def _handle_update_task(
         emp_name = task.assigned_to or "Unassigned"
 
     change_summary = ", ".join(changes_made)
-    return f"Done. {emp_name} has been notified about: {change_summary}."
+    return f"Done. {emp_name} notified about {task.title} — {change_summary}."
 
 
 async def _handle_complete_task(
