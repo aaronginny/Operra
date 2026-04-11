@@ -408,6 +408,15 @@ _FALLBACK_HELP = (
 # ---------------------------------------------------------------------------
 
 
+# Hardcoded regex for the most common CEO deadline update pattern.
+# Intercepts BEFORE AI parsing — immune to model hallucinations.
+# Pattern: "Tell <Name> the deadline for <task> is now <date>"
+_HARD_DEADLINE_RE = re.compile(
+    r"tell\s+([A-Za-z][A-Za-z'-]{1,30})\s+the\s+deadline\s+for\s+(.+?)\s+is\s+now\s+(.+)",
+    re.IGNORECASE,
+)
+
+
 async def handle_ceo_command(
     db: AsyncSession,
     ceo_user: User,
@@ -417,43 +426,69 @@ async def handle_ceo_command(
     """Process a CEO WhatsApp command end-to-end.
 
     Returns a dict with 'status' and 'reply' keys for the TwiML response.
+    Always returns a reply — never silently fails.
     """
     company_id = ceo_user.company_id
     logger.info(
-        "=== CEO COMMAND === user_id=%s company=%s text=%r",
-        ceo_user.id, company_id, text,
+        "=== CEO COMMAND === sender=%r user_id=%s company=%s text=%r",
+        sender, ceo_user.id, company_id, text,
     )
 
-    # Get known employee names for better AI parsing
-    employee_names = await get_all_employee_names(db)
+    try:
+        # ── Hardcoded regex intercept (bypasses AI for deadline updates) ──
+        hard_match = _HARD_DEADLINE_RE.match(text.strip())
+        if hard_match:
+            emp_name = hard_match.group(1).strip().capitalize()
+            task_kw  = hard_match.group(2).strip()
+            date_raw = hard_match.group(3).strip()
+            date_iso = _extract_date_from_text(date_raw) or _extract_date_from_text(text)
+            logger.info(
+                "CEO hard-regex match: emp=%r kw=%r date_raw=%r → date_iso=%r",
+                emp_name, task_kw, date_raw, date_iso,
+            )
+            if date_iso:
+                parsed = {
+                    "intent": "update_task",
+                    "employee_name": emp_name,
+                    "task_keyword": task_kw,
+                    "changes": {"due_date": date_iso},
+                    "message": None,
+                    "summary": f"Update deadline for {emp_name}'s {task_kw} task to {date_raw}",
+                }
+                reply = await _handle_update_task(db, company_id, parsed, sender)
+                return {"status": "ceo_command", "reply": reply}
 
-    # Parse intent via AI
-    parsed = await parse_ceo_command(text, employee_names)
-    logger.info(
-        "CEO raw parse: intent=%s employee=%r keyword=%r changes=%r",
-        parsed.get("intent"), parsed.get("employee_name"),
-        parsed.get("task_keyword"), parsed.get("changes"),
-    )
+        # ── AI / rule-based parsing path ──────────────────────────────────
+        employee_names = await get_all_employee_names(db)
 
-    # Deterministic sanitization — fixes month-as-name and wrong intent
-    parsed = _sanitize_parsed(parsed, text, employee_names)
-    intent = parsed.get("intent", "unknown")
-    logger.info(
-        "CEO final parse: intent=%s employee=%r keyword=%r changes=%r",
-        intent, parsed.get("employee_name"),
-        parsed.get("task_keyword"), parsed.get("changes"),
-    )
+        parsed = await parse_ceo_command(text, employee_names)
+        logger.info(
+            "CEO raw parse: intent=%s employee=%r keyword=%r changes=%r",
+            parsed.get("intent"), parsed.get("employee_name"),
+            parsed.get("task_keyword"), parsed.get("changes"),
+        )
 
-    # Execute the command
-    if intent == "check_status":
-        reply = await _handle_check_status(db, company_id, parsed)
-    elif intent == "update_task":
-        reply = await _handle_update_task(db, company_id, parsed, sender)
-    elif intent == "complete_task":
-        reply = await _handle_complete_task(db, company_id, parsed)
-    elif intent == "send_message":
-        reply = await _handle_send_message(db, company_id, parsed)
-    else:
-        reply = _FALLBACK_HELP
+        parsed = _sanitize_parsed(parsed, text, employee_names)
+        intent = parsed.get("intent", "unknown")
+        logger.info(
+            "CEO final parse: intent=%s employee=%r keyword=%r changes=%r",
+            intent, parsed.get("employee_name"),
+            parsed.get("task_keyword"), parsed.get("changes"),
+        )
+
+        if intent == "check_status":
+            reply = await _handle_check_status(db, company_id, parsed)
+        elif intent == "update_task":
+            reply = await _handle_update_task(db, company_id, parsed, sender)
+        elif intent == "complete_task":
+            reply = await _handle_complete_task(db, company_id, parsed)
+        elif intent == "send_message":
+            reply = await _handle_send_message(db, company_id, parsed)
+        else:
+            reply = _FALLBACK_HELP
+
+    except Exception as exc:
+        logger.exception("CEO command failed: %s", exc)
+        reply = f"Command received but failed: {exc!r}\nPlease try again."
 
     return {"status": "ceo_command", "reply": reply}

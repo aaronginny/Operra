@@ -77,6 +77,15 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS tasks_created_count INTEGER NOT NULL DEFAULT 0;
         """,
     ),
+    # 005 — cleanup junk tasks created by CEO God Mode bug (safe to re-run)
+    (
+        "cleanup.junk_ceo_tasks",
+        """
+        DELETE FROM tasks
+        WHERE title ILIKE '%Inform Aaron about%'
+           OR description ILIKE '%Tell Aaron that the deadline%';
+        """,
+    ),
 ]
 
 

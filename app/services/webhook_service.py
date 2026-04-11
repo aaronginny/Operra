@@ -253,6 +253,8 @@ async def process_incoming_message(
     if not text.strip():
         return {"status": "no_text"}
 
+    logger.info("=== INCOMING === sender=%r text=%r", sender, text[:120])
+
     # ── CEO God Mode — must run FIRST, before auto-registration ──
     # Prevents CEO messages from being treated as employee task updates
     # or creating the CEO as a placeholder employee record.

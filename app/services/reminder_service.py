@@ -86,6 +86,12 @@ async def _send_morning_pulse(db) -> None:
         if task.assigned_employee_id:
             emp_tasks.setdefault(task.assigned_employee_id, []).append(task)
 
+    # Filter out junk tasks from morning pulse (temp guard for "Inform …" titles)
+    for emp_id in list(emp_tasks.keys()):
+        emp_tasks[emp_id] = [t for t in emp_tasks[emp_id] if "inform" not in t.title.lower()]
+        if not emp_tasks[emp_id]:
+            del emp_tasks[emp_id]
+
     for emp_id, emp_task_list in emp_tasks.items():
         employee = emp_task_list[0].assigned_employee
         if not employee or not employee.phone_number:
@@ -134,6 +140,21 @@ async def _check_and_remind() -> None:
         tasks = list(result.scalars().all())
 
         for task in tasks:
+            # ── Guard: skip junk / brand-new tasks ───────────────
+            created = (
+                task.created_at.replace(tzinfo=None)
+                if task.created_at and task.created_at.tzinfo
+                else task.created_at
+            )
+            if task.due_at is not None and created:
+                due_naive = task.due_at.replace(tzinfo=None) if task.due_at.tzinfo else task.due_at
+                if due_naive < created:
+                    logger.debug("Skipping task #%s — deadline before created_at (junk)", task.id)
+                    continue
+                if (now - created) < timedelta(hours=1):
+                    logger.debug("Skipping task #%s — less than 1 hour old", task.id)
+                    continue
+
             if task.due_at is None:
                 pass
             else:
