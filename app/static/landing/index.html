@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foreman AI — Run Your Team from WhatsApp</title>
+<meta name="description" content="Assign tasks, track progress, and manage your entire operation from WhatsApp. No app downloads. Built for Indian businesses.">
+<style>
+/* ── Reset & Base ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;background:#0a0a0f;color:#e0e0e8;line-height:1.6;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+img{max-width:100%;display:block}
+ul{list-style:none}
+
+/* ── Utilities ────────────────────────────────────────────── */
+.container{max-width:1140px;margin:0 auto;padding:0 24px}
+.btn{display:inline-block;padding:14px 32px;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;transition:all .25s ease;border:none;text-align:center}
+.btn-primary{background:linear-gradient(135deg,#7c3aed,#9f5afd);color:#fff;box-shadow:0 4px 24px rgba(124,58,237,.35)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(124,58,237,.5)}
+.btn-outline{background:transparent;color:#c4b5fd;border:2px solid #7c3aed}
+.btn-outline:hover{background:rgba(124,58,237,.12);transform:translateY(-2px)}
+.section-label{text-transform:uppercase;letter-spacing:3px;font-size:.8rem;font-weight:700;color:#7c3aed;margin-bottom:12px}
+.section-title{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;margin-bottom:16px;color:#fff;line-height:1.2}
+.section-sub{color:#9a9ab0;font-size:1.1rem;max-width:600px;margin:0 auto 48px}
+
+/* ── Scroll animation ─────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(40px);transition:opacity .7s ease,transform .7s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* ── Navbar ───────────────────────────────────────────────── */
+.navbar{position:fixed;top:0;left:0;right:0;z-index:1000;padding:16px 0;transition:background .3s ease}
+.navbar.scrolled{background:rgba(10,10,15,.92);backdrop-filter:blur(16px);border-bottom:1px solid rgba(124,58,237,.15)}
+.navbar .container{display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-size:1.35rem;font-weight:900;color:#fff;letter-spacing:-.5px}
+.nav-logo span{color:#7c3aed}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:.92rem;font-weight:500;color:#9a9ab0;transition:color .2s}
+.nav-links a:hover{color:#fff}
+.nav-cta{padding:10px 24px;font-size:.88rem;border-radius:8px}
+.nav-mobile{display:none;background:none;border:none;cursor:pointer;padding:4px}
+.nav-mobile span{display:block;width:24px;height:2px;background:#fff;margin:5px 0;transition:all .3s}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.hero{padding:160px 0 100px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-200px;right:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(124,58,237,.15) 0%,transparent 70%);pointer-events:none}
+.hero .container{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.hero-text h1{font-size:clamp(2.2rem,5vw,3.6rem);font-weight:900;line-height:1.1;color:#fff;margin-bottom:20px}
+.hero-text h1 span{background:linear-gradient(135deg,#7c3aed,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-text p{font-size:1.15rem;color:#9a9ab0;margin-bottom:36px;max-width:480px}
+.hero-buttons{display:flex;gap:16px;flex-wrap:wrap}
+
+/* WhatsApp mock */
+.wa-mock{background:#0b141a;border-radius:20px;padding:20px;max-width:380px;margin-left:auto;box-shadow:0 20px 80px rgba(0,0,0,.4);border:1px solid #1f2c34}
+.wa-header{display:flex;align-items:center;gap:12px;padding-bottom:16px;border-bottom:1px solid #1f2c34;margin-bottom:16px}
+.wa-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#c084fc);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff}
+.wa-name{font-weight:700;color:#e9edef;font-size:.95rem}
+.wa-name small{display:block;font-weight:400;font-size:.75rem;color:#8696a0}
+.wa-messages{display:flex;flex-direction:column;gap:8px}
+.wa-msg{padding:8px 14px;border-radius:10px;max-width:85%;font-size:.88rem;line-height:1.45;position:relative;animation:msgFade .5s ease both}
+.wa-msg:nth-child(1){animation-delay:.3s}
+.wa-msg:nth-child(2){animation-delay:.8s}
+.wa-msg:nth-child(3){animation-delay:1.3s}
+.wa-msg:nth-child(4){animation-delay:1.8s}
+@keyframes msgFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.wa-out{background:#005c4b;color:#e9edef;align-self:flex-end;border-bottom-right-radius:3px}
+.wa-in{background:#1f2c34;color:#e9edef;align-self:flex-start;border-bottom-left-radius:3px}
+.wa-bot{background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(124,58,237,.1));color:#d4bfff;align-self:flex-start;border-bottom-left-radius:3px;border:1px solid rgba(124,58,237,.2)}
+.wa-time{font-size:.65rem;color:#8696a0;text-align:right;margin-top:4px}
+
+/* ── Social Proof Bar ─────────────────────────────────────── */
+.social-proof{padding:40px 0;border-top:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);background:rgba(18,18,26,.5)}
+.social-proof .container{text-align:center}
+.social-proof p{color:#6b6b80;font-size:.92rem;margin-bottom:24px}
+.stat-pills{display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+.stat-pill{background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:100px;padding:10px 28px;font-size:.92rem;font-weight:600;color:#c4b5fd;white-space:nowrap}
+
+/* ── How It Works ─────────────────────────────────────────── */
+.how-it-works{padding:100px 0;text-align:center}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:48px}
+.step{position:relative;padding:40px 28px;border-radius:16px;background:#12121a;border:1px solid rgba(255,255,255,.05);transition:border-color .3s}
+.step:hover{border-color:rgba(124,58,237,.3)}
+.step-num{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#7c3aed,#9f5afd);display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:900;color:#fff;margin:0 auto 20px;box-shadow:0 4px 20px rgba(124,58,237,.3)}
+.step h3{font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:10px}
+.step p{color:#9a9ab0;font-size:.95rem}
+.step-arrow{display:none;position:absolute;right:-28px;top:50%;transform:translateY(-50%);color:#7c3aed;font-size:1.5rem}
+
+/* ── Features ─────────────────────────────────────────────── */
+.features{padding:100px 0;text-align:center}
+.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+.feature-card{padding:36px 28px;border-radius:16px;background:#12121a;border:1px solid rgba(255,255,255,.05);text-align:left;transition:all .3s ease}
+.feature-card:hover{border-color:rgba(124,58,237,.3);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.feature-icon{font-size:2rem;margin-bottom:16px;display:block}
+.feature-card h3{font-size:1.08rem;font-weight:700;color:#fff;margin-bottom:10px}
+.feature-card p{color:#9a9ab0;font-size:.92rem;line-height:1.55}
+
+/* ── Pricing ──────────────────────────────────────────────── */
+.pricing{padding:100px 0;text-align:center}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px;align-items:start}
+.price-card{padding:40px 28px;border-radius:20px;background:#12121a;border:1px solid rgba(255,255,255,.06);position:relative;transition:all .3s}
+.price-card:hover{transform:translateY(-4px)}
+.price-card.popular{border:2px solid #7c3aed;box-shadow:0 8px 48px rgba(124,58,237,.2)}
+.popular-badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#7c3aed,#c084fc);color:#fff;font-size:.72rem;font-weight:800;padding:6px 20px;border-radius:100px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
+.price-tier{font-size:.95rem;font-weight:600;color:#9a9ab0;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.price-amount{font-size:2.5rem;font-weight:900;color:#fff;margin-bottom:4px}
+.price-amount span{font-size:1rem;font-weight:500;color:#6b6b80}
+.price-period{font-size:.85rem;color:#6b6b80;margin-bottom:28px}
+.price-features{margin-bottom:32px;text-align:left}
+.price-features li{padding:8px 0;color:#c0c0d0;font-size:.92rem;display:flex;align-items:center;gap:10px}
+.price-features li::before{content:'';display:inline-block;width:18px;height:18px;background:rgba(124,58,237,.15);border-radius:50%;flex-shrink:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237c3aed' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center}
+.price-card .btn{width:100%}
+.price-note{color:#6b6b80;font-size:.85rem;margin-top:40px}
+
+/* ── Testimonials ─────────────────────────────────────────── */
+.testimonials{padding:100px 0;text-align:center}
+.testimonial-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+.testimonial{padding:36px 28px;border-radius:16px;background:#12121a;border:1px solid rgba(255,255,255,.05);text-align:left}
+.testimonial-stars{color:#f59e0b;margin-bottom:16px;font-size:1rem;letter-spacing:2px}
+.testimonial q{display:block;font-size:1rem;color:#d0d0e0;line-height:1.6;margin-bottom:20px;font-style:italic}
+.testimonial-author{display:flex;align-items:center;gap:12px}
+.testimonial-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#1e1e2e,#2a2a3e);display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;color:#7c3aed}
+.testimonial-name{font-weight:700;color:#fff;font-size:.92rem}
+.testimonial-role{color:#6b6b80;font-size:.8rem}
+
+/* ── FAQ ──────────────────────────────────────────────────── */
+.faq{padding:100px 0}
+.faq .container{max-width:740px}
+.faq-list{margin-top:48px}
+.faq-item{border-bottom:1px solid rgba(255,255,255,.06);padding:20px 0}
+.faq-q{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:16px}
+.faq-q h3{font-size:1.05rem;font-weight:600;color:#e0e0e8;transition:color .2s}
+.faq-q:hover h3{color:#fff}
+.faq-q .faq-icon{width:28px;height:28px;border-radius:8px;background:rgba(124,58,237,.1);display:flex;align-items:center;justify-content:center;color:#7c3aed;font-size:1.2rem;transition:transform .3s;flex-shrink:0}
+.faq-item.open .faq-icon{transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease,padding .35s ease}
+.faq-item.open .faq-a{max-height:200px;padding-top:12px}
+.faq-a p{color:#9a9ab0;font-size:.95rem;line-height:1.6}
+
+/* ── Footer CTA ───────────────────────────────────────────── */
+.footer-cta{padding:100px 0;text-align:center;position:relative}
+.footer-cta::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(circle,rgba(124,58,237,.12) 0%,transparent 70%);pointer-events:none}
+.footer-cta h2{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:900;color:#fff;margin-bottom:16px}
+.footer-cta p{color:#9a9ab0;font-size:1.1rem;margin-bottom:36px}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.footer{padding:32px 0;border-top:1px solid rgba(255,255,255,.05)}
+.footer .container{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:#6b6b80;font-size:.85rem;transition:color .2s}
+.footer-links a:hover{color:#c4b5fd}
+.footer-copy{color:#4a4a5a;font-size:.85rem}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media(max-width:1024px){
+  .steps,.feature-grid,.pricing-grid,.testimonial-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:768px){
+  .hero .container{grid-template-columns:1fr;text-align:center}
+  .hero-text p{margin-left:auto;margin-right:auto}
+  .hero-buttons{justify-content:center}
+  .wa-mock{margin:40px auto 0;max-width:340px}
+  .nav-links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,15,.98);flex-direction:column;justify-content:center;gap:28px;z-index:999}
+  .nav-links.active{display:flex}
+  .nav-links a{font-size:1.2rem;color:#e0e0e8}
+  .nav-mobile{display:block;z-index:1001}
+  .steps,.feature-grid,.pricing-grid,.testimonial-grid{grid-template-columns:1fr}
+  .stat-pills{flex-direction:column;align-items:center}
+  .footer .container{flex-direction:column;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ NAVBAR ═══════════════════ -->
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="#" class="nav-logo">Foreman<span>AI</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="#features" onclick="closeNav()">Features</a>
+      <a href="#pricing" onclick="closeNav()">Pricing</a>
+      <a href="#how-it-works" onclick="closeNav()">How It Works</a>
+      <a href="/dashboard" class="btn btn-primary nav-cta" onclick="closeNav()">Get Started Free</a>
+    </div>
+    <button class="nav-mobile" id="navToggle" aria-label="Toggle menu" onclick="toggleNav()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══════════════════ HERO ═══════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-text">
+      <h1>Run your team from <span>WhatsApp</span></h1>
+      <p>Assign tasks to your workers. They reply DONE. You see everything on one dashboard. No app downloads. No training.</p>
+      <div class="hero-buttons">
+        <a href="/dashboard" class="btn btn-primary">Start Free</a>
+        <a href="#how-it-works" class="btn btn-outline">See How It Works</a>
+      </div>
+    </div>
+    <div class="wa-mock">
+      <div class="wa-header">
+        <div class="wa-avatar">F</div>
+        <div class="wa-name">Foreman AI<small>online</small></div>
+      </div>
+      <div class="wa-messages">
+        <div class="wa-msg wa-out">Fix the plumbing at Site 3 by Friday<div class="wa-time">10:32 AM</div></div>
+        <div class="wa-msg wa-bot">Task assigned to Ravi &#10004;&#65039;<div class="wa-time">10:32 AM</div></div>
+        <div class="wa-msg wa-in">DONE<div class="wa-time">3:47 PM</div></div>
+        <div class="wa-msg wa-bot">Task marked complete! CEO notified &#127881;<div class="wa-time">3:47 PM</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ SOCIAL PROOF ═══════════════════ -->
+<section class="social-proof">
+  <div class="container">
+    <p>Trusted by contractors, cleaning companies, and site managers across India</p>
+    <div class="stat-pills">
+      <div class="stat-pill">500+ tasks completed</div>
+      <div class="stat-pill">48 businesses onboarded</div>
+      <div class="stat-pill">98% on-time delivery</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
+<section class="how-it-works" id="how-it-works">
+  <div class="container">
+    <div class="section-label reveal">How It Works</div>
+    <h2 class="section-title reveal">Three steps. Zero friction.</h2>
+    <p class="section-sub reveal">No sign-ups for your team. No training sessions. Just WhatsApp.</p>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">1</div>
+        <h3>You assign the task</h3>
+        <p>Type naturally on WhatsApp. "Paint the walls at Prestige Tower by Thursday." Foreman AI understands.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">2</div>
+        <h3>Worker gets notified</h3>
+        <p>Your worker receives a clear WhatsApp message instantly with the task details and deadline.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">3</div>
+        <h3>You see it all</h3>
+        <p>Live dashboard updates in real time. Every task, every worker, every status — one screen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ FEATURES ═══════════════════ -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="section-label reveal">Features</div>
+    <h2 class="section-title reveal">Everything you need to manage your team</h2>
+    <p class="section-sub reveal">Built for people who run real operations, not Silicon Valley startups.</p>
+    <div class="feature-grid">
+      <div class="feature-card reveal">
+        <span class="feature-icon">&#129302;</span>
+        <h3>CEO God Mode</h3>
+        <p>Control everything from WhatsApp. Change deadlines, check status, send updates — just type it.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">&#9989;</span>
+        <h3>Smart Checkpoints</h3>
+        <p>Break tasks into steps. Workers tick them off via WhatsApp as they go. You see progress in real time.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">&#127749;</span>
+        <h3>Morning Pulse</h3>
+        <p>Every morning, your team gets their task list automatically. No micromanaging needed.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">&#128202;</span>
+        <h3>Live Dashboard</h3>
+        <p>See every task, every worker, every status — updated in real time. No refresh needed.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">&#128276;</span>
+        <h3>Auto Reminders</h3>
+        <p>Foreman AI nags your workers so you don't have to. Overdue tasks get automatic follow-ups.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">&#128200;</span>
+        <h3>Progress Tracking</h3>
+        <p>Workers send updates in plain English. AI summarises it for you in clean, actionable reports.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ PRICING ═══════════════════ -->
+<section class="pricing" id="pricing">
+  <div class="container">
+    <div class="section-label reveal">Pricing</div>
+    <h2 class="section-title reveal">Simple pricing. No surprises.</h2>
+    <p class="section-sub reveal">Start free. Upgrade when you're ready. Pay via UPI.</p>
+    <div class="pricing-grid">
+      <!-- Free -->
+      <div class="price-card reveal">
+        <div class="price-tier">Free</div>
+        <div class="price-amount">&#8377;0</div>
+        <div class="price-period">forever</div>
+        <ul class="price-features">
+          <li>1 project</li>
+          <li>3 tasks maximum</li>
+          <li>Basic WhatsApp alerts</li>
+          <li>Dashboard access</li>
+        </ul>
+        <a href="/dashboard" class="btn btn-outline" style="width:100%">Get Started</a>
+      </div>
+      <!-- Basic -->
+      <div class="price-card popular reveal">
+        <div class="popular-badge">Most Popular</div>
+        <div class="price-tier">Basic</div>
+        <div class="price-amount">&#8377;2,000 <span>/ project</span></div>
+        <div class="price-period">one-time per project</div>
+        <ul class="price-features">
+          <li>Unlimited tasks per project</li>
+          <li>Smart Checkpoints</li>
+          <li>CEO God Mode</li>
+          <li>Morning Pulse</li>
+          <li>Auto Reminders</li>
+        </ul>
+        <a href="/dashboard" class="btn btn-primary">Get Started</a>
+      </div>
+      <!-- Premium -->
+      <div class="price-card reveal">
+        <div class="price-tier">Premium</div>
+        <div class="price-amount">&#8377;5,000 <span>/ month</span></div>
+        <div class="price-period">billed monthly</div>
+        <ul class="price-features">
+          <li>Unlimited projects</li>
+          <li>Unlimited tasks</li>
+          <li>All features included</li>
+          <li>Priority WhatsApp support</li>
+          <li>White-glove onboarding</li>
+        </ul>
+        <a href="/dashboard" class="btn btn-outline" style="width:100%">Get Started</a>
+      </div>
+    </div>
+    <p class="price-note reveal">All plans: Pay via UPI &middot; Activated within 1 hour</p>
+  </div>
+</section>
+
+<!-- ═══════════════════ TESTIMONIALS ═══════════════════ -->
+<section class="testimonials">
+  <div class="container">
+    <div class="section-label reveal">What People Say</div>
+    <h2 class="section-title reveal">Trusted by real business owners</h2>
+    <div class="testimonial-grid">
+      <div class="testimonial reveal">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <q>I used to call each worker 3 times a day. Now I just check the dashboard. My phone bill dropped, my blood pressure dropped.</q>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">R</div>
+          <div>
+            <div class="testimonial-name">Ramesh K.</div>
+            <div class="testimonial-role">Plumbing Contractor, Chennai</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial reveal">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <q>My workers don't use email. They all use WhatsApp. This just works. Set it up in 10 minutes and never looked back.</q>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">P</div>
+          <div>
+            <div class="testimonial-name">Priya M.</div>
+            <div class="testimonial-role">Cleaning Services, Bangalore</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial reveal">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <q>The morning reminders alone are worth it. Zero missed tasks since we started. My team actually knows what to do each day.</q>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">S</div>
+          <div>
+            <div class="testimonial-name">Suresh R.</div>
+            <div class="testimonial-role">Site Manager, Hyderabad</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ FAQ ═══════════════════ -->
+<section class="faq" id="faq">
+  <div class="container">
+    <div class="section-label reveal" style="text-align:center">FAQ</div>
+    <h2 class="section-title reveal" style="text-align:center">Got questions?</h2>
+    <div class="faq-list">
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <h3>Do my workers need to download an app?</h3>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-a"><p>No. Your workers only need WhatsApp, which they already have. No downloads, no sign-ups, no training.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <h3>What if a worker doesn't reply?</h3>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-a"><p>Foreman AI sends automatic reminders for overdue tasks. You'll also see unresponsive workers flagged on your dashboard.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <h3>How do I pay?</h3>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-a"><p>Pay via UPI to aaronginny@okhdfcbank. Send your payment screenshot on WhatsApp to 9150016161. Your plan is activated within 1 hour.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <h3>Can I manage multiple projects?</h3>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-a"><p>Yes! On the Basic plan, pay per project. On Premium, get unlimited projects for a flat monthly fee.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <h3>Is my data safe?</h3>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-a"><p>Yes. Your data is hosted on secure cloud servers with encryption. Only you and your team can access your tasks and reports.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ FOOTER CTA ═══════════════════ -->
+<section class="footer-cta">
+  <div class="container reveal">
+    <h2>Ready to run your team<br>from WhatsApp?</h2>
+    <p>Join 48 businesses already managing their teams smarter.</p>
+    <a href="/dashboard" class="btn btn-primary" style="padding:18px 48px;font-size:1.1rem">Start Free Today</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-copy">&copy; 2026 Foreman AI</div>
+    <div class="footer-links">
+      <a href="#">Privacy</a>
+      <a href="#">Contact</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══════════════════ JS ═══════════════════ -->
+<script>
+/* ── Navbar scroll effect ─────────────────── */
+var navbar = document.getElementById("navbar");
+window.addEventListener("scroll", function() {
+  navbar.classList.toggle("scrolled", window.scrollY > 40);
+});
+
+/* ── Mobile nav ───────────────────────────── */
+function toggleNav() {
+  document.getElementById("navLinks").classList.toggle("active");
+}
+function closeNav() {
+  document.getElementById("navLinks").classList.remove("active");
+}
+
+/* ── FAQ accordion ────────────────────────── */
+function toggleFaq(el) {
+  var item = el.parentElement;
+  var wasOpen = item.classList.contains("open");
+  // close all
+  document.querySelectorAll(".faq-item").forEach(function(i) { i.classList.remove("open"); });
+  if (!wasOpen) item.classList.add("open");
+}
+
+/* ── Scroll reveal ────────────────────────── */
+var revealEls = document.querySelectorAll(".reveal");
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(e) {
+    if (e.isIntersecting) {
+      e.target.classList.add("visible");
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12 });
+revealEls.forEach(function(el) { observer.observe(el); });
+</script>
+</body>
+</html>

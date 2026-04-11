@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -99,13 +99,18 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.get("/", include_in_schema=False)
 def root():
-    """Redirect bare root to the login page."""
-    return RedirectResponse(url="/static/login.html")
+    """Serve the marketing landing page at the root URL."""
+    return FileResponse("app/static/landing/index.html")
 
 @app.get("/login", include_in_schema=False)
 def login_page():
     """Convenience redirect — /login → login page."""
     return RedirectResponse(url="/static/login.html")
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard_page():
+    """Convenience redirect — /dashboard → dashboard SPA."""
+    return RedirectResponse(url="/static/dashboard/index.html")
 
 
 @app.get("/health", tags=["Health"])
