@@ -5,6 +5,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     company_name: str
+    whatsapp_number: str | None = None
 
 class UserLogin(BaseModel):
     email: EmailStr

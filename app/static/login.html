@@ -60,6 +60,10 @@
                 <label>Password</label>
                 <input type="password" id="signupPassword" required />
             </div>
+            <div class="form-group">
+                <label>Your WhatsApp Number <span style="color:#64748b;font-size:.8rem;">(for CEO commands)</span></label>
+                <input type="tel" id="signupWhatsapp" placeholder="+919150016161" />
+            </div>
             <button type="submit">Create Company Account</button>
             <div id="signupError" class="error"></div>
         </form>
@@ -119,6 +123,7 @@
             const err = document.getElementById('signupError');
             btn.textContent = "Loading...";
 
+            const waNum = document.getElementById('signupWhatsapp').value.trim();
             fetch("/auth/signup", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -126,7 +131,8 @@
                     name: document.getElementById('signupName').value,
                     company_name: document.getElementById('signupCompany').value,
                     email: document.getElementById('signupEmail').value,
-                    password: document.getElementById('signupPassword').value
+                    password: document.getElementById('signupPassword').value,
+                    whatsapp_number: waNum || null
                 })
             })
             .then(res => res.json())

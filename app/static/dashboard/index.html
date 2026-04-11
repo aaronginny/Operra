@@ -720,6 +720,7 @@
       <button class="nav-tab active" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
       <button class="nav-tab" id="tabEmployees" onclick="switchTab('employees')">Employees</button>
       <button class="nav-tab" id="tabEnquiries" onclick="switchTab('enquiries')">Enquiries</button>
+      <button class="nav-tab" id="tabSettings" onclick="switchTab('settings')">⚙ Settings</button>
     </div>
 
     <!-- Dashboard View -->
@@ -869,6 +870,38 @@
         </table>
       </div>
     </div> <!-- /Enquiries View -->
+
+    <!-- Settings View -->
+    <div id="viewSettings" style="display: none;">
+      <h2 style="margin-bottom: 24px;">Settings</h2>
+
+      <div style="max-width: 520px;">
+        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px;">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px;">CEO WhatsApp Number</h3>
+          <p style="font-size: .82rem; color: var(--text-dim); margin-bottom: 16px;">
+            Messages from this number are treated as CEO commands in Foreman AI.
+            Include country code, e.g. <strong>+919150016161</strong>
+          </p>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input
+              type="tel"
+              id="settingsWhatsapp"
+              placeholder="+919150016161"
+              style="flex: 1; padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); font-size: .9rem; font-family: inherit;"
+            />
+            <button class="btn btn-primary btn-sm" onclick="saveWhatsappNumber()">Save</button>
+          </div>
+          <div id="settingsWhatsappMsg" style="font-size:.82rem; margin-top: 8px; min-height: 18px;"></div>
+        </div>
+
+        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px;">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px;">Account</h3>
+          <p style="font-size: .82rem; color: var(--text-dim); margin-bottom: 12px;">Signed in as <span id="settingsEmail" style="color: var(--text);">—</span></p>
+          <button class="btn btn-ghost btn-sm" onclick="logout()">Sign out</button>
+        </div>
+      </div>
+    </div> <!-- /Settings View -->
+
   </div>
 
   <!-- Employee Profile Modal -->
@@ -1428,6 +1461,7 @@
         document.getElementById('viewDashboard').style.display = 'none';
         document.getElementById('viewEmployees').style.display = 'none';
         document.getElementById('viewEnquiries').style.display = 'none';
+        document.getElementById('viewSettings').style.display = 'none';
 
         if (tabId === 'dashboard') {
             document.getElementById('tabDashboard').classList.add('active');
@@ -1439,6 +1473,44 @@
             document.getElementById('tabEnquiries').classList.add('active');
             document.getElementById('viewEnquiries').style.display = 'block';
             loadEnquiries();
+        } else if (tabId === 'settings') {
+            document.getElementById('tabSettings').classList.add('active');
+            document.getElementById('viewSettings').style.display = 'block';
+            loadProfile();
+        }
+    }
+
+    /* ── Settings / Profile ──────────────────────────────────── */
+    async function loadProfile() {
+        try {
+            const data = await api("/auth/me");
+            document.getElementById("settingsWhatsapp").value = data.whatsapp_number || "";
+            document.getElementById("settingsEmail").textContent = data.email || "—";
+        } catch (e) {
+            // silently ignore — user stays logged in
+        }
+    }
+
+    async function saveWhatsappNumber() {
+        const num = document.getElementById("settingsWhatsapp").value.trim();
+        const msg = document.getElementById("settingsWhatsappMsg");
+        msg.style.color = "var(--text-dim)";
+        msg.textContent = "Saving…";
+        try {
+            const data = await api("/auth/profile", {
+                method: "PATCH",
+                body: JSON.stringify({ whatsapp_number: num || null })
+            });
+            if (data.success) {
+                msg.style.color = "var(--green)";
+                msg.textContent = "Saved! CEO commands from this number are now active.";
+            } else {
+                msg.style.color = "var(--red)";
+                msg.textContent = data.error || "Save failed.";
+            }
+        } catch (e) {
+            msg.style.color = "var(--red)";
+            msg.textContent = "Error: " + e.message;
         }
     }
 

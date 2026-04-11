@@ -2,7 +2,16 @@
 import jwt
 from datetime import datetime, timedelta
 import bcrypt
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.config import settings
+from app.database import get_db
+
+_bearer = HTTPBearer(auto_error=False)
 
 SECRET_KEY = getattr(settings, "secret_key", "super_secret_dev_key_operra_123!")
 ALGORITHM = "HS256"
@@ -33,3 +42,28 @@ def decode_access_token(token: str) -> dict | None:
         return decoded_data
     except Exception:
         return None
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
+):
+    """FastAPI dependency that returns the authenticated User from the JWT."""
+    from app.models.user import User  # local import to avoid circular
+
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    payload = decode_access_token(credentials.credentials)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    user_id: int | None = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    return user
