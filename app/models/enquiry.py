@@ -34,10 +34,10 @@ STAGE_ORDER = [
 
 # WhatsApp message template for each stage (sent to the assigned employee)
 STAGE_MESSAGES = {
-    EnquiryStage.follow_up: "Foreman AI - Enquiry Update\n\nPlease follow up with {client_name}.",
-    EnquiryStage.send_options: "Foreman AI - Enquiry Update\n\nPlease send service options to {client_name}.",
-    EnquiryStage.close_deal: "Foreman AI - Enquiry Update\n\nPlease close the deal with {client_name}.",
-    EnquiryStage.payment_received: "Foreman AI - Enquiry Update\n\nPayment received from {client_name}. Job confirmed!",
+    EnquiryStage.follow_up: "PhantomPilot - Enquiry Update\n\nPlease follow up with {client_name}.",
+    EnquiryStage.send_options: "PhantomPilot - Enquiry Update\n\nPlease send service options to {client_name}.",
+    EnquiryStage.close_deal: "PhantomPilot - Enquiry Update\n\nPlease close the deal with {client_name}.",
+    EnquiryStage.payment_received: "PhantomPilot - Enquiry Update\n\nPayment received from {client_name}. Job confirmed!",
 }
 
 

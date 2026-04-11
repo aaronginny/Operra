@@ -1,4 +1,4 @@
-"""Billing service — subscription tier enforcement for Foreman AI.
+"""Billing service — subscription tier enforcement for PhantomPilot.
 
 Tiers
 -----

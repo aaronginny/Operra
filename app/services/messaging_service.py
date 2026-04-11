@@ -169,7 +169,7 @@ async def send_email(email: str, message: str, subject: str = "Task Reminder") -
 # ---------------------------------------------------------------------------
 
 WELCOME_TEXT = (
-    "Welcome to Foreman AI.\n"
+    "Welcome to PhantomPilot.\n"
     "\n"
     "You will receive task reminders here.\n"
     "\n"
@@ -227,7 +227,7 @@ def format_urgent_reminder(task_title: str) -> str:
 def format_deadline_alert(task_title: str) -> str:
     """Deadline reached — final alert."""
     return (
-        f"Foreman AI - Deadline Reached\n\n"
+        f"PhantomPilot - Deadline Reached\n\n"
         f"Task: {task_title}\n\n"
         f"Please reply with:\n"
         f"DONE - mark complete\n"

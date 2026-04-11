@@ -67,7 +67,7 @@ async def create_task_endpoint(
             )
             desc_str = task.description or "No description"
             task_notification = (
-                f"Foreman AI - New Task Assigned\n\n"
+                f"PhantomPilot - New Task Assigned\n\n"
                 f"Task: {task.title}\n"
                 f"Description: {desc_str}\n"
                 f"Due: {due_str}\n\n"
@@ -181,7 +181,7 @@ async def update_due_date(
         if employee and employee.phone_number:
             due_str = payload.due_at.strftime("%b %d, %Y %I:%M %p").lstrip("0")
             msg = (
-                f"Foreman AI - Task Update\n\n"
+                f"PhantomPilot - Task Update\n\n"
                 f"Task: {task.title}\n"
                 f"Your deadline has been updated.\n"
                 f"New due date: {due_str}\n\n"

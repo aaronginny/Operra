@@ -241,7 +241,7 @@ async def _handle_check_status(
     task = await _find_task(db, company_id, parsed["employee_name"], parsed["task_keyword"])
     if not task:
         emp_name = parsed["employee_name"] or "that employee"
-        return f"Foreman AI: No active task found for {emp_name}."
+        return f"PhantomPilot: No active task found for {emp_name}."
 
     employee = await _get_employee_for_task(db, task)
     emp_name = employee.name if employee else (task.assigned_to or "Unassigned")
@@ -252,7 +252,7 @@ async def _handle_check_status(
     due = task.due_at.strftime("%b %d, %I:%M %p").lstrip("0") if task.due_at else "No deadline"
 
     return (
-        f"Foreman AI — Status Report\n\n"
+        f"PhantomPilot — Status Report\n\n"
         f"Task: {task.title}\n"
         f"Assigned to: {emp_name}\n"
         f"Status: {status_label}\n"
@@ -269,7 +269,7 @@ async def _handle_update_task(
     task = await _find_task(db, company_id, parsed["employee_name"], parsed["task_keyword"])
     if not task:
         emp_name = parsed["employee_name"] or "that employee"
-        return f"Foreman AI: No active task found for {emp_name}."
+        return f"PhantomPilot: No active task found for {emp_name}."
 
     changes = parsed.get("changes") or {}
     changes_made = []
@@ -304,7 +304,7 @@ async def _handle_update_task(
         changes_made.append(f"Title → {changes['title']}")
 
     if not changes_made:
-        return "Foreman AI: I understood you want to update a task, but I couldn't determine what to change. Try: 'Change the deadline for [task] to [date]'"
+        return "PhantomPilot: I understood you want to update a task, but I couldn't determine what to change. Try: 'Change the deadline for [task] to [date]'"
 
     await db.flush()
 
@@ -341,7 +341,7 @@ async def _handle_complete_task(
     task = await _find_task(db, company_id, parsed["employee_name"], parsed["task_keyword"])
     if not task:
         emp_name = parsed["employee_name"] or "that employee"
-        return f"Foreman AI: No active task found for {emp_name}."
+        return f"PhantomPilot: No active task found for {emp_name}."
 
     task.status = TaskStatus.completed
     task.completed_at = datetime.now()
@@ -369,7 +369,7 @@ async def _handle_send_message(
     """Handle: 'Tell Ryan to call me'"""
     emp_name = parsed.get("employee_name")
     if not emp_name:
-        return "Foreman AI: I couldn't determine which employee to message. Try: 'Tell [name] ...'"
+        return "PhantomPilot: I couldn't determine which employee to message. Try: 'Tell [name] ...'"
 
     # Find employee
     emp_stmt = select(Employee).where(
@@ -380,7 +380,7 @@ async def _handle_send_message(
     employee = emp_result.scalars().first()
 
     if not employee or not employee.phone_number:
-        return f"Foreman AI: Employee \"{emp_name}\" not found or has no phone number."
+        return f"PhantomPilot: Employee \"{emp_name}\" not found or has no phone number."
 
     relay_message = parsed.get("message") or parsed.get("summary") or "Message from CEO."
     notification = f"Message from CEO:\n{relay_message}"
@@ -389,11 +389,11 @@ async def _handle_send_message(
     if sent:
         return f"Done. Message sent to {employee.name}."
     else:
-        return f"Foreman AI: Failed to send message to {employee.name}. Check Twilio config."
+        return f"PhantomPilot: Failed to send message to {employee.name}. Check Twilio config."
 
 
 _FALLBACK_HELP = (
-    "Foreman AI: Command not recognized.\n\n"
+    "PhantomPilot: Command not recognized.\n\n"
     "Try:\n"
     "• \"Tell [employee] the deadline for [task] is [date]\"\n"
     "• \"How is [employee] doing on [task]?\"\n"

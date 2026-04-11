@@ -32,7 +32,7 @@ def _normalize_whatsapp(number: str | None) -> str | None:
 @router.post("/signup")
 async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     """Create a new company + admin user account."""
-    logger.info("[Foreman AI] Signup attempt for: %s", payload.email)
+    logger.info("[PhantomPilot] Signup attempt for: %s", payload.email)
 
     # Check if user exists
     stmt = select(User).where(User.email == payload.email)
@@ -58,7 +58,7 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     await db.flush()
     await db.refresh(user)
 
-    logger.info("[Foreman AI] Signup OK for: %s  |  company_id=%s", payload.email, company.id)
+    logger.info("[PhantomPilot] Signup OK for: %s  |  company_id=%s", payload.email, company.id)
 
     # Generate token
     token = create_access_token({"sub": user.email, "user_id": user.id, "company_id": user.company_id, "role": user.role.value})
@@ -68,22 +68,22 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 @router.post("/login")
 async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     """Authenticate and return a JWT token."""
-    logger.info("[Foreman AI] Login attempt for: %s", payload.email)
+    logger.info("[PhantomPilot] Login attempt for: %s", payload.email)
 
     stmt = select(User).where(User.email == payload.email)
     result = await db.execute(stmt)
     user = result.scalars().first()
 
     if not user or not user.password_hash:
-        logger.warning("[Foreman AI] Login FAILED for: %s (user not found)", payload.email)
+        logger.warning("[PhantomPilot] Login FAILED for: %s (user not found)", payload.email)
         return {"success": False, "error": "Incorrect email or password"}
 
     if not verify_password(payload.password, user.password_hash):
-        logger.warning("[Foreman AI] Login FAILED for: %s (bad password)", payload.email)
+        logger.warning("[PhantomPilot] Login FAILED for: %s (bad password)", payload.email)
         return {"success": False, "error": "Incorrect email or password"}
 
     token = create_access_token({"sub": user.email, "user_id": user.id, "company_id": user.company_id, "role": user.role.value})
-    logger.info("[Foreman AI] Login OK for: %s  |  company_id=%s", payload.email, user.company_id)
+    logger.info("[PhantomPilot] Login OK for: %s  |  company_id=%s", payload.email, user.company_id)
     return {"success": True, "access_token": token, "token_type": "bearer", "company_id": user.company_id}
 
 
@@ -140,5 +140,5 @@ async def reset_users(db: AsyncSession = Depends(get_db)):
     """
     await db.execute(delete(User))
     await db.execute(delete(Company))
-    logger.warning("[Foreman AI] All users and companies have been deleted via /auth/reset")
+    logger.warning("[PhantomPilot] All users and companies have been deleted via /auth/reset")
     return {"success": True, "message": "All users and companies cleared. You can now sign up again."}

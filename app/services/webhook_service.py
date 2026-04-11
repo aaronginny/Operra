@@ -301,7 +301,7 @@ async def process_incoming_message(
             from app.services.messaging_service import send_whatsapp_message
             await send_whatsapp_message(
                 sender,
-                "Foreman AI — Upgrade Required\n\n"
+                "PhantomPilot — Upgrade Required\n\n"
                 "WhatsApp God Mode is available on the Basic plan (₹2,000/project) "
                 "or Premium plan (₹5,000/month).\n\n"
                 "Visit your dashboard to upgrade.",
@@ -486,7 +486,7 @@ async def process_incoming_message(
                 if analysis.get("is_blocker") and not is_completion:
                     if settings.founder_phone:
                         alert_msg = (
-                            f"⚠️ Foreman Alert: {employee_for_update.name} is stuck "
+                            f"⚠️ PhantomPilot Alert: {employee_for_update.name} is stuck "
                             f"on \"{active_task.title}\".\n"
                             f"Detail: {summary or text[:100]}"
                         )
@@ -611,7 +611,7 @@ async def process_incoming_message(
     if employee and employee.phone_number:
         desc_str = task.description or "No description"
         task_notification = (
-            f"Foreman AI - New Task Assigned\n\n"
+            f"PhantomPilot - New Task Assigned\n\n"
             f"Task: {task.title}\n"
             f"Description: {desc_str}\n"
             f"Due: {due_str}\n\n"

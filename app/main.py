@@ -69,8 +69,8 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="Foreman AI",
-    description="Backend API that captures WhatsApp messages, extracts tasks via LLM, and tracks them. Foreman AI - Smart Task Management for Teams",
+    title="PhantomPilot",
+    description="Backend API that captures WhatsApp messages, extracts tasks via LLM, and tracks them. PhantomPilot - Smart Task Management for Teams",
     version="0.2.0",
     lifespan=lifespan,
 )
