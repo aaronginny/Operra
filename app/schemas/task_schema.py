@@ -19,6 +19,7 @@ class TaskCreate(BaseModel):
     reminder_interval_days: int | None = None
     progress_percent: int = 0
     last_update: datetime | None = None
+    checkpoints: list[str] | None = None  # e.g. ["Check logo", "Buy fabric"]
 
 
 class TaskUpdate(BaseModel):
@@ -34,6 +35,7 @@ class TaskUpdate(BaseModel):
     reminder_interval_days: int | None = None
     progress_percent: int | None = None
     last_update: datetime | None = None
+    checkpoints: str | None = None  # Raw JSON string
 
 
 class TaskResponse(BaseModel):
@@ -54,6 +56,7 @@ class TaskResponse(BaseModel):
     progress_percent: int
     last_update: datetime | None = None
     last_update_summary: str | None = None
+    checkpoints: str | None = None  # JSON string
 
     model_config = {"from_attributes": True}
 

@@ -1,5 +1,7 @@
 """Task service — CRUD helpers for the Task model."""
 
+import json
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +27,13 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
         )
         employee_id = employee.id
 
+    # Convert checkpoints list → JSON string
+    checkpoints_json = None
+    if data.checkpoints:
+        checkpoints_json = json.dumps(
+            [{"text": cp.strip(), "done": False} for cp in data.checkpoints if cp.strip()]
+        )
+
     task = Task(
         company_id=data.company_id,
         title=data.title,
@@ -35,6 +44,7 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
         due_at=data.due_at,
         status=TaskStatus.pending,
         source_type=SourceType(data.source_type),
+        checkpoints=checkpoints_json,
     )
     db.add(task)
     await db.flush()

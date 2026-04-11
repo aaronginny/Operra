@@ -394,14 +394,16 @@ async def process_incoming_message(
         active_task = task_res.scalars().first()
         
         if active_task:
-            analysis = await analyze_progress_update(text, active_task.title)
+            analysis = await analyze_progress_update(text, active_task.title, checkpoints_json=active_task.checkpoints)
             # If message starts with "UPDATE", always treat it as a progress update
             # even if AI couldn't classify it (e.g. "UPDATE i kinda did it...")
             if analysis.get("type") == "no_progress" and text.strip().upper().startswith("UPDATE"):
+                from app.services.ai_service import _detect_blocker
                 analysis = {
                     "type": "progress_update",
                     "progress_percent": analysis.get("progress_percent"),
                     "summary": text.strip()[6:].strip()[:120] or "Employee update",
+                    "is_blocker": _detect_blocker(text),
                 }
             if analysis.get("type") in ["progress_update", "task_completion"]:
                 is_completion = analysis.get("type") == "task_completion"
@@ -420,6 +422,45 @@ async def process_incoming_message(
                 elif active_task.status == TaskStatus.in_progress and not active_task.started_at:
                     active_task.started_at = datetime.now()
 
+                # ── Smart Checkpoint completion ──────────────────
+                checkpoint_msg = ""
+                if active_task.checkpoints:
+                    import json as _json
+                    from app.services.ai_service import analyze_checkpoint_completion
+                    try:
+                        cps = _json.loads(active_task.checkpoints)
+                        incomplete = [(i, cp) for i, cp in enumerate(cps) if not cp.get("done", False)]
+                        if incomplete:
+                            match_idx = analyze_checkpoint_completion(
+                                text, [cp["text"] for _, cp in incomplete]
+                            )
+                            if match_idx is not None:
+                                real_idx = incomplete[match_idx][0]
+                                cps[real_idx]["done"] = True
+                                active_task.checkpoints = _json.dumps(cps)
+                                cp_text = cps[real_idx]["text"]
+                                checkpoint_msg = f'\n✅ Checkpoint marked done: "{cp_text}"'
+                                logger.info(
+                                    'Checkpoint auto-completed: task=%s cp=%r',
+                                    active_task.id, cp_text,
+                                )
+                    except (ValueError, TypeError, KeyError):
+                        pass
+
+                # ── CEO Blocker Alert ────────────────────────────
+                if analysis.get("is_blocker") and not is_completion:
+                    if settings.founder_phone:
+                        alert_msg = (
+                            f"⚠️ Foreman Alert: {employee_for_update.name} is stuck "
+                            f"on \"{active_task.title}\".\n"
+                            f"Detail: {summary or text[:100]}"
+                        )
+                        await send_whatsapp_message(settings.founder_phone, alert_msg)
+                        logger.info(
+                            "CEO blocker alert sent for task #%s — %s",
+                            active_task.id, employee_for_update.name,
+                        )
+
                 await db.flush()
 
                 logger.info(
@@ -427,6 +468,7 @@ async def process_incoming_message(
                     employee_for_update.name, active_task.title, pct, summary,
                 )
                 confirm_msg = "Task marked complete!" if is_completion else f"Progress updated: {pct}%. Keep it up!"
+                confirm_msg += checkpoint_msg
                 await send_whatsapp_message(sender, confirm_msg)
                 
                 return {

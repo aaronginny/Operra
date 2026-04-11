@@ -92,6 +92,10 @@ class Task(Base):
     last_update_summary: Mapped[str | None] = mapped_column(
         String(500), nullable=True
     )
+    # Smart Checkpoints — JSON list: [{"text":"…","done":false}, …]
+    checkpoints: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
 
     # Relationships
     assigned_employee = relationship("Employee", back_populates="tasks")

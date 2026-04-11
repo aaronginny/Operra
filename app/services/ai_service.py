@@ -357,18 +357,20 @@ def _rule_based_extract(text: str, known_names: list[str] | None = None) -> dict
 # ---------------------------------------------------------------------------
 
 _PROGRESS_SYSTEM_PROMPT = """You are analyzing an employee's WhatsApp message about their task: '{task_title}'.
-
+{checkpoints_context}
 Determine if this is a progress update, task completion, or unrelated message.
 Return ONLY valid JSON with these keys:
   "type": one of ["progress_update", "task_completion", "no_progress"]
   "progress_percent": integer 0-100 (estimate from context clues — e.g. "almost done" ≈ 85, "just started" ≈ 10, "halfway" ≈ 50). Use 100 for completions. null if no_progress.
-  "summary": a short one-line summary of the update for the manager's dashboard (e.g. "70% complete - finishing final details"). null if no_progress.
+  "summary": a short summary of the update for the manager (MAX 10 WORDS, e.g. "Logo done, stuck on pipes"). null if no_progress.
+  "is_blocker": true if the employee sounds stuck, blocked, or unable to proceed. false otherwise.
 
 Examples:
-- "almost done, just finishing the corners" → {{"type":"progress_update","progress_percent":85,"summary":"85% — finishing corners"}}
-- "done with everything" → {{"type":"task_completion","progress_percent":100,"summary":"Completed"}}
-- "having trouble with the paint" → {{"type":"progress_update","progress_percent":null,"summary":"Blocked — issue with paint"}}
-- "ok thanks" → {{"type":"no_progress","progress_percent":null,"summary":null}}
+- "almost done, just finishing the corners" → {{"type":"progress_update","progress_percent":85,"summary":"85% — finishing corners","is_blocker":false}}
+- "done with everything" → {{"type":"task_completion","progress_percent":100,"summary":"Completed","is_blocker":false}}
+- "kinda did the logo but stuck on pipes" → {{"type":"progress_update","progress_percent":40,"summary":"Logo done, stuck on pipes","is_blocker":true}}
+- "having trouble, can't get the material" → {{"type":"progress_update","progress_percent":null,"summary":"Blocked — can't get material","is_blocker":true}}
+- "ok thanks" → {{"type":"no_progress","progress_percent":null,"summary":null,"is_blocker":false}}
 """
 
 # Simple keyword→percent map for the rule-based fallback
@@ -381,37 +383,84 @@ _PROGRESS_KEYWORDS = [
     ({"mostly done", "most of it"}, 75, "progress_update"),
 ]
 
+# Keywords that indicate the employee is blocked / stuck
+_BLOCKER_KEYWORDS = {
+    "stuck", "blocked", "can't", "cannot", "unable", "problem", "issue",
+    "trouble", "struggling", "difficult", "waiting for", "need help",
+    "not possible", "delayed", "broken", "missing", "unavailable",
+}
 
-async def analyze_progress_update(text: str, task_title: str) -> dict:
+
+def _detect_blocker(text: str) -> bool:
+    """Return True if the text contains blocker/stuck keywords."""
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in _BLOCKER_KEYWORDS)
+
+
+def _checkpoint_progress(checkpoints_json: str | None) -> int | None:
+    """Compute progress percent from checkpoint completion ratio.
+
+    Returns None if no checkpoints exist.
+    """
+    if not checkpoints_json:
+        return None
+    try:
+        cps = json.loads(checkpoints_json)
+        if not cps:
+            return None
+        done = sum(1 for cp in cps if cp.get("done", False))
+        return int((done / len(cps)) * 100)
+    except (ValueError, TypeError):
+        return None
+
+
+async def analyze_progress_update(
+    text: str, task_title: str, checkpoints_json: str | None = None
+) -> dict:
     """Analyze a free-text message to extract progress info and a short summary.
 
-    Returns dict with keys: type, progress_percent, summary.
+    Returns dict with keys: type, progress_percent, summary, is_blocker.
     """
     if not settings.openai_api_key or settings.openai_api_key.startswith("sk-your"):
-        return _rule_based_progress(text)
+        return _rule_based_progress(text, checkpoints_json)
 
-    return await _openai_progress(text, task_title)
+    return await _openai_progress(text, task_title, checkpoints_json)
 
 
-def _rule_based_progress(text: str) -> dict:
+def _rule_based_progress(text: str, checkpoints_json: str | None = None) -> dict:
     """Fallback when no OpenAI key is set."""
     text_lower = text.lower().strip()
+    is_blocker = _detect_blocker(text)
 
     # Explicit UPDATE <number> command
     match = re.search(r"update\s+(\d+)\s*%?", text_lower)
     if match:
         pct = min(int(match.group(1)), 100)
         if pct >= 100:
-            return {"type": "task_completion", "progress_percent": 100, "summary": "Completed"}
-        return {"type": "progress_update", "progress_percent": pct, "summary": f"{pct}% complete"}
+            return {"type": "task_completion", "progress_percent": 100, "summary": "Completed", "is_blocker": False}
+        return {"type": "progress_update", "progress_percent": pct, "summary": f"{pct}% complete", "is_blocker": is_blocker}
 
     # Keyword matching
     for keywords, pct, update_type in _PROGRESS_KEYWORDS:
         if any(kw in text_lower for kw in keywords):
             summary = "Completed" if update_type == "task_completion" else f"{pct}% — {text_lower[:60]}"
-            return {"type": update_type, "progress_percent": pct, "summary": summary}
+            # Blend with checkpoint progress if available
+            cp_pct = _checkpoint_progress(checkpoints_json)
+            if cp_pct is not None and update_type != "task_completion":
+                pct = max(pct, cp_pct)  # Use higher of keyword vs checkpoint
+            return {"type": update_type, "progress_percent": pct, "summary": summary, "is_blocker": is_blocker}
 
-    return {"type": "no_progress", "progress_percent": None, "summary": None}
+    # If blocked but no progress keyword, still report as progress update
+    if is_blocker:
+        cp_pct = _checkpoint_progress(checkpoints_json)
+        return {
+            "type": "progress_update",
+            "progress_percent": cp_pct,
+            "summary": f"Blocked — {text_lower[:50]}",
+            "is_blocker": True,
+        }
+
+    return {"type": "no_progress", "progress_percent": None, "summary": None, "is_blocker": False}
 
 
 # ---------------------------------------------------------------------------
@@ -560,8 +609,8 @@ The CEO manages employees and tasks. Parse their natural language into a structu
 1. "update_task" — CEO wants to change a task's deadline, description, or other field.
    Triggers: words like "deadline", "due date", "is now [date]", "change", "update [task field]", "extend", "move the deadline".
    Examples:
-     "Tell Ryan the deadline for the plumbing job is now April 20th" → update_task, employee=Ryan, keyword=plumbing, due_date=2025-04-20
-     "Tell aaron the deadline for the plumbing task is now April 25th" → update_task, employee=aaron, keyword=plumbing, due_date=2026-04-25T17:00:00
+     "Tell Ryan the deadline for the plumbing job is now April 20th" → update_task, employee=Ryan, keyword=plumbing, due_date=2026-04-20
+     "Tell aaron the deadline for the plumbing task is now April 25th" → update_task, employee=aaron, keyword=plumbing, due_date=2026-04-25
      "Update Ryan's task description to use copper pipes instead" → update_task, employee=Ryan, keyword=null, description="use copper pipes instead"
 2. "check_status" — CEO wants a status report on a task or employee.
    Triggers: "how is", "how's", "status", "progress", "doing on", "update on".
@@ -574,13 +623,17 @@ The CEO manages employees and tasks. Parse their natural language into a structu
    Examples: "Tell Ryan to call me" → send_message, employee=Ryan, message="call me"
 5. "unknown" — Cannot determine intent.
 
+## CRITICAL: NO CREATE TASK INTENT
+- The CEO God Mode NEVER creates tasks. Do NOT classify ANY command as "create_task".
+- "Tell [employee] the deadline for [task] is now [date]" must ALWAYS be classified as "update_task", never "create_task" or "send_message".
+
 ## Priority when "Tell" appears:
 - If the sentence contains "deadline", "due date", "is now [date/time]", "description", or "change" → intent is "update_task".
 - Otherwise if it is just "Tell [name] to [do something]" → intent is "send_message".
 
 ## Date parsing for due_date:
-- Convert human dates to ISO-8601 datetime format YYYY-MM-DDT17:00:00 (5 PM end-of-day). Use the current year (2026) unless another year is mentioned.
-- "April 25th" → "2026-04-25T17:00:00", "April 20th" → "2026-04-20T17:00:00", "next Monday" → nearest upcoming Monday at 17:00.
+- Convert human dates to ISO-8601 date format YYYY-MM-DD. Use the current year (2026) unless another year is mentioned.
+- "April 25th" → "2026-04-25", "April 20th" → "2026-04-20".
 
 Known employees: {employee_names}
 
@@ -691,10 +744,9 @@ _MONTH_TO_NUM = {
 
 
 def _extract_date_from_text(text: str) -> str | None:
-    """Extract a human date phrase and convert to ISO-8601 datetime string.
+    """Extract a human date phrase and convert to ISO-8601 date string.
 
-    Returns YYYY-MM-DDT17:00:00 (5 PM end-of-day) so deadlines don't land
-    at midnight. Uses the current calendar year.
+    Returns YYYY-MM-DD. Uses the current calendar year.
     """
     match = _DATE_PHRASE_RE.search(text)
     if not match:
@@ -715,9 +767,36 @@ def _extract_date_from_text(text: str) -> str | None:
             day = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
         if month and day:
             year = datetime.now().year
-            return f"{year}-{month:02d}-{day:02d}T17:00:00"
+            return f"{year}-{month:02d}-{day:02d}"
     except (ValueError, IndexError):
         pass
+    return None
+
+
+# Regex to extract a task keyword from phrases like:
+#   "deadline for the plumbing task", "plumbing job", "the painting task"
+_TASK_KEYWORD_RE = re.compile(
+    r"(?:deadline|due\s*date|status|progress|doing\s+on|update\s+on)\s+(?:for|of|on)?\s*(?:the\s+)?(.+?)\s+(?:task|job|work|project)",
+    re.IGNORECASE,
+)
+# Broader fallback: "[employee]'s plumbing task"
+_POSSESSIVE_TASK_RE = re.compile(
+    r"'s\s+(.+?)\s+(?:task|job|work|project)",
+    re.IGNORECASE,
+)
+
+
+def _extract_task_keyword(text: str) -> str | None:
+    """Extract a task-identifying keyword from the CEO command.
+
+    Looks for patterns like "deadline for the plumbing task" → "plumbing".
+    """
+    m = _TASK_KEYWORD_RE.search(text)
+    if m:
+        return m.group(1).strip()
+    m = _POSSESSIVE_TASK_RE.search(text)
+    if m:
+        return m.group(1).strip()
     return None
 
 
@@ -753,6 +832,9 @@ def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
     if due_date_iso:
         result["changes"]["due_date"] = due_date_iso
 
+    # ── Step 2b: Extract task keyword ─────────────────────────────
+    result["task_keyword"] = _extract_task_keyword(text)
+
     # ── Step 3: Detect intent (order matters) ────────────────────
     has_deadline_kw = any(kw in text_lower for kw in [
         "deadline", "due date", "is now", "by", "extend", "move the deadline",
@@ -786,9 +868,21 @@ def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
     return result
 
 
-async def _openai_progress(text: str, task_title: str) -> dict:
+async def _openai_progress(text: str, task_title: str, checkpoints_json: str | None = None) -> dict:
     """Call OpenAI to interpret the progress update."""
-    sys_prompt = _PROGRESS_SYSTEM_PROMPT.format(task_title=task_title)
+    # Build checkpoint context for the prompt
+    cp_context = ""
+    if checkpoints_json:
+        try:
+            cps = json.loads(checkpoints_json)
+            items = [f"  {'✅' if cp.get('done') else '⬜'} {cp['text']}" for cp in cps]
+            cp_context = "\nCheckpoints for this task:\n" + "\n".join(items) + "\n"
+        except (ValueError, TypeError):
+            pass
+
+    sys_prompt = _PROGRESS_SYSTEM_PROMPT.format(
+        task_title=task_title, checkpoints_context=cp_context
+    )
     payload = {
         "model": settings.openai_model,
         "messages": [
@@ -813,13 +907,79 @@ async def _openai_progress(text: str, task_title: str) -> dict:
                     response.status_code,
                     response.text[:300],
                 )
-                return _rule_based_progress(text)
+                return _rule_based_progress(text, checkpoints_json)
             result = json.loads(response.json()["choices"][0]["message"]["content"])
+
+        ai_pct = result.get("progress_percent")
+        # Blend with checkpoint progress if available
+        cp_pct = _checkpoint_progress(checkpoints_json)
+        if ai_pct is not None and cp_pct is not None:
+            ai_pct = max(ai_pct, cp_pct)
+        elif cp_pct is not None:
+            ai_pct = cp_pct
+
         return {
             "type": result.get("type", "no_progress"),
-            "progress_percent": result.get("progress_percent"),
+            "progress_percent": ai_pct,
             "summary": result.get("summary"),
+            "is_blocker": result.get("is_blocker", False),
         }
     except Exception as exc:
         logger.error("OpenAI progress analysis failed (%s) — falling back to rule-based", exc)
-        return _rule_based_progress(text)
+        return _rule_based_progress(text, checkpoints_json)
+
+
+# ---------------------------------------------------------------------------
+# Smart Checkpoint completion analyser
+# ---------------------------------------------------------------------------
+
+_AFFIRMATIVE_WORDS = {
+    "yes", "yeah", "yep", "yup", "done", "finished", "completed", "did",
+    "checked", "sorted", "handled", "ready", "bought", "got", "sent",
+}
+
+
+def analyze_checkpoint_completion(
+    reply_text: str, incomplete_checkpoints: list[str]
+) -> int | None:
+    """Determine which incomplete checkpoint the employee is confirming.
+
+    Uses word-overlap scoring + affirmative keyword detection.
+    Returns the index (into incomplete_checkpoints) of the best match,
+    or None if no match found.
+    """
+    if not incomplete_checkpoints or not reply_text.strip():
+        return None
+
+    reply_lower = reply_text.lower()
+    reply_words = set(re.findall(r"[a-z]+", reply_lower))
+
+    # Must contain at least one affirmative word
+    if not reply_words & _AFFIRMATIVE_WORDS:
+        return None
+
+    best_idx = None
+    best_score = 0
+
+    for i, cp_text in enumerate(incomplete_checkpoints):
+        cp_words = set(re.findall(r"[a-z]+", cp_text.lower()))
+        # Remove very common words to avoid false positives
+        cp_words -= {"the", "a", "an", "to", "for", "with", "and", "or", "is", "it"}
+        if not cp_words:
+            continue
+
+        overlap = reply_words & cp_words
+        score = len(overlap) / len(cp_words)  # fraction of checkpoint words mentioned
+
+        if score > best_score and score >= 0.3:  # at least 30% word overlap
+            best_score = score
+            best_idx = i
+
+    if best_idx is not None:
+        logger.info(
+            "Checkpoint match: reply=%r → checkpoint[%d]=%r (score=%.2f)",
+            reply_text[:80], best_idx, incomplete_checkpoints[best_idx], best_score,
+        )
+
+    return best_idx
+

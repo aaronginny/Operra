@@ -189,13 +189,21 @@ async def send_welcome_message(phone_number: str) -> None:
 # Smart follow-up message templates
 # ---------------------------------------------------------------------------
 
-def format_progress_check(employee_name: str, task_title: str, deadline: str) -> str:
-    """60-minute follow-up — friendly progress check."""
+def format_progress_check(employee_name: str, task_title: str, deadline: str, next_checkpoint: str | None = None) -> str:
+    """60-minute follow-up — friendly progress check.
+
+    If a next_checkpoint is provided, includes a question about it.
+    """
+    checkpoint_line = ""
+    if next_checkpoint:
+        checkpoint_line = f"\nAlso, did you manage to {next_checkpoint} yet?\n"
+
     return (
         f"Hi {employee_name} 👋\n\n"
         f"Checking in on your task:\n"
         f'"{task_title}"\n\n'
-        f"Deadline: {deadline}\n\n"
+        f"Deadline: {deadline}\n"
+        f"{checkpoint_line}\n"
         f"Have you started?\n\n"
         f"Reply:\n"
         f"STARTED\n"

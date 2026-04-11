@@ -570,6 +570,107 @@
     }
 
     /* ── Responsive ────────────────────────────────────────── */
+
+    /* ── Checkpoint Checklist ──────────────────────────────── */
+    .checkpoint-list {
+      list-style: none;
+      margin: 6px 0 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .checkpoint-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .76rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 2px 0;
+      transition: color .2s;
+    }
+
+    .checkpoint-item:hover {
+      color: var(--text);
+    }
+
+    .checkpoint-item input[type="checkbox"] {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 3px;
+      background: var(--surface-2);
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+      transition: all .15s;
+    }
+
+    .checkpoint-item input[type="checkbox"]:checked {
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    .checkpoint-item input[type="checkbox"]:checked::after {
+      content: "✓";
+      position: absolute;
+      top: -1px;
+      left: 2px;
+      font-size: 10px;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .checkpoint-item.done .cp-text {
+      text-decoration: line-through;
+      opacity: .5;
+    }
+
+    .checkpoint-progress {
+      font-size: .68rem;
+      color: var(--accent);
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    /* ── Progress Bar ────────────────────────────────────── */
+    .progress-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: var(--surface-2);
+      border-radius: 3px;
+      margin: 4px 0;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width .4s ease;
+    }
+
+    /* ── Smart Summary ──────────────────────────────────── */
+    .smart-summary {
+      font-size: .74rem;
+      padding: 4px 8px;
+      background: var(--accent-gl);
+      border-radius: 6px;
+      border-left: 2px solid var(--accent);
+      color: var(--accent);
+      margin-top: 4px;
+      max-width: 180px;
+      line-height: 1.3;
+    }
+
+    .smart-summary.blocker {
+      background: var(--red-bg);
+      border-left-color: var(--red);
+      color: var(--red);
+    }
+
     @media (max-width: 700px) {
       .filters {
         flex-direction: column;
@@ -876,6 +977,37 @@
       <h2 style="margin-bottom: 24px;">Settings</h2>
 
       <div style="max-width: 520px;">
+
+        <!-- ── Plan & Billing ─────────────────────────────────── -->
+        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+              <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 4px;">Plan & Billing</h3>
+              <p style="font-size: .82rem; color: var(--text-dim);">Manage your Foreman AI subscription.</p>
+            </div>
+            <span id="planBadge" style="display:inline-flex; align-items:center; gap:5px; padding: 4px 12px; border-radius: 20px; font-size:.75rem; font-weight:700; background: var(--yellow-bg); color: var(--yellow);">
+              ⚡ BASIC
+            </span>
+          </div>
+
+          <!-- Usage Bar -->
+          <div style="margin-bottom: 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+              <span style="font-size:.8rem; font-weight:600; color:var(--text)">Free Projects Used</span>
+              <span id="usageText" style="font-size:.8rem; color:var(--text-dim);">— / 1</span>
+            </div>
+            <div style="height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden; border:1px solid var(--border);">
+              <div id="usageBar" style="height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--blue)); border-radius:4px; transition: width .5s ease;"></div>
+            </div>
+            <p id="usageHint" style="font-size:.74rem; color:var(--text-dim); margin-top:6px;">Loading plan details…</p>
+          </div>
+
+          <!-- Upgrade Button -->
+          <button class="btn btn-primary" id="btnUpgrade" onclick="openUpgradeModal()" style="width:100%; justify-content:center; background: linear-gradient(135deg, #6c5ce7, #74b9ff);">
+            🚀 Upgrade to Premium
+          </button>
+        </div>
+
         <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px;">
           <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px;">CEO WhatsApp Number</h3>
           <p style="font-size: .82rem; color: var(--text-dim); margin-bottom: 16px;">
@@ -998,6 +1130,10 @@
               <option value="3">Every 3 days</option>
             </select>
           </div>
+          <div class="form-group">
+            <label for="fCheckpoints">Checkpoints (comma separated)</label>
+            <input class="form-input" id="fCheckpoints" placeholder="e.g. Check logo, Buy fabric, Call supplier" />
+          </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-ghost" onclick="closeModal('modalOverlay')">Cancel</button>
             <button type="submit" class="btn btn-primary" id="btnSubmit">Create Task & Assign</button>
@@ -1047,6 +1183,35 @@
     </div>
   </div>
 
+  <!-- Upgrade Modal -->
+  <div class="modal-overlay" id="modalUpgrade">
+    <div class="modal" style="max-width: 420px; text-align: center;">
+      <div style="font-size:2.5rem; margin-bottom:12px;">🚀</div>
+      <h2 style="background: linear-gradient(135deg, var(--accent), var(--blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px;">Go Premium</h2>
+      <p style="font-size:.9rem; color:var(--text-dim); line-height:1.6; margin-bottom:20px;">
+        Unlock <strong style="color:var(--text)">unlimited tasks</strong>, advanced AI reminders, and full team management.
+      </p>
+      <div style="background: var(--surface-2); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; text-align:left;">
+        <div style="font-size:.82rem; color:var(--text-dim); margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;">What you get</div>
+        <ul style="list-style:none; font-size:.85rem; display:flex; flex-direction:column; gap:6px;">
+          <li>✅ Unlimited task projects</li>
+          <li>✅ AI morning pulse reminders</li>
+          <li>✅ CEO blocker alerts</li>
+          <li>✅ Smart checkpoint AI</li>
+          <li>✅ Priority support</li>
+        </ul>
+      </div>
+      <div style="background: var(--accent-gl); border: 1px solid rgba(108,92,231,.3); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 20px;">
+        <p style="font-size:.85rem; color:var(--accent); font-weight:600;">Billing system coming soon!</p>
+        <p style="font-size:.8rem; color:var(--text-dim); margin-top:4px;">Contact <strong style="color:var(--text)">Aaron</strong> to upgrade manually right now.</p>
+      </div>
+      <div class="modal-actions" style="justify-content:center;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalUpgrade')">Maybe Later</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal('modalUpgrade')" style="background: linear-gradient(135deg, #6c5ce7, #74b9ff);">Got It!</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div class="toast-container" id="toasts"></div>
 
@@ -1060,6 +1225,70 @@
     let allEmployees = [];
     let activeStatus = "";
     let activeEmployee = "";
+    let billingStatus = null;  // cached billing info
+
+    /* ── Billing ─────────────────────────────────────────────── */
+    async function loadBillingStatus() {
+      try {
+        billingStatus = await api("/tasks/billing-status");
+        _renderBillingUI(billingStatus);
+      } catch (e) {
+        // Non-fatal — don't crash the dashboard
+        console.warn("Could not load billing status:", e.message);
+      }
+    }
+
+    function _renderBillingUI(b) {
+      if (!b) return;
+
+      // Plan Badge
+      const badge = document.getElementById("planBadge");
+      if (badge) {
+        if (b.is_premium) {
+          badge.textContent = "✨ PREMIUM";
+          badge.style.background = "var(--green-bg)";
+          badge.style.color = "var(--green)";
+        } else {
+          badge.innerHTML = "⚡ BASIC";
+          badge.style.background = "var(--yellow-bg)";
+          badge.style.color = "var(--yellow)";
+        }
+      }
+
+      // Usage Bar
+      const usageText = document.getElementById("usageText");
+      const usageBar = document.getElementById("usageBar");
+      const usageHint = document.getElementById("usageHint");
+      if (usageText) usageText.textContent = `${b.tasks_created_count} / ${b.free_task_limit}`;
+      if (usageBar) {
+        const pct = b.is_premium ? 0 : Math.min((b.tasks_created_count / b.free_task_limit) * 100, 100);
+        usageBar.style.width = pct + "%";
+        usageBar.style.background = b.limit_reached
+          ? "var(--red)"
+          : "linear-gradient(90deg, var(--accent), var(--blue))";
+      }
+      if (usageHint) {
+        if (b.is_premium) {
+          usageHint.textContent = "You're on Premium — unlimited tasks!";
+          usageHint.style.color = "var(--green)";
+        } else if (b.limit_reached) {
+          usageHint.textContent = "Free limit reached. Upgrade to create more tasks.";
+          usageHint.style.color = "var(--red)";
+        } else {
+          const remaining = b.free_task_limit - b.tasks_created_count;
+          usageHint.textContent = `${remaining} free project${remaining !== 1 ? "s" : ""} remaining.`;
+          usageHint.style.color = "var(--text-dim)";
+        }
+      }
+
+      // Upgrade button — hide if already premium
+      const btnUpgrade = document.getElementById("btnUpgrade");
+      if (btnUpgrade) btnUpgrade.style.display = b.is_premium ? "none" : "flex";
+    }
+
+    function openUpgradeModal() {
+      document.getElementById("modalUpgrade").classList.add("open");
+    }
 
     /* ── API helpers ─────────────────────────────────────────── */
     async function api(path, opts = {}) {
@@ -1136,11 +1365,35 @@
         const pct = t.progress_percent || 0;
         const lastUp = t.last_update ? formatDate(t.last_update) : formatDate(t.created_at);
 
+        // Build checkpoints HTML
+        let checkpointsHtml = '';
+        if (t.checkpoints) {
+          try {
+            const cps = JSON.parse(t.checkpoints);
+            if (cps.length) {
+              const doneCount = cps.filter(c => c.done).length;
+              checkpointsHtml = `<ul class="checkpoint-list">`;
+              cps.forEach((cp, idx) => {
+                const checked = cp.done ? 'checked' : '';
+                const doneClass = cp.done ? 'done' : '';
+                checkpointsHtml += `
+                  <li class="checkpoint-item ${doneClass}" onclick="toggleCheckpoint(${t.id}, ${idx}, event)">
+                    <input type="checkbox" ${checked} tabindex="-1" />
+                    <span class="cp-text">${esc(cp.text)}</span>
+                  </li>`;
+              });
+              checkpointsHtml += `</ul>`;
+              checkpointsHtml += `<div class="checkpoint-progress">${doneCount}/${cps.length} checkpoints done</div>`;
+            }
+          } catch(e) {}
+        }
+
         return `
       <tr class="${rowClass}">
         <td>
           <div class="task-title">${esc(t.title)}</div>
           ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
+          ${checkpointsHtml}
         </td>
         <td>
           <div style="display: flex; align-items: center; gap: 6px;">
@@ -1154,10 +1407,13 @@
         </td>
         <td>
           <div style="font-weight:600; font-size:.85rem; color:var(--text)">${pct}%</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" style="width:${pct}%; background: ${pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--accent)' : 'var(--yellow)'};"></div>
+          </div>
           ${t.last_update_summary
-            ? `<div style="font-size:.75rem; color:var(--accent); margin:2px 0">${esc(t.last_update_summary)}</div>`
+            ? `<div class="smart-summary ${t.last_update_summary.toLowerCase().includes('block') || t.last_update_summary.toLowerCase().includes('stuck') ? 'blocker' : ''}">💬 ${esc(t.last_update_summary)}</div>`
             : ""}
-          <div style="font-size:.7rem; color:var(--text-dim)">Updated: ${lastUp}</div>
+          <div style="font-size:.7rem; color:var(--text-dim); margin-top:2px">Updated: ${lastUp}</div>
         </td>
         <td><span class="badge badge-${t.status}">${statusLabel(t.status)}</span></td>
         <td class="due-text ${dueClass}" id="due-cell-${t.id}">
@@ -1230,6 +1486,17 @@
         } catch (e) {
           toast("Failed to delete task.", "error");
         }
+    }
+
+    /* ── Toggle checkpoint (CEO clicks checkbox on dashboard) ── */
+    async function toggleCheckpoint(taskId, cpIndex, event) {
+      event.stopPropagation();
+      try {
+        await api(`/tasks/${taskId}/checkpoints/${cpIndex}/toggle`, { method: "PATCH" });
+        await loadTasks();
+      } catch (e) {
+        toast("Failed to update checkpoint.", "error");
+      }
     }
 
     /* ── Change due date ─────────────────────────────────────── */
@@ -1314,6 +1581,12 @@
       if (dueInput) body.due_at = new Date(dueInput).toISOString();
       if (freqInput) body.reminder_interval_days = parseInt(freqInput);
 
+      // Checkpoints: split by comma, trim, filter empty
+      const cpInput = document.getElementById("fCheckpoints").value.trim();
+      if (cpInput) {
+        body.checkpoints = cpInput.split(",").map(s => s.trim()).filter(Boolean);
+      }
+
       try {
         await api("/tasks", { method: "POST", body: JSON.stringify(body) });
 
@@ -1331,9 +1604,18 @@
         toast("Task created and assigned!", "success");
         closeModal('modalOverlay');
         await loadTasks();
+        await loadBillingStatus();  // refresh usage after task creation
         if (sourceEqId) await loadEnquiries();
       } catch (e) {
-        toast("Failed to create task", "error");
+        // If free limit hit, show upgrade modal instead of generic error
+        const msg = e.message || "";
+        if (msg.includes("Free limit reached") || msg.includes("Upgrade to Premium") || msg.includes("403")) {
+          closeModal('modalOverlay');
+          openUpgradeModal();
+          await loadBillingStatus();
+        } else {
+          toast("Failed to create task: " + msg, "error");
+        }
       } finally {
         btn.disabled = false;
         btn.textContent = "Create Task & Assign";
@@ -1477,6 +1759,7 @@
             document.getElementById('tabSettings').classList.add('active');
             document.getElementById('viewSettings').style.display = 'block';
             loadProfile();
+            loadBillingStatus();  // refresh billing panel each time settings opens
         }
     }
 
@@ -1555,6 +1838,12 @@
 
     /* ── Modal ───────────────────────────────────────────────── */
     function openModal() {
+      // Billing gatekeeper: block if free limit reached
+      if (billingStatus && billingStatus.limit_reached) {
+        openUpgradeModal();
+        return;
+      }
+
       document.getElementById("createForm").reset();
       document.getElementById("fSourceEnquiryId").value = "";
       document.getElementById("taskModalTitle").textContent = "Add Task";

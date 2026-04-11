@@ -47,6 +47,36 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(20) DEFAULT NULL;
         """,
     ),
+    # 003 — smart checkpoints (sub-tasks) for tasks
+    (
+        "tasks.checkpoints",
+        """
+        ALTER TABLE tasks
+        ADD COLUMN IF NOT EXISTS checkpoints TEXT DEFAULT NULL;
+        """,
+    ),
+    # 004 — tiered billing columns for companies
+    (
+        "companies.subscription_level",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS subscription_level VARCHAR(50) NOT NULL DEFAULT 'basic';
+        """,
+    ),
+    (
+        "companies.is_premium",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS is_premium BOOLEAN NOT NULL DEFAULT false;
+        """,
+    ),
+    (
+        "companies.tasks_created_count",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS tasks_created_count INTEGER NOT NULL DEFAULT 0;
+        """,
+    ),
 ]
 
 

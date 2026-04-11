@@ -1,4 +1,4 @@
-﻿"""Task CRUD routes."""
+"""Task CRUD routes."""
 
 import logging
 from datetime import datetime
@@ -14,6 +14,11 @@ from app.models.task import Task
 from app.schemas.task_schema import TaskCreate, TaskResponse, TaskUpdate
 from app.services.messaging_service import send_whatsapp_message
 from app.services.task_service import create_task, get_task, get_tasks, update_task
+from app.services.billing_service import (
+    check_can_create_task,
+    increment_task_count,
+    get_billing_status,
+)
 from app.dependencies import get_current_user
 from app.schemas.auth_schema import CurrentUser
 
@@ -30,7 +35,17 @@ async def create_task_endpoint(
 ):
     """Create a task manually."""
     payload.company_id = current_user.company_id
+
+    # ── Tiered Billing Gatekeeper ─────────────────────────────
+    try:
+        await check_can_create_task(db, current_user.company_id)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
     task = await create_task(db, payload)
+
+    # ── Increment usage counter ───────────────────────────────
+    await increment_task_count(db, current_user.company_id)
 
     if task.assigned_employee_id:
         employee = await db.get(Employee, task.assigned_employee_id)
@@ -72,6 +87,15 @@ async def create_task_endpoint(
             )
 
     return task
+
+
+@router.get("/billing-status")
+async def billing_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Return the current company's billing/plan status for the dashboard."""
+    return await get_billing_status(db, current_user.company_id)
 
 
 @router.get("", response_model=list[TaskResponse])
@@ -150,5 +174,41 @@ async def update_due_date(
                 logger.info("Due-date update notification sent to %s", employee.phone_number)
             else:
                 logger.warning("Due-date notification FAILED for employee id=%s", task.assigned_employee_id)
+
+    return task
+
+
+@router.patch("/{task_id}/checkpoints/{index}/toggle")
+async def toggle_checkpoint(
+    task_id: int,
+    index: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Toggle a checkpoint's done status by its index (0-based).
+
+    Used by the dashboard when the CEO manually clicks a checkbox.
+    """
+    import json as _json
+
+    task = await get_task(db, task_id)
+    if task is None or task.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not task.checkpoints:
+        raise HTTPException(status_code=400, detail="Task has no checkpoints")
+
+    try:
+        cps = _json.loads(task.checkpoints)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid checkpoints data")
+
+    if index < 0 or index >= len(cps):
+        raise HTTPException(status_code=400, detail=f"Checkpoint index {index} out of range")
+
+    cps[index]["done"] = not cps[index].get("done", False)
+    task.checkpoints = _json.dumps(cps)
+    await db.flush()
+    await db.refresh(task)
 
     return task

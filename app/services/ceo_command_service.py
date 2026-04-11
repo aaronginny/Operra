@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.employee import Employee
 from app.models.task import Task, TaskStatus
 from app.models.user import User
-from app.services.ai_service import parse_ceo_command, _MONTH_NAMES, _extract_date_from_text
+from app.services.ai_service import parse_ceo_command, _MONTH_NAMES, _extract_date_from_text, _extract_task_keyword
 from app.config import settings
 from app.services.employee_service import (
     get_all_employee_names,
@@ -93,6 +93,22 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
             if date_iso:
                 changes["due_date"] = date_iso
                 parsed = {**parsed, "changes": changes}
+
+    # ── Fix 4: BLOCK create_task — CEO God Mode never creates tasks ──
+    if parsed.get("intent") == "create_task":
+        logger.warning("CEO parse: blocking create_task intent — converting to update_task")
+        date_iso = _extract_date_from_text(raw_text)
+        changes = dict(parsed.get("changes") or {})
+        if date_iso and not changes.get("due_date"):
+            changes["due_date"] = date_iso
+        parsed = {**parsed, "intent": "update_task", "changes": changes}
+
+    # ── Fix 5: Extract task_keyword from raw text if missing ──
+    if not parsed.get("task_keyword"):
+        keyword = _extract_task_keyword(raw_text)
+        if keyword:
+            logger.info("CEO parse: extracted task_keyword=%r from raw text", keyword)
+            parsed = {**parsed, "task_keyword": keyword}
 
     return parsed
 
@@ -257,13 +273,21 @@ async def _handle_update_task(
 
     changes = parsed.get("changes") or {}
     changes_made = []
+    deadline_str = ""
 
     if changes.get("due_date"):
         try:
             new_due = datetime.fromisoformat(changes["due_date"])
             task.due_at = new_due
+            # Use explicit format e.g. "April 25th"
+            day = new_due.day
+            suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+            deadline_str = f"{new_due.strftime('%B')} {day}{suffix}"
+            
             # Show just date for EOD deadlines, full time otherwise
             if new_due.hour == 17 and new_due.minute == 0:
+                due_display = new_due.strftime("%B %d").replace(" 0", " ")
+            elif new_due.hour == 0 and new_due.minute == 0:
                 due_display = new_due.strftime("%B %d").replace(" 0", " ")
             else:
                 due_display = new_due.strftime("%b %d, %I:%M %p").lstrip("0")
@@ -286,20 +310,28 @@ async def _handle_update_task(
 
     # Notify the assigned employee
     employee = await _get_employee_for_task(db, task)
-    if employee and employee.phone_number:
+    
+    # Custom message format for deadline updates if that's the only/main change
+    kw = parsed.get("task_keyword") or "task"
+    if deadline_str and not changes.get("description") and not changes.get("title"):
+        notification = f"CEO Update: Deadline for {kw} moved to {deadline_str}"
+        ceo_reply = f"Done. {employee.name if employee else (task.assigned_to or 'Unassigned')} notified - {kw} deadline updated to {deadline_str}"
+    else:
+        # Fallback formatting for multiple changes
         change_text = "\n".join(f"• {c}" for c in changes_made)
         notification = (
             f"CEO Update: {change_text} for task:\n"
             f"{task.title}\n"
             f"Please acknowledge."
         )
-        await send_whatsapp_message(employee.phone_number, notification)
-        emp_name = employee.name
-    else:
-        emp_name = task.assigned_to or "Unassigned"
+        emp_name = employee.name if employee else (task.assigned_to or "Unassigned")
+        change_summary = ", ".join(changes_made)
+        ceo_reply = f"Done. {emp_name} notified about {task.title} — {change_summary}."
 
-    change_summary = ", ".join(changes_made)
-    return f"Done. {emp_name} notified about {task.title} — {change_summary}."
+    if employee and employee.phone_number:
+        await send_whatsapp_message(employee.phone_number, notification)
+
+    return ceo_reply
 
 
 async def _handle_complete_task(

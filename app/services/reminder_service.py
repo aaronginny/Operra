@@ -5,7 +5,8 @@ Uses a plain asyncio background loop (no external scheduler dependency).
 Follow-up tiers:
   60 min before deadline → friendly progress check
   30 min before deadline → urgency reminder
-  Deadline reached       → overdue alert
+  Deadline reached       → overdue alert + escalation every 4h
+  9 AM daily             → personalized morning pulse with checkpoint info
 """
 
 import asyncio
@@ -41,8 +42,82 @@ URGENT_WINDOW = timedelta(minutes=30)
 # Minimum gap between repeated nudges of the same tier (avoid spam)
 NUDGE_COOLDOWN = timedelta(minutes=25)
 
+# Escalation nagging for overdue tasks
+OVERDUE_NAG_INTERVAL = timedelta(hours=4)
+
 _scheduler_task: asyncio.Task | None = None
 _last_checkin_date = None
+_last_morning_pulse_date = None
+
+
+def _get_next_checkpoint(task) -> str | None:
+    """Return the text of the first incomplete checkpoint, or None."""
+    import json
+    if not task.checkpoints:
+        return None
+    try:
+        cps = json.loads(task.checkpoints)
+        for cp in cps:
+            if not cp.get("done", False):
+                return cp.get("text")
+    except (ValueError, TypeError, KeyError):
+        pass
+    return None
+
+
+async def _send_morning_pulse(db) -> None:
+    """Send a personalized 9 AM WhatsApp to every employee with active tasks.
+
+    References the first incomplete checkpoint to make the message actionable.
+    """
+    from app.models.employee import Employee
+
+    stmt = (
+        select(Task)
+        .where(Task.status.in_([TaskStatus.pending, TaskStatus.in_progress, TaskStatus.overdue]))
+        .options(selectinload(Task.assigned_employee))
+    )
+    result = await db.execute(stmt)
+    tasks = list(result.scalars().all())
+
+    # Group tasks by employee
+    emp_tasks: dict[int, list[Task]] = {}
+    for task in tasks:
+        if task.assigned_employee_id:
+            emp_tasks.setdefault(task.assigned_employee_id, []).append(task)
+
+    for emp_id, emp_task_list in emp_tasks.items():
+        employee = emp_task_list[0].assigned_employee
+        if not employee or not employee.phone_number:
+            continue
+
+        # Build message — pick the most important task (overdue first, then nearest deadline)
+        priority_task = sorted(emp_task_list, key=lambda t: (
+            0 if t.status == TaskStatus.overdue else 1,
+            t.due_at or datetime(2099, 12, 31),
+        ))[0]
+
+        next_cp = _get_next_checkpoint(priority_task)
+        checkpoint_line = ""
+        if next_cp:
+            checkpoint_line = f"\nThe CEO is looking for progress on: \"{next_cp}\".\n"
+
+        task_count = len(emp_task_list)
+        extra_tasks = ""
+        if task_count > 1:
+            extra_tasks = f"\n(You also have {task_count - 1} other active task{'s' if task_count > 2 else ''}.)"
+
+        msg = (
+            f"Good morning {employee.name}! 🌅\n\n"
+            f"For the \"{priority_task.title}\":"
+            f"{checkpoint_line}"
+            f"\nHow is it coming along?"
+            f"{extra_tasks}\n\n"
+            f"Reply with an update or type DONE if completed!"
+        )
+
+        await send_whatsapp_message(employee.phone_number, msg)
+        logger.info("Morning pulse sent to %s (%d tasks)", employee.name, task_count)
 
 
 async def _check_and_remind() -> None:
@@ -52,7 +127,7 @@ async def _check_and_remind() -> None:
     async with async_session() as db:
         stmt = (
             select(Task)
-            .where(Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]))
+            .where(Task.status.in_([TaskStatus.pending, TaskStatus.in_progress, TaskStatus.overdue]))
             .options(selectinload(Task.assigned_employee))
         )
         result = await db.execute(stmt)
@@ -71,14 +146,32 @@ async def _check_and_remind() -> None:
                 time_left = due - now
                 deadline_str = due.strftime("%I:%M %p").lstrip("0")
 
-                # Tier 0: Overdue
+                # Tier 0: Overdue — escalation nagging every 4 hours
                 if due < now:
-                    task.status = TaskStatus.overdue
-                    msg = format_deadline_alert(task.title)
-                    await send_whatsapp_message(assignee_phone, msg)
-                    if assignee_email:
-                        await send_email(assignee_email, msg)
-                    logger.info("Marked task #%s as overdue.", task.id)
+                    if task.status != TaskStatus.overdue:
+                        task.status = TaskStatus.overdue
+                        msg = format_deadline_alert(task.title)
+                        await send_whatsapp_message(assignee_phone, msg)
+                        if assignee_email:
+                            await send_email(assignee_email, msg)
+                        logger.info("Marked task #%s as overdue.", task.id)
+                    else:
+                        # Already overdue — nag every 4 hours
+                        last_nag = task.last_urgent_reminder_sent or task.due_at
+                        last_nag_naive = last_nag.replace(tzinfo=None) if last_nag.tzinfo else last_nag
+                        if (now - last_nag_naive) >= OVERDUE_NAG_INTERVAL:
+                            hours_late = int((now - due).total_seconds() / 3600)
+                            next_cp = _get_next_checkpoint(task)
+                            cp_line = f'\nNext checkpoint: "{next_cp}"' if next_cp else ""
+                            nag_msg = (
+                                f"⏰ Overdue Reminder ({hours_late}h late)\n\n"
+                                f"Task: {task.title}"
+                                f"{cp_line}\n\n"
+                                f"Please send an UPDATE or reply DONE if completed."
+                            )
+                            await send_whatsapp_message(assignee_phone, nag_msg)
+                            task.last_urgent_reminder_sent = now
+                            logger.info("Overdue escalation nag sent for task #%s (%dh late)", task.id, hours_late)
                     continue
 
                 if time_left <= URGENT_WINDOW:
@@ -92,7 +185,9 @@ async def _check_and_remind() -> None:
 
                 if time_left <= FOLLOWUP_WINDOW:
                     if _cooldown_ok(task.last_followup_sent, now):
-                        msg = format_progress_check(assignee_name, task.title, deadline_str)
+                        # Extract next incomplete checkpoint (if any)
+                        next_cp = _get_next_checkpoint(task)
+                        msg = format_progress_check(assignee_name, task.title, deadline_str, next_checkpoint=next_cp)
                         await send_whatsapp_message(assignee_phone, msg)
                         if assignee_email:
                             await send_email(assignee_email, msg)
@@ -112,23 +207,21 @@ async def _check_and_remind() -> None:
                         task.last_update = now # reset interval
                         task.last_followup_sent = now
 
-        # FEATURE 5 -> Daily check-in bot
-        global _last_checkin_date
+        # ── Morning Pulse (9 AM daily) ──────────────────────────
+        global _last_morning_pulse_date
         today = now.date()
-        # let's say we send it at 9 AM or whenever, or just once a day if now.hour >= 9
-        if getattr(settings, 'checkin_bot_enabled', True):
-            if now.hour >= 9 and _last_checkin_date != today:
-                # get all employees with active tasks
-                stmt_emp = select(Task.assigned_employee_id).where(Task.status.in_([TaskStatus.pending, TaskStatus.in_progress])).distinct()
-                emp_res = await db.execute(stmt_emp)
-                emp_ids = emp_res.scalars().all()
-                for eid in emp_ids:
-                    if eid:
-                        from app.models.employee import Employee
-                        emp = await db.get(Employee, eid)
-                        if emp and emp.phone_number:
-                            await send_whatsapp_message(emp.phone_number, "Daily Update\n\nWhat progress did you make today?")
-                _last_checkin_date = today
+        if now.hour >= 9 and _last_morning_pulse_date != today:
+            try:
+                await _send_morning_pulse(db)
+                _last_morning_pulse_date = today
+                logger.info("Morning pulse completed for %s", today)
+            except Exception:
+                logger.exception("Morning pulse failed")
+
+        # Legacy daily check-in (replaced by morning pulse above)
+        global _last_checkin_date
+        # Kept for backward compat but morning pulse handles it now
+        _last_checkin_date = today
 
         await db.commit()
 
