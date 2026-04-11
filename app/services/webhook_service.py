@@ -253,12 +253,29 @@ async def process_incoming_message(
     if not text.strip():
         return {"status": "no_text"}
 
-    logger.info("=== INCOMING === sender=%r text=%r", sender, text[:120])
+    # ── TEST MODE: CEO can simulate employee messages ─────────────
+    # Prefix "EMPLOYEE:" (any case) strips CEO detection and processes
+    # the rest as if it came from a regular employee (same sender number).
+    # Example: "EMPLOYEE: UPDATE finished the pipe inspection"
+    _EMPLOYEE_TEST_PREFIX = "EMPLOYEE:"
+    force_employee_path = False
+    if text.strip().upper().startswith(_EMPLOYEE_TEST_PREFIX):
+        original_text = text.strip()
+        text = original_text[len(_EMPLOYEE_TEST_PREFIX):].strip()
+        force_employee_path = True
+        logger.info("=== TEST MODE === stripping prefix, remaining text: %r", text[:120])
 
-    # ── CEO God Mode — must run FIRST, before auto-registration ──
-    # Prevents CEO messages from being treated as employee task updates
-    # or creating the CEO as a placeholder employee record.
+    logger.info("=== INCOMING === sender=%r force_employee=%s text=%r", sender, force_employee_path, text[:120])
+
+    # ── CEO lookup — always run to identify sender and get company_id ──
+    # In TEST MODE we skip routing to CEO commands but still need company_id.
     ceo_user = await get_ceo_user(db, sender)
+    if ceo_user and force_employee_path:
+        # TEST MODE: store company_id for the employee path, then skip CEO routing
+        if force_company_id is None:
+            force_company_id = ceo_user.company_id
+        logger.info("=== TEST MODE === CEO company_id=%s, routing to employee path", force_company_id)
+        ceo_user = None  # prevent CEO routing below
     if ceo_user:
         # Resolve company_id from the CEO user record
         ceo_company_id = ceo_user.company_id

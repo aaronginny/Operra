@@ -86,6 +86,31 @@ _MIGRATIONS = [
            OR description ILIKE '%Tell Aaron that the deadline%';
         """,
     ),
+    # 006 — owner account premium upgrade (whatsapp_number = '+919150016161')
+    (
+        "companies.owner_premium",
+        """
+        UPDATE companies
+        SET is_premium = true, subscription_level = 'premium'
+        WHERE id = (
+            SELECT company_id FROM users
+            WHERE whatsapp_number = '+919150016161'
+            LIMIT 1
+        );
+        """,
+    ),
+    # 007 — premium + counter reset via role lookup (reliable fallback when
+    #        whatsapp_number was not set in the DB — migration 006 may have hit 0 rows)
+    (
+        "companies.ceo_role_premium",
+        """
+        UPDATE companies
+        SET is_premium = true, subscription_level = 'premium', tasks_created_count = 0
+        WHERE id IN (
+            SELECT DISTINCT company_id FROM users WHERE role = 'ceo'
+        );
+        """,
+    ),
 ]
 
 

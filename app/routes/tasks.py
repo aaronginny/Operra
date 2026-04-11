@@ -38,8 +38,18 @@ async def create_task_endpoint(
 
     # ── Tiered Billing Gatekeeper ─────────────────────────────
     try:
-        await check_can_create_task(db, current_user.company_id)
+        await check_can_create_task(
+            db,
+            current_user.company_id,
+            user_id=current_user.id,
+            user_email=current_user.email,
+            user_role=current_user.role,
+        )
     except ValueError as e:
+        logger.warning(
+            "POST /tasks 403 blocked: user_id=%s email=%r role=%r company=%s",
+            current_user.id, current_user.email, current_user.role, current_user.company_id,
+        )
         raise HTTPException(status_code=403, detail=str(e))
 
     task = await create_task(db, payload)
@@ -95,7 +105,13 @@ async def billing_status(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Return the current company's billing/plan status for the dashboard."""
-    return await get_billing_status(db, current_user.company_id)
+    return await get_billing_status(
+        db,
+        current_user.company_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_role=current_user.role,
+    )
 
 
 @router.get("", response_model=list[TaskResponse])
