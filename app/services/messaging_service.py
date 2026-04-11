@@ -54,6 +54,18 @@ def _normalize_whatsapp_phone(phone_number: str) -> str:
     cleaned = re.sub(r"[\s\-()]", "", cleaned)
     if not cleaned.startswith("+"):
         cleaned = f"+{cleaned}"
+
+    # Warn when a number looks like a bare 10-digit Indian mobile (6–9 prefix)
+    # that is missing the +91 country code — e.g. "+9876543210" instead of "+919876543210".
+    digits_only = cleaned.lstrip("+")
+    if len(digits_only) == 10 and digits_only[0] in "6789":
+        logger.warning(
+            "=== PHONE FORMAT WARNING === %r looks like an Indian mobile number "
+            "without country code. Expected +91XXXXXXXXXX but got %s. "
+            "Message will be sent to %s — update the employee's phone number if delivery fails.",
+            phone_number, cleaned, cleaned,
+        )
+
     return cleaned
 
 
@@ -78,8 +90,8 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
     from_number = _normalize_whatsapp_phone(settings.twilio_whatsapp_number)
 
     logger.info(
-        "=== TWILIO SEND ATTEMPT === raw_to=%r  normalized_to=%s  from=%s",
-        phone_number, clean_phone, from_number,
+        "=== TWILIO SEND ATTEMPT === raw_to=%r  normalized_to=%s  from=whatsapp:%s  to=whatsapp:%s",
+        phone_number, clean_phone, from_number, clean_phone,
     )
 
     try:
@@ -115,7 +127,7 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
             "=== TWILIO SEND FAILED === to=%s error_code=%s msg=%s",
             clean_phone, error_code, error_msg,
         )
-        logger.debug("Twilio exception detail:", exc_info=True)
+        logger.error("=== TWILIO EXCEPTION TRACEBACK ===", exc_info=True)
         return False
 
 

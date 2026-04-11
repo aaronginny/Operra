@@ -59,6 +59,11 @@ async def create_task_endpoint(
     # ── Increment usage counter ───────────────────────────────
     await increment_task_count(db, current_user.company_id)
 
+    if not task.assigned_employee_id:
+        logger.info(
+            "=== TASK NOTIFY SKIP === task_id=%s title=%r — no employee assigned, skipping WhatsApp notification",
+            task.id, task.title,
+        )
     if task.assigned_employee_id:
         employee = await db.get(Employee, task.assigned_employee_id)
         if employee and employee.phone_number:
