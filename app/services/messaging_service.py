@@ -1,17 +1,22 @@
-"""Messaging service — WhatsApp (Twilio) and Email (SMTP) delivery.
+"""Messaging service — WhatsApp (Meta Cloud API) and Email (SMTP) delivery.
 
 Falls back to console logging when credentials are not configured,
 so the app can run in development without external accounts.
+
+WhatsApp provider: Meta Cloud API (migrated from Twilio).
+Twilio code is kept below but commented out until Meta is confirmed working.
 """
 
 import asyncio
 import logging
+import os
 import re
+import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import aiosmtplib
-from twilio.rest import Client as TwilioClient
+# from twilio.rest import Client as TwilioClient  # kept for rollback
 
 from app.config import settings
 
@@ -37,31 +42,25 @@ def format_reminder(employee_name: str, task_title: str, deadline: str | None) -
 
 
 # ---------------------------------------------------------------------------
-# WhatsApp via Twilio
+# WhatsApp via Meta Cloud API
 # ---------------------------------------------------------------------------
 
-def _twilio_configured() -> bool:
-    """Return True if all Twilio credentials are present."""
-    return bool(settings.twilio_account_sid and settings.twilio_auth_token and settings.twilio_whatsapp_number)
-
-
 def _normalize_whatsapp_phone(phone_number: str) -> str:
-    """Normalize user-entered WhatsApp numbers to Twilio-friendly E.164 format."""
+    """Normalize a phone number to digits-only (no + prefix) for Meta API."""
     cleaned = phone_number.strip()
     if cleaned.lower().startswith("whatsapp:"):
         cleaned = cleaned.split(":", 1)[1]
 
     cleaned = re.sub(r"[\s\-()]", "", cleaned)
-    if not cleaned.startswith("+"):
-        cleaned = f"+{cleaned}"
+    # Meta wants no leading +
+    cleaned = cleaned.lstrip("+")
 
     # Warn when a number looks like a bare 10-digit Indian mobile (6–9 prefix)
-    # that is missing the +91 country code — e.g. "+9876543210" instead of "+919876543210".
-    digits_only = cleaned.lstrip("+")
-    if len(digits_only) == 10 and digits_only[0] in "6789":
+    # missing the 91 country code — e.g. "9876543210" instead of "919876543210".
+    if len(cleaned) == 10 and cleaned[0] in "6789":
         logger.warning(
             "=== PHONE FORMAT WARNING === %r looks like an Indian mobile number "
-            "without country code. Expected +91XXXXXXXXXX but got %s. "
+            "without country code. Expected 91XXXXXXXXXX but got %s. "
             "Message will be sent to %s — update the employee's phone number if delivery fails.",
             phone_number, cleaned, cleaned,
         )
@@ -69,66 +68,75 @@ def _normalize_whatsapp_phone(phone_number: str) -> str:
     return cleaned
 
 
-async def send_whatsapp_message(phone_number: str, message: str) -> bool:
-    """Send a WhatsApp message via the Twilio API.
+def _send_via_meta(to_clean: str, body: str) -> bool:
+    """Synchronous Meta Cloud API call (run inside asyncio.to_thread)."""
+    phone_number_id = os.getenv("META_PHONE_NUMBER_ID")
+    access_token = os.getenv("META_ACCESS_TOKEN")
 
-    If Twilio credentials are not configured the message is logged to the
-    console instead so the scheduler never crashes.
-    """
-    if not _twilio_configured():
-        logger.error(
-            "=== TWILIO NOT CONFIGURED === "
-            "SID=%s  TOKEN=%s  NUMBER=%s — message to %r NOT sent.",
-            "set" if settings.twilio_account_sid else "MISSING",
-            "set" if settings.twilio_auth_token else "MISSING",
-            "set" if settings.twilio_whatsapp_number else "MISSING",
-            phone_number,
-        )
+    if not phone_number_id or not access_token:
+        logger.error("=== META NOT CONFIGURED === META_PHONE_NUMBER_ID or META_ACCESS_TOKEN missing")
         return False
 
-    clean_phone = _normalize_whatsapp_phone(phone_number)
-    from_number = _normalize_whatsapp_phone(settings.twilio_whatsapp_number)
+    url = f"https://graph.facebook.com/v25.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_clean,
+        "type": "text",
+        "text": {"body": body},
+    }
 
-    logger.info(
-        "=== TWILIO SEND ATTEMPT === raw_to=%r  normalized_to=%s  from=whatsapp:%s  to=whatsapp:%s",
-        phone_number, clean_phone, from_number, clean_phone,
-    )
-
-    try:
-        client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
-
-        # Twilio's WhatsApp API is synchronous; run in a thread to keep the
-        # event loop unblocked.
-        sent = await asyncio.to_thread(
-            client.messages.create,
-            body=message,
-            from_=f"whatsapp:{from_number}",
-            to=f"whatsapp:{clean_phone}",
-        )
-
-        if sent.status in ("failed", "undelivered"):
-            logger.error(
-                "=== TWILIO DELIVERY FAILED === to=%s SID=%s status=%s error_code=%s",
-                clean_phone, sent.sid, sent.status, sent.error_code,
-            )
-            return False
-
-        logger.info(
-            "=== TWILIO SENT OK === to=%s SID=%s status=%s",
-            clean_phone, sent.sid, sent.status,
-        )
+    response = requests.post(url, headers=headers, json=payload, timeout=10)
+    if response.status_code == 200:
+        logger.info("=== META SENT OK === to %s", to_clean)
         return True
-
-    except Exception as exc:
-        # Extract Twilio error code if present (TwilioRestException has .code)
-        error_code = getattr(exc, "code", None)
-        error_msg = getattr(exc, "msg", None) or str(exc)
-        logger.error(
-            "=== TWILIO SEND FAILED === to=%s error_code=%s msg=%s",
-            clean_phone, error_code, error_msg,
-        )
-        logger.error("=== TWILIO EXCEPTION TRACEBACK ===", exc_info=True)
+    else:
+        logger.error("=== META SEND FAILED === %s: %s", response.status_code, response.text)
         return False
+
+
+async def send_whatsapp_message(phone_number: str, message: str) -> bool:
+    """Send a WhatsApp message via the Meta Cloud API.
+
+    requests.post is synchronous; it runs inside asyncio.to_thread so the
+    event loop stays unblocked.  Falls back gracefully when env vars are absent.
+    """
+    to_clean = _normalize_whatsapp_phone(phone_number)
+    logger.info("=== META SEND ATTEMPT === raw_to=%r  normalized_to=%s", phone_number, to_clean)
+    return await asyncio.to_thread(_send_via_meta, to_clean, message)
+
+
+# ---------------------------------------------------------------------------
+# TWILIO — kept for rollback, not active
+# ---------------------------------------------------------------------------
+# def _twilio_configured() -> bool:
+#     return bool(settings.twilio_account_sid and settings.twilio_auth_token and settings.twilio_whatsapp_number)
+#
+# async def _send_via_twilio(phone_number: str, message: str) -> bool:
+#     if not _twilio_configured():
+#         logger.error("=== TWILIO NOT CONFIGURED ===")
+#         return False
+#     clean_phone = _normalize_whatsapp_phone_e164(phone_number)
+#     from_number = _normalize_whatsapp_phone_e164(settings.twilio_whatsapp_number)
+#     try:
+#         client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
+#         sent = await asyncio.to_thread(
+#             client.messages.create,
+#             body=message,
+#             from_=f"whatsapp:{from_number}",
+#             to=f"whatsapp:{clean_phone}",
+#         )
+#         if sent.status in ("failed", "undelivered"):
+#             logger.error("=== TWILIO DELIVERY FAILED === SID=%s status=%s", sent.sid, sent.status)
+#             return False
+#         logger.info("=== TWILIO SENT OK === SID=%s status=%s", sent.sid, sent.status)
+#         return True
+#     except Exception as exc:
+#         logger.error("=== TWILIO SEND FAILED === %s", exc, exc_info=True)
+#         return False
 
 
 # ---------------------------------------------------------------------------
