@@ -164,7 +164,7 @@ async def send_email(email: str, message: str, subject: str = "Task Reminder") -
     def _send() -> None:
         resend.api_key = os.getenv("RESEND_API_KEY")
         resend.Emails.send({
-            "from": "PhantomPilot <onboarding@resend.dev>",
+            "from": "PhantomPilot <noreply@phantompilot.xyz>",
             "to": email,
             "subject": subject,
             "text": message,
