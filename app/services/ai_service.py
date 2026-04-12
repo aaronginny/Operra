@@ -624,7 +624,7 @@ The CEO manages employees and tasks. Parse their natural language into a structu
 5. "unknown" — Cannot determine intent.
 
 ## CRITICAL: NO CREATE TASK INTENT
-- The CEO God Mode NEVER creates tasks. Do NOT classify ANY command as "create_task".
+- The CEO Control Tower NEVER creates tasks. Do NOT classify ANY command as "create_task".
 - "Tell [employee] the deadline for [task] is now [date]" must ALWAYS be classified as "update_task", never "create_task" or "send_message".
 
 ## Priority when "Tell" appears:

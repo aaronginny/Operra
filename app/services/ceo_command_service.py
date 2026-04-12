@@ -94,7 +94,7 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
                 changes["due_date"] = date_iso
                 parsed = {**parsed, "changes": changes}
 
-    # ── Fix 4: BLOCK create_task — CEO God Mode never creates tasks ──
+    # ── Fix 4: BLOCK create_task — CEO Control Tower never creates tasks ──
     if parsed.get("intent") == "create_task":
         logger.warning("CEO parse: blocking create_task intent — converting to update_task")
         date_iso = _extract_date_from_text(raw_text)

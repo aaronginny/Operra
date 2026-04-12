@@ -293,23 +293,23 @@ async def process_incoming_message(
 
         logger.info("=== CEO DETECTED === user_id=%s name=%r company=%s", ceo_user.id, ceo_user.name, ceo_company_id)
 
-        # ── Tier check: God Mode requires Basic or Premium ────────
-        from app.services.billing_service import check_can_use_god_mode
-        god_mode_ok = await check_can_use_god_mode(db, ceo_company_id, user_role=ceo_user.role.value)
-        if not god_mode_ok:
-            logger.info("God Mode blocked (free tier) for company=%s", ceo_company_id)
+        # ── Tier check: Control Tower requires Basic or Premium ────────
+        from app.services.billing_service import check_can_use_control_tower
+        control_tower_ok = await check_can_use_control_tower(db, ceo_company_id, user_role=ceo_user.role.value)
+        if not control_tower_ok:
+            logger.info("Control Tower blocked (free tier) for company=%s", ceo_company_id)
             from app.services.messaging_service import send_whatsapp_message
             await send_whatsapp_message(
                 sender,
                 "PhantomPilot — Upgrade Required\n\n"
-                "WhatsApp God Mode is available on the Basic plan (₹2,000/project) "
+                "WhatsApp Control Tower is available on the Basic plan (₹2,000/project) "
                 "or Premium plan (₹5,000/month).\n\n"
                 "Visit your dashboard to upgrade.",
             )
             await db.commit()
-            return {"status": "god_mode_blocked_free_tier"}
+            return {"status": "control_tower_blocked_free_tier"}
 
-        # CEO can still use ADD command; everything else is God Mode
+        # CEO can still use ADD command; everything else is Control Tower
         add_check = await handle_add_employee(db, sender, text, ceo_company_id)
         if add_check is not None:
             add_check["message_log_id"] = log.id

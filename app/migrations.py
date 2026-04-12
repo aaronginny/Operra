@@ -39,7 +39,7 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS stage_history TEXT DEFAULT NULL;
         """,
     ),
-    # 002 — ensure users.whatsapp_number exists (CEO God Mode needs it)
+    # 002 — ensure users.whatsapp_number exists (CEO Control Tower needs it)
     (
         "users.whatsapp_number",
         """
@@ -77,7 +77,7 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS tasks_created_count INTEGER NOT NULL DEFAULT 0;
         """,
     ),
-    # 005 — cleanup junk tasks created by CEO God Mode bug (safe to re-run)
+    # 005 — cleanup junk tasks created by CEO Control Tower bug (safe to re-run)
     (
         "cleanup.junk_ceo_tasks",
         """

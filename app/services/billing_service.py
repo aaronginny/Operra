@@ -2,9 +2,9 @@
 
 Tiers
 -----
-free     — 3 tasks max, no checkpoints, no God Mode, no morning pulse
+free     — 3 tasks max, no checkpoints, no Control Tower, no morning pulse
 basic    — ₹2,000 per project; unlimited tasks per paid project,
-           checkpoints + God Mode + morning pulse enabled
+           checkpoints + Control Tower + morning pulse enabled
 premium  — ₹5,000 / month; unlimited everything, all features
 
 Payment
@@ -251,12 +251,12 @@ async def check_can_use_checkpoints(
     return tier in ("basic", "premium")
 
 
-async def check_can_use_god_mode(
+async def check_can_use_control_tower(
     db: AsyncSession,
     company_id: int,
     user_role: str | None = None,
 ) -> bool:
-    """Return True if the company tier allows WhatsApp God Mode.
+    """Return True if the company tier allows WhatsApp Control Tower.
 
     Free tier: blocked. Basic / Premium: allowed. CEO: always allowed.
     """
