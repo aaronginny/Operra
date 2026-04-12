@@ -175,6 +175,35 @@ _MIGRATIONS = [
         WHERE trial_ends_at IS NULL;
         """,
     ),
+    # 015 — email OTP verification columns on users
+    (
+        "users.is_verified",
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;
+        """,
+    ),
+    (
+        "users.otp_code",
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6) DEFAULT NULL;
+        """,
+    ),
+    (
+        "users.otp_expires_at",
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP DEFAULT NULL;
+        """,
+    ),
+    # 016 — backfill: existing users (signed up before OTP) are already verified
+    (
+        "users.is_verified_backfill",
+        """
+        UPDATE users SET is_verified = TRUE WHERE is_verified = FALSE;
+        """,
+    ),
 ]
 
 

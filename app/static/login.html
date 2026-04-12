@@ -42,6 +42,17 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
 .error{color:#f87171;text-align:center;margin-top:14px;font-size:.82rem;min-height:20px}
 .hidden{display:none}
 
+/* ── OTP Step ─────────────────────────────────────────────── */
+.otp-email-hint{color:#64748b;font-size:.85rem;margin-bottom:28px;line-height:1.5}
+.otp-email-hint strong{color:#94a3b8}
+.otp-input{width:100%;padding:16px;background:#0f172a;border:1px solid #1e293b;color:#fff;border-radius:8px;font-size:1.8rem;font-weight:700;letter-spacing:14px;text-align:center;font-family:inherit;outline:none;transition:border-color .2s}
+.otp-input:focus{border-color:rgba(255,255,255,.3)}
+.otp-resend{text-align:center;margin-top:16px;font-size:.82rem}
+.resend-link{color:#64748b;cursor:pointer;text-decoration:underline;text-underline-offset:3px;transition:color .2s}
+.resend-link:hover{color:#94a3b8}
+.resend-link.disabled{color:#334155;cursor:default;text-decoration:none}
+.resend-cooldown{color:#475569}
+
 /* ── Right Panel (Laptop Mockup) ──────────────────────────── */
 .right{flex:1.2;background:radial-gradient(ellipse at 50% 40%,#0e0e14,#06060a 70%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 
@@ -90,7 +101,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
   <h1 class="welcome fade-up-d1">Welcome back</h1>
   <p class="welcome-sub fade-up-d2">Sign in to manage your team, or create a new account.</p>
 
-  <div class="tabs fade-up-d2">
+  <div class="tabs fade-up-d2" id="authTabs">
     <div class="tab" id="tabLogin" onclick="switchTab('login')">Login</div>
     <div class="tab active" id="tabSignup" onclick="switchTab('signup')">Sign Up</div>
   </div>
@@ -132,6 +143,33 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
     <button type="submit" class="submit-btn">Create Company Account</button>
     <div id="signupError" class="error"></div>
   </form>
+
+  <!-- ── OTP Verification Step ──────────────────────────────── -->
+  <div id="otpStep" class="hidden fade-up-d3">
+    <p class="otp-email-hint">
+      We sent a 6-digit code to<br>
+      <strong id="otpEmailDisplay"></strong>
+    </p>
+    <div class="form-group">
+      <label>Verification Code</label>
+      <input
+        type="text"
+        id="otpInput"
+        class="otp-input"
+        placeholder="000000"
+        maxlength="6"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        oninput="this.value=this.value.replace(/\D/g,'')"
+      />
+    </div>
+    <button type="button" class="submit-btn" id="otpVerifyBtn" onclick="handleVerifyOtp()">Verify Code</button>
+    <div id="otpError" class="error"></div>
+    <div class="otp-resend">
+      <span class="resend-link" id="resendLink" onclick="handleResendOtp()">Resend code</span>
+      <span class="resend-cooldown hidden" id="resendCooldown"></span>
+    </div>
+  </div>
 </div>
 
 <!-- ── Right: Laptop Mockup ────────────────────────────────── -->
@@ -213,22 +251,139 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
 
 <script>
 var API = window.location.origin;
+var _otpEmail = "";
+var _resendTimer = null;
 
 if (localStorage.getItem("company_id")) {
   window.location.href = "/static/dashboard/index.html";
 }
 
+/* ── Tab switching ──────────────────────────────────────────── */
 function switchTab(tab) {
   document.getElementById("tabLogin").classList.toggle("active", tab === "login");
   document.getElementById("tabSignup").classList.toggle("active", tab === "signup");
   document.getElementById("loginForm").classList.toggle("hidden", tab !== "login");
   document.getElementById("signupForm").classList.toggle("hidden", tab !== "signup");
+  document.getElementById("otpStep").classList.add("hidden");
+  document.getElementById("authTabs").classList.remove("hidden");
   document.getElementById("loginError").innerText = "";
   document.getElementById("signupError").innerText = "";
   var w = document.querySelector(".welcome");
   w.textContent = tab === "login" ? "Welcome back" : "Get started";
 }
 
+/* ── OTP Step helpers ───────────────────────────────────────── */
+function showOtpStep(email) {
+  _otpEmail = email;
+  document.getElementById("otpEmailDisplay").textContent = email;
+  document.getElementById("otpInput").value = "";
+  document.getElementById("otpError").innerText = "";
+
+  // Hide forms and tabs, show OTP step
+  document.getElementById("authTabs").classList.add("hidden");
+  document.getElementById("loginForm").classList.add("hidden");
+  document.getElementById("signupForm").classList.add("hidden");
+  document.getElementById("otpStep").classList.remove("hidden");
+
+  document.querySelector(".welcome").textContent = "Check your email";
+  document.querySelector(".welcome-sub").textContent = "Enter the code we sent you to verify your account.";
+
+  startResendCooldown(30);
+  document.getElementById("otpInput").focus();
+}
+
+function startResendCooldown(seconds) {
+  var link = document.getElementById("resendLink");
+  var cd = document.getElementById("resendCooldown");
+  link.classList.add("disabled");
+  link.classList.remove("resend-link");
+  cd.classList.remove("hidden");
+  var remaining = seconds;
+  cd.textContent = "Resend in " + remaining + "s";
+  if (_resendTimer) clearInterval(_resendTimer);
+  _resendTimer = setInterval(function() {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(_resendTimer);
+      _resendTimer = null;
+      cd.classList.add("hidden");
+      link.classList.remove("disabled");
+      link.classList.add("resend-link");
+      cd.textContent = "";
+    } else {
+      cd.textContent = "Resend in " + remaining + "s";
+    }
+  }, 1000);
+}
+
+/* ── Verify OTP ─────────────────────────────────────────────── */
+function handleVerifyOtp() {
+  var otp = document.getElementById("otpInput").value.trim();
+  var btn = document.getElementById("otpVerifyBtn");
+  var err = document.getElementById("otpError");
+
+  if (otp.length !== 6) {
+    err.innerText = "Please enter the 6-digit code";
+    return;
+  }
+
+  btn.textContent = "Verifying...";
+  btn.disabled = true;
+  err.innerText = "";
+
+  fetch("/auth/verify-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: _otpEmail, otp: otp })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) {
+      localStorage.setItem("company_id", data.company_id);
+      localStorage.setItem("token", data.access_token);
+      window.location.href = "/static/dashboard/index.html";
+    } else {
+      err.innerText = data.error || "Invalid code — please try again";
+      btn.textContent = "Verify Code";
+      btn.disabled = false;
+    }
+  })
+  .catch(function() {
+    err.innerText = "An error occurred";
+    btn.textContent = "Verify Code";
+    btn.disabled = false;
+  });
+}
+
+/* ── Resend OTP ─────────────────────────────────────────────── */
+function handleResendOtp() {
+  var link = document.getElementById("resendLink");
+  if (link.classList.contains("disabled")) return;
+
+  document.getElementById("otpError").innerText = "";
+
+  fetch("/auth/send-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: _otpEmail })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function() {
+    startResendCooldown(30);
+  })
+  .catch(function() {
+    document.getElementById("otpError").innerText = "Failed to resend — please try again";
+  });
+}
+
+/* Allow Enter key to submit OTP */
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !document.getElementById("otpStep").classList.contains("hidden")) {
+    handleVerifyOtp();
+  }
+});
+
+/* ── Login ──────────────────────────────────────────────────── */
 function handleLogin(e) {
   e.preventDefault();
   var btn = e.target.querySelector("button");
@@ -245,7 +400,10 @@ function handleLogin(e) {
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    if (data.success) {
+    if (data.success && data.needs_otp) {
+      btn.textContent = "Login";
+      showOtpStep(data.email);
+    } else if (data.success) {
       localStorage.setItem("company_id", data.company_id);
       localStorage.setItem("token", data.access_token);
       window.location.href = "/static/dashboard/index.html";
@@ -260,6 +418,7 @@ function handleLogin(e) {
   });
 }
 
+/* ── Signup ─────────────────────────────────────────────────── */
 function handleSignup(e) {
   e.preventDefault();
   var btn = e.target.querySelector("button");
@@ -280,7 +439,11 @@ function handleSignup(e) {
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    if (data.success) {
+    if (data.success && data.needs_otp) {
+      btn.textContent = "Create Company Account";
+      showOtpStep(data.email);
+    } else if (data.success) {
+      // Founder bypass — token issued directly
       localStorage.setItem("company_id", data.company_id);
       localStorage.setItem("token", data.access_token);
       window.location.href = "/static/dashboard/index.html";

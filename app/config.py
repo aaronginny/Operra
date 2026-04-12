@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     email_user: str | None = None
     email_password: str | None = None
 
+    # ── Gmail OTP (for email verification) ───────────────────
+    gmail_user: str | None = None        # GMAIL_USER env var
+    gmail_app_password: str | None = None  # GMAIL_APP_PASSWORD env var
+
     # ── Founder notifications ─────────────────────────────────
     founder_phone: str | None = None
     founder_email: str | None = None
