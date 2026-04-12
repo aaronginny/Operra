@@ -158,6 +158,23 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL DEFAULT NULL;
         """,
     ),
+    # 013 — 7-day free trial: trial_ends_at column on companies
+    (
+        "companies.trial_ends_at",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+        """,
+    ),
+    # 014 — 7-day free trial: backfill existing companies (created_at + 7 days)
+    (
+        "companies.trial_ends_at_backfill",
+        """
+        UPDATE companies
+        SET trial_ends_at = created_at + INTERVAL '7 days'
+        WHERE trial_ends_at IS NULL;
+        """,
+    ),
 ]
 
 

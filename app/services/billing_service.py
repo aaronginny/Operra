@@ -2,6 +2,7 @@
 
 Tiers
 -----
+trial    — first 7 days after signup; full access to ALL features, unlimited tasks
 free     — 3 tasks max, no checkpoints, no Control Tower, no morning pulse
 basic    — ₹2,000 per project; unlimited tasks per paid project,
            checkpoints + Control Tower + morning pulse enabled
@@ -67,6 +68,30 @@ async def _user_whatsapp(db: AsyncSession, user_id: int | None) -> str | None:
 def _is_ceo_bypass(user_role: str | None) -> bool:
     """Role-based bypass — CEO/founder is always allowed, no DB lookups needed."""
     return user_role in ("ceo", "founder")
+
+
+def _is_trial_active(company: Company | None) -> bool:
+    """Return True if the company's 7-day trial is still running."""
+    if company is None or company.trial_ends_at is None:
+        return False
+    now = datetime.now(tz=timezone.utc)
+    trial_end = company.trial_ends_at
+    if trial_end.tzinfo is None:
+        trial_end = trial_end.replace(tzinfo=timezone.utc)
+    return now < trial_end
+
+
+def _trial_days_remaining(company: Company | None) -> int:
+    """Return whole days remaining in trial (0 if expired or no trial)."""
+    if company is None or company.trial_ends_at is None:
+        return 0
+    now = datetime.now(tz=timezone.utc)
+    trial_end = company.trial_ends_at
+    if trial_end.tzinfo is None:
+        trial_end = trial_end.replace(tzinfo=timezone.utc)
+    if now >= trial_end:
+        return 0
+    return max(0, (trial_end - now).days)
 
 
 def _get_effective_tier(company: Company | None, is_founder_user: bool) -> str:
@@ -156,15 +181,22 @@ async def get_billing_status(
     is_prem = tier == "premium"
     tasks_count = company.tasks_created_count if company else 0
     paid_projects = _paid_projects(company)
+    trial_active = _is_trial_active(company)
+    trial_days = _trial_days_remaining(company)
 
     limit_reached = (
-        tier == "free"
+        not trial_active
+        and tier == "free"
         and tasks_count >= FREE_TASK_LIMIT
     )
 
     expires_iso = None
     if company and company.tier_expires_at:
         expires_iso = company.tier_expires_at.isoformat()
+
+    trial_ends_iso = None
+    if company and company.trial_ends_at:
+        trial_ends_iso = company.trial_ends_at.isoformat()
 
     return {
         "tier": tier,
@@ -176,6 +208,10 @@ async def get_billing_status(
         "limit_reached": limit_reached,
         "tier_expires_at": expires_iso,
         "projects_paid": paid_projects,
+        # Trial fields
+        "is_trial_active": trial_active,
+        "trial_ends_at": trial_ends_iso,
+        "trial_days_remaining": trial_days,
     }
 
 
@@ -209,19 +245,25 @@ async def check_can_create_task(
         return
 
     company = await db.get(Company, company_id)
+
+    # 3 — Active trial: unlimited tasks, full access
+    if _is_trial_active(company):
+        logger.info("Billing check bypassed: company_id=%s is in active trial", company_id)
+        return
+
     tier = _get_effective_tier(company, False)
 
-    # 3 — Premium
+    # 4 — Premium
     if tier == "premium":
         return
 
-    # 4 — Basic + paid project
+    # 5 — Basic + paid project
     if tier == "basic" and project_id is not None:
         paid = _paid_projects(company)
         if project_id in paid:
             return
 
-    # 5 — Free tier (or basic without a paid project) — check limit
+    # 6 — Free tier (or basic without a paid project) — check limit
     count = company.tasks_created_count if company else 0
     if count >= FREE_TASK_LIMIT:
         if tier == "basic":
@@ -242,11 +284,13 @@ async def check_can_use_checkpoints(
 ) -> bool:
     """Return True if the company tier allows Smart Checkpoints.
 
-    Free tier: blocked. Basic / Premium: allowed. CEO: always allowed.
+    Free tier: blocked. Trial / Basic / Premium: allowed. CEO: always allowed.
     """
     if _is_ceo_bypass(user_role):
         return True
     company = await db.get(Company, company_id)
+    if _is_trial_active(company):
+        return True
     tier = _get_effective_tier(company, False)
     return tier in ("basic", "premium")
 
@@ -258,11 +302,13 @@ async def check_can_use_control_tower(
 ) -> bool:
     """Return True if the company tier allows WhatsApp Control Tower.
 
-    Free tier: blocked. Basic / Premium: allowed. CEO: always allowed.
+    Free tier: blocked. Trial / Basic / Premium: allowed. CEO: always allowed.
     """
     if _is_ceo_bypass(user_role):
         return True
     company = await db.get(Company, company_id)
+    if _is_trial_active(company):
+        return True
     tier = _get_effective_tier(company, False)
     return tier in ("basic", "premium")
 
@@ -273,9 +319,11 @@ async def check_can_send_morning_pulse(
 ) -> bool:
     """Return True if the company tier allows morning pulse messages.
 
-    Free tier: blocked. Basic / Premium: allowed.
+    Free tier: blocked. Trial / Basic / Premium: allowed.
     """
     company = await db.get(Company, company_id)
+    if _is_trial_active(company):
+        return True
     tier = _get_effective_tier(company, False)
     return tier in ("basic", "premium")
 

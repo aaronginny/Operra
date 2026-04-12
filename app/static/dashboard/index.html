@@ -798,12 +798,53 @@
     .emp-card.selected { border-color: var(--accent); background: var(--accent-gl); }
     .emp-card .name { font-weight: 600; font-size: .85rem; margin-bottom: 4px; }
     .emp-card .phone { font-size: .7rem; color: var(--text-dim); }
+
+    /* ── Trial Banner ───────────────────────────────────────── */
+    .trial-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: #ffffff;
+      color: #0a0f1a;
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 20px;
+      font-size: .85rem;
+      font-weight: 500;
+    }
+    .trial-banner strong { font-weight: 700; }
+    .trial-banner .trial-upgrade-btn {
+      background: #0a0f1a;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: .78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .trial-banner .trial-upgrade-btn:hover { opacity: .85; }
+    .trial-banner .trial-dismiss {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 1rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      line-height: 1;
+    }
   </style>
 </head>
 
 <body>
 
   <div class="app">
+    <!-- Trial Banner -->
+    <div id="trialBanner" class="trial-banner" style="display:none;"></div>
+
     <!-- Header -->
     <header>
       <div>
@@ -1307,7 +1348,11 @@
       // Plan Badge
       const badge = document.getElementById("planBadge");
       if (badge) {
-        if (tier === "premium") {
+        if (b.is_trial_active) {
+          badge.textContent = "🎁 TRIAL";
+          badge.style.background = "var(--blue-bg)";
+          badge.style.color = "var(--blue)";
+        } else if (tier === "premium") {
           badge.textContent = "✨ PREMIUM";
           badge.style.background = "var(--green-bg)";
           badge.style.color = "var(--green)";
@@ -1326,10 +1371,12 @@
       const usageText = document.getElementById("usageText");
       const usageBar  = document.getElementById("usageBar");
       const usageHint = document.getElementById("usageHint");
-      const unlimited = tier === "premium" || tier === "basic";
+      const unlimited = b.is_trial_active || tier === "premium" || tier === "basic";
 
       if (usageText) {
-        usageText.textContent = unlimited ? "∞ Unlimited" : `${b.tasks_created_count} / ${b.free_task_limit}`;
+        usageText.textContent = b.is_trial_active
+          ? `∞ Trial (${b.trial_days_remaining}d left)`
+          : (unlimited ? "∞ Unlimited" : `${b.tasks_created_count} / ${b.free_task_limit}`);
       }
       if (usageBar) {
         const pct = unlimited ? 0 : Math.min((b.tasks_created_count / b.free_task_limit) * 100, 100);
@@ -1339,7 +1386,11 @@
           : "linear-gradient(90deg, var(--accent), var(--blue))";
       }
       if (usageHint) {
-        if (tier === "premium") {
+        if (b.is_trial_active) {
+          const d = b.trial_days_remaining;
+          usageHint.textContent = `Trial active — ${d} day${d !== 1 ? "s" : ""} left. All features unlocked.`;
+          usageHint.style.color = "var(--blue)";
+        } else if (tier === "premium") {
           usageHint.textContent = "Premium active — unlimited projects & tasks.";
           usageHint.style.color = "var(--green)";
         } else if (tier === "basic") {
@@ -1367,6 +1418,21 @@
         } else {
           btnUpgrade.style.display = "flex";
           btnUpgrade.textContent = "🚀 Upgrade Plan";
+        }
+      }
+
+      // Trial banner
+      const banner = document.getElementById("trialBanner");
+      if (banner) {
+        if (b.is_trial_active && b.trial_days_remaining > 0) {
+          const d = b.trial_days_remaining;
+          banner.style.display = "flex";
+          banner.innerHTML = `<span>🎉 Free trial — <strong>${d} day${d !== 1 ? "s" : ""} remaining</strong>. Upgrade to keep full access.</span><div style="display:flex;gap:8px;align-items:center;flex-shrink:0;"><button class="trial-upgrade-btn" onclick="openUpgradeModal()">Upgrade</button><button class="trial-dismiss" onclick="document.getElementById('trialBanner').style.display='none'">✕</button></div>`;
+        } else if (!b.is_trial_active && b.trial_ends_at && tier === "free") {
+          banner.style.display = "flex";
+          banner.innerHTML = `<span>Your trial has ended. Upgrade to restore full access.</span><div style="display:flex;gap:8px;align-items:center;flex-shrink:0;"><button class="trial-upgrade-btn" onclick="openUpgradeModal()">Upgrade Now</button><button class="trial-dismiss" onclick="document.getElementById('trialBanner').style.display='none'">✕</button></div>`;
+        } else {
+          banner.style.display = "none";
         }
       }
     }

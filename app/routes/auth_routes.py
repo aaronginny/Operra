@@ -2,6 +2,7 @@
 
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -40,8 +41,11 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     if result.scalars().first():
         return {"success": False, "error": "Email already registered"}
 
-    # Create company
-    company = Company(name=payload.company_name)
+    # Create company (set 7-day trial immediately)
+    company = Company(
+        name=payload.company_name,
+        trial_ends_at=datetime.now(tz=timezone.utc) + timedelta(days=7),
+    )
     db.add(company)
     await db.flush()
 

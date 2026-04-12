@@ -35,3 +35,7 @@ class Company(Base):
     # JSON list of Project IDs unlocked via Basic per-project payments
     # e.g. "[1, 5, 12]"
     projects_paid: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 7-day free trial expiry (set at signup; NULL for pre-trial accounts)
+    trial_ends_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
