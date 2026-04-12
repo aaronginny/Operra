@@ -43,10 +43,15 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
 .hidden{display:none}
 
 /* ── OTP Step ─────────────────────────────────────────────── */
-.otp-email-hint{color:#64748b;font-size:.85rem;margin-bottom:28px;line-height:1.5}
-.otp-email-hint strong{color:#94a3b8}
-.otp-input{width:100%;padding:16px;background:#0f172a;border:1px solid #1e293b;color:#fff;border-radius:8px;font-size:1.8rem;font-weight:700;letter-spacing:14px;text-align:center;font-family:inherit;outline:none;transition:border-color .2s}
-.otp-input:focus{border-color:rgba(255,255,255,.3)}
+@keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-8px)}30%{transform:translateX(8px)}45%{transform:translateX(-6px)}60%{transform:translateX(6px)}75%{transform:translateX(-3px)}90%{transform:translateX(3px)}}
+.shake{animation:shake .4s ease}
+.otp-email-hint{color:#64748b;font-size:.85rem;margin-bottom:28px;line-height:1.6}
+.otp-email-hint strong{color:#94a3b8;display:block;margin-top:4px}
+.otp-boxes{display:flex;gap:10px;justify-content:center;margin-bottom:28px}
+.otp-box{width:48px;height:56px;background:#0f172a;border:1px solid #1e293b;color:#fff;border-radius:8px;font-size:1.5rem;font-weight:700;text-align:center;font-family:'Courier New',monospace;outline:none;transition:border-color .2s,box-shadow .2s;caret-color:transparent}
+.otp-box:focus{border-color:rgba(255,255,255,.4);box-shadow:0 0 0 3px rgba(255,255,255,.06)}
+.otp-box.filled{border-color:rgba(255,255,255,.25)}
+.otp-box.error-box{border-color:#f87171;box-shadow:0 0 0 3px rgba(248,113,113,.12)}
 .otp-resend{text-align:center;margin-top:16px;font-size:.82rem}
 .resend-link{color:#64748b;cursor:pointer;text-decoration:underline;text-underline-offset:3px;transition:color .2s}
 .resend-link:hover{color:#94a3b8}
@@ -147,23 +152,19 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
   <!-- ── OTP Verification Step ──────────────────────────────── -->
   <div id="otpStep" class="hidden fade-up-d3">
     <p class="otp-email-hint">
-      We sent a 6-digit code to<br>
+      We sent a 6-digit code to
       <strong id="otpEmailDisplay"></strong>
     </p>
-    <div class="form-group">
-      <label>Verification Code</label>
-      <input
-        type="text"
-        id="otpInput"
-        class="otp-input"
-        placeholder="000000"
-        maxlength="6"
-        inputmode="numeric"
-        autocomplete="one-time-code"
-        oninput="this.value=this.value.replace(/\D/g,'')"
-      />
+    <!-- 6 individual digit boxes -->
+    <div class="otp-boxes" id="otpBoxes">
+      <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="0" autocomplete="one-time-code" />
+      <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="1" />
+      <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="2" />
+      <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="3" />
+      <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="4" />
+      <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="5" />
     </div>
-    <button type="button" class="submit-btn" id="otpVerifyBtn" onclick="handleVerifyOtp()">Verify Code</button>
+    <button type="button" class="submit-btn" id="otpVerifyBtn" onclick="handleVerifyOtp()">Verify</button>
     <div id="otpError" class="error"></div>
     <div class="otp-resend">
       <span class="resend-link" id="resendLink" onclick="handleResendOtp()">Resend code</span>
@@ -272,12 +273,113 @@ function switchTab(tab) {
   w.textContent = tab === "login" ? "Welcome back" : "Get started";
 }
 
+/* ── OTP box wiring ─────────────────────────────────────────── */
+(function() {
+  var boxes = null;
+
+  function getBoxes() {
+    if (!boxes) boxes = Array.from(document.querySelectorAll(".otp-box"));
+    return boxes;
+  }
+
+  function getOtpValue() {
+    return getBoxes().map(function(b) { return b.value; }).join("");
+  }
+
+  function clearBoxes() {
+    getBoxes().forEach(function(b) {
+      b.value = "";
+      b.classList.remove("filled", "error-box");
+    });
+  }
+
+  function shakeBoxes() {
+    var container = document.getElementById("otpBoxes");
+    container.classList.remove("shake");
+    void container.offsetWidth; // reflow to restart animation
+    container.classList.add("shake");
+    getBoxes().forEach(function(b) { b.classList.add("error-box"); });
+  }
+
+  document.addEventListener("input", function(e) {
+    if (!e.target.classList.contains("otp-box")) return;
+    var box = e.target;
+    var idx = parseInt(box.dataset.idx, 10);
+    var bs = getBoxes();
+
+    // Strip non-digits, keep only last char
+    box.value = box.value.replace(/\D/g, "").slice(-1);
+    box.classList.toggle("filled", box.value !== "");
+    box.classList.remove("error-box");
+
+    if (box.value && idx < 5) {
+      bs[idx + 1].focus();
+    }
+
+    // Auto-submit when all 6 filled
+    if (getOtpValue().length === 6) {
+      handleVerifyOtp();
+    }
+  });
+
+  document.addEventListener("keydown", function(e) {
+    if (!e.target.classList.contains("otp-box")) {
+      // Also allow Enter on OTP step
+      if (e.key === "Enter" && !document.getElementById("otpStep").classList.contains("hidden")) {
+        handleVerifyOtp();
+      }
+      return;
+    }
+    var box = e.target;
+    var idx = parseInt(box.dataset.idx, 10);
+    var bs = getBoxes();
+
+    if (e.key === "Backspace") {
+      if (box.value) {
+        box.value = "";
+        box.classList.remove("filled", "error-box");
+      } else if (idx > 0) {
+        bs[idx - 1].focus();
+        bs[idx - 1].value = "";
+        bs[idx - 1].classList.remove("filled", "error-box");
+      }
+    } else if (e.key === "ArrowLeft" && idx > 0) {
+      bs[idx - 1].focus();
+    } else if (e.key === "ArrowRight" && idx < 5) {
+      bs[idx + 1].focus();
+    }
+  });
+
+  // Handle paste (e.g. pasting "123456")
+  document.addEventListener("paste", function(e) {
+    if (!e.target.classList.contains("otp-box")) return;
+    e.preventDefault();
+    var pasted = (e.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "").slice(0, 6);
+    var bs = getBoxes();
+    pasted.split("").forEach(function(ch, i) {
+      if (bs[i]) {
+        bs[i].value = ch;
+        bs[i].classList.add("filled");
+        bs[i].classList.remove("error-box");
+      }
+    });
+    var next = Math.min(pasted.length, 5);
+    bs[next].focus();
+    if (pasted.length === 6) handleVerifyOtp();
+  });
+
+  // Expose helpers to outer scope
+  window._otpGetValue = getOtpValue;
+  window._otpClearBoxes = clearBoxes;
+  window._otpShakeBoxes = shakeBoxes;
+})();
+
 /* ── OTP Step helpers ───────────────────────────────────────── */
 function showOtpStep(email) {
   _otpEmail = email;
   document.getElementById("otpEmailDisplay").textContent = email;
-  document.getElementById("otpInput").value = "";
   document.getElementById("otpError").innerText = "";
+  window._otpClearBoxes();
 
   // Hide forms and tabs, show OTP step
   document.getElementById("authTabs").classList.add("hidden");
@@ -289,7 +391,7 @@ function showOtpStep(email) {
   document.querySelector(".welcome-sub").textContent = "Enter the code we sent you to verify your account.";
 
   startResendCooldown(30);
-  document.getElementById("otpInput").focus();
+  document.querySelector(".otp-box[data-idx='0']").focus();
 }
 
 function startResendCooldown(seconds) {
@@ -318,12 +420,12 @@ function startResendCooldown(seconds) {
 
 /* ── Verify OTP ─────────────────────────────────────────────── */
 function handleVerifyOtp() {
-  var otp = document.getElementById("otpInput").value.trim();
+  var otp = window._otpGetValue();
   var btn = document.getElementById("otpVerifyBtn");
   var err = document.getElementById("otpError");
 
   if (otp.length !== 6) {
-    err.innerText = "Please enter the 6-digit code";
+    err.innerText = "Please enter all 6 digits";
     return;
   }
 
@@ -343,14 +445,17 @@ function handleVerifyOtp() {
       localStorage.setItem("token", data.access_token);
       window.location.href = "/static/dashboard/index.html";
     } else {
-      err.innerText = data.error || "Invalid code — please try again";
-      btn.textContent = "Verify Code";
+      window._otpShakeBoxes();
+      err.innerText = "Incorrect code, try again";
+      btn.textContent = "Verify";
       btn.disabled = false;
+      window._otpClearBoxes();
+      document.querySelector(".otp-box[data-idx='0']").focus();
     }
   })
   .catch(function() {
     err.innerText = "An error occurred";
-    btn.textContent = "Verify Code";
+    btn.textContent = "Verify";
     btn.disabled = false;
   });
 }
@@ -361,6 +466,7 @@ function handleResendOtp() {
   if (link.classList.contains("disabled")) return;
 
   document.getElementById("otpError").innerText = "";
+  window._otpClearBoxes();
 
   fetch("/auth/send-otp", {
     method: "POST",
@@ -370,18 +476,12 @@ function handleResendOtp() {
   .then(function(r) { return r.json(); })
   .then(function() {
     startResendCooldown(30);
+    document.querySelector(".otp-box[data-idx='0']").focus();
   })
   .catch(function() {
     document.getElementById("otpError").innerText = "Failed to resend — please try again";
   });
 }
-
-/* Allow Enter key to submit OTP */
-document.addEventListener("keydown", function(e) {
-  if (e.key === "Enter" && !document.getElementById("otpStep").classList.contains("hidden")) {
-    handleVerifyOtp();
-  }
-});
 
 /* ── Login ──────────────────────────────────────────────────── */
 function handleLogin(e) {

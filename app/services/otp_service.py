@@ -36,22 +36,24 @@ def send_otp_email(email: str, otp: str) -> None:
     html_body = f"""<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"></head>
-<body style="font-family:'Segoe UI',system-ui,sans-serif;background:#0a0f1a;margin:0;padding:40px 20px">
-  <div style="max-width:480px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:40px;text-align:center">
-    <h1 style="color:#ffffff;font-size:1.4rem;font-weight:700;margin:0 0 6px">PhantomPilot</h1>
-    <p style="color:#64748b;font-size:.85rem;margin:0 0 32px">Smart Task Management</p>
-    <p style="color:#94a3b8;font-size:.95rem;margin:0 0 20px">Your verification code:</p>
-    <div style="background:#1e293b;border-radius:10px;padding:24px 16px;margin:0 0 24px">
-      <span style="font-size:2.8rem;font-weight:700;color:#ffffff;letter-spacing:14px;font-variant-numeric:tabular-nums">{otp}</span>
+<body style="font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a0f;margin:0;padding:48px 20px">
+  <div style="max-width:460px;margin:0 auto;background:#0d0d14;border:1px solid #1a1a2e;border-radius:14px;padding:44px 40px;text-align:center">
+    <h1 style="font-family:Georgia,'Times New Roman',serif;color:#ffffff;font-size:1.5rem;font-weight:400;letter-spacing:-.02em;margin:0 0 4px">PhantomPilot</h1>
+    <p style="color:#4a4a6a;font-size:.78rem;text-transform:uppercase;letter-spacing:.12em;margin:0 0 36px">Smart Task Management</p>
+    <p style="color:#8888aa;font-size:.9rem;margin:0 0 20px">Your verification code</p>
+    <div style="background:#13131e;border:1px solid #222236;border-radius:10px;padding:28px 16px;margin:0 0 28px">
+      <span style="font-size:3rem;font-weight:700;color:#ffffff;letter-spacing:16px;font-variant-numeric:tabular-nums;font-family:'Courier New',monospace">{otp}</span>
     </div>
-    <p style="color:#64748b;font-size:.82rem;margin:0 0 8px">
-      This code expires in <strong style="color:#94a3b8">10 minutes</strong>.
+    <p style="color:#5a5a7a;font-size:.82rem;margin:0 0 8px">
+      This code expires in <strong style="color:#8888aa">10 minutes</strong>.
     </p>
-    <p style="color:#475569;font-size:.78rem;margin:0">
-      If you didn't sign up for PhantomPilot, you can safely ignore this email.
+    <p style="color:#4a4a6a;font-size:.78rem;margin:0 0 32px">
+      Do not share this code with anyone.
     </p>
-    <hr style="border:none;border-top:1px solid #1e293b;margin:28px 0">
-    <p style="color:#334155;font-size:.72rem;margin:0">PhantomPilot &mdash; Smart Task Management</p>
+    <hr style="border:none;border-top:1px solid #1a1a2e;margin:0 0 24px">
+    <p style="color:#333348;font-size:.72rem;margin:0">
+      If you didn't create a PhantomPilot account, you can safely ignore this email.
+    </p>
   </div>
 </body>
 </html>"""

@@ -173,7 +173,7 @@ async def send_otp(payload: SendOtpRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to send OTP email — check server Gmail credentials")
 
     logger.info("[OTP] Fresh OTP sent to %s", user.email)
-    return {"message": "OTP sent"}
+    return {"message": "OTP sent to your email"}
 
 
 class VerifyOtpRequest(BaseModel):
@@ -197,7 +197,7 @@ async def verify_otp(payload: VerifyOtpRequest, db: AsyncSession = Depends(get_d
     logger.info("[PhantomPilot] OTP verified — issuing token for %s", user.email)
     return {
         "success": True,
-        "message": "verified",
+        "message": "Email verified successfully",
         "access_token": token,
         "token_type": "bearer",
         "company_id": user.company_id,
