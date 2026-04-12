@@ -144,20 +144,25 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def _email_configured() -> bool:
-    """Return True if SMTP credentials are present."""
-    return bool(settings.email_user and settings.email_password)
+    """Return True if Gmail SMTP credentials are present.
+
+    Reads GMAIL_USER and GMAIL_APP_PASSWORD — the same env vars used by
+    otp_service.py, so a single set of credentials covers both OTP emails
+    and reminder emails.
+    """
+    return bool(settings.gmail_user and settings.gmail_app_password)
 
 
 async def send_email(email: str, message: str, subject: str = "Task Reminder") -> None:
-    """Send an email via SMTP (async).
+    """Send an email via Gmail SMTP (async).
 
     If email credentials are not configured the message is logged to the
     console instead so the scheduler never crashes.
     """
     if not _email_configured():
         logger.warning(
-            "Email credentials not configured — logging message instead.\n"
-            "[Email → %s]\n%s",
+            "Email credentials not configured (GMAIL_USER / GMAIL_APP_PASSWORD) "
+            "— logging message instead.\n[Email → %s]\n%s",
             email,
             message,
         )
@@ -165,17 +170,17 @@ async def send_email(email: str, message: str, subject: str = "Task Reminder") -
 
     try:
         msg = MIMEMultipart()
-        msg["From"] = settings.email_user
+        msg["From"] = settings.gmail_user
         msg["To"] = email
         msg["Subject"] = subject
         msg.attach(MIMEText(message, "plain"))
 
         await aiosmtplib.send(
             msg,
-            hostname=settings.email_host,
-            port=settings.email_port,
-            username=settings.email_user,
-            password=settings.email_password,
+            hostname="smtp.gmail.com",
+            port=587,
+            username=settings.gmail_user,
+            password=settings.gmail_app_password,
             start_tls=True,
         )
 

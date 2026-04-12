@@ -1,6 +1,7 @@
 """OTP generation, email delivery, and verification for PhantomPilot signup."""
 
 import logging
+import os
 import random
 import smtplib
 import string
@@ -27,6 +28,10 @@ def send_otp_email(email: str, otp: str) -> None:
     Raises RuntimeError if credentials are not configured.
     Raises smtplib.SMTPException on delivery failure.
     """
+    # Debug: confirm what the env vars resolve to at runtime
+    print(f"GMAIL_USER: {os.getenv('GMAIL_USER')}")
+    print(f"GMAIL_APP_PASSWORD set: {bool(os.getenv('GMAIL_APP_PASSWORD'))}")
+
     gmail_user = settings.gmail_user
     gmail_password = settings.gmail_app_password
 
