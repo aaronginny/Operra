@@ -12,10 +12,8 @@ import logging
 import os
 import re
 import requests
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
-import aiosmtplib
+import resend
 # from twilio.rest import Client as TwilioClient  # kept for rollback
 
 from app.config import settings
@@ -144,49 +142,39 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def _email_configured() -> bool:
-    """Return True if Gmail SMTP credentials are present.
-
-    Reads GMAIL_USER and GMAIL_APP_PASSWORD — the same env vars used by
-    otp_service.py, so a single set of credentials covers both OTP emails
-    and reminder emails.
-    """
-    return bool(settings.gmail_user and settings.gmail_app_password)
+    """Return True if Resend API key is present."""
+    return bool(os.getenv("RESEND_API_KEY"))
 
 
 async def send_email(email: str, message: str, subject: str = "Task Reminder") -> None:
-    """Send an email via Gmail SMTP (async).
+    """Send an email via Resend API (async-safe via asyncio.to_thread).
 
-    If email credentials are not configured the message is logged to the
+    If RESEND_API_KEY is not configured the message is logged to the
     console instead so the scheduler never crashes.
     """
     if not _email_configured():
         logger.warning(
-            "Email credentials not configured (GMAIL_USER / GMAIL_APP_PASSWORD) "
+            "Email credentials not configured (RESEND_API_KEY missing) "
             "— logging message instead.\n[Email → %s]\n%s",
             email,
             message,
         )
         return
 
+    def _send() -> None:
+        resend.api_key = os.getenv("RESEND_API_KEY")
+        resend.Emails.send({
+            "from": "PhantomPilot <onboarding@resend.dev>",
+            "to": email,
+            "subject": subject,
+            "text": message,
+        })
+
     try:
-        msg = MIMEMultipart()
-        msg["From"] = settings.gmail_user
-        msg["To"] = email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(message, "plain"))
-
-        await aiosmtplib.send(
-            msg,
-            hostname="smtp.gmail.com",
-            port=587,
-            username=settings.gmail_user,
-            password=settings.gmail_app_password,
-            start_tls=True,
-        )
-
-        logger.info("Email sent to %s (subject: %s)", email, subject)
+        await asyncio.to_thread(_send)
+        logger.info("=== RESEND SENT OK === to %s (subject: %s)", email, subject)
     except Exception:
-        logger.exception("Failed to send email to %s", email)
+        logger.exception("=== RESEND FAILED === to %s", email)
 
 
 # ---------------------------------------------------------------------------

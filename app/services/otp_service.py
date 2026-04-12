@@ -3,16 +3,12 @@
 import logging
 import os
 import random
-import smtplib
 import string
 from datetime import datetime, timedelta, timezone
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
+import resend
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -22,21 +18,17 @@ def generate_otp() -> str:
     return "".join(random.choices(string.digits, k=6))
 
 
-def send_otp_email(email: str, otp: str) -> None:
-    """Send verification OTP via Gmail SMTP.
+def send_otp_email(email: str, otp: str) -> bool:
+    """Send verification OTP via Resend API.
 
-    Raises RuntimeError if credentials are not configured.
-    Raises smtplib.SMTPException on delivery failure.
+    Returns True on success, False on failure (never raises — callers
+    check the return value and decide whether to surface an error).
     """
-    # Debug: confirm what the env vars resolve to at runtime
-    print(f"GMAIL_USER: {os.getenv('GMAIL_USER')}")
-    print(f"GMAIL_APP_PASSWORD set: {bool(os.getenv('GMAIL_APP_PASSWORD'))}")
+    resend.api_key = os.getenv("RESEND_API_KEY")
 
-    gmail_user = settings.gmail_user
-    gmail_password = settings.gmail_app_password
-
-    if not gmail_user or not gmail_password:
-        raise RuntimeError("Gmail credentials not configured (GMAIL_USER / GMAIL_APP_PASSWORD)")
+    if not resend.api_key:
+        logger.error("=== RESEND NOT CONFIGURED === RESEND_API_KEY env var is missing")
+        return False
 
     html_body = f"""<!DOCTYPE html>
 <html lang="en">
@@ -63,19 +55,18 @@ def send_otp_email(email: str, otp: str) -> None:
 </body>
 </html>"""
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Your PhantomPilot verification code"
-    msg["From"] = gmail_user
-    msg["To"] = email
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.ehlo()
-        server.starttls()
-        server.login(gmail_user, gmail_password)
-        server.sendmail(gmail_user, email, msg.as_string())
-
-    logger.info("[OTP] Verification email sent to %s", email)
+    try:
+        resend.Emails.send({
+            "from": "PhantomPilot <onboarding@resend.dev>",
+            "to": email,
+            "subject": "Your PhantomPilot verification code",
+            "html": html_body,
+        })
+        logger.info("=== RESEND SENT OK === to %s", email)
+        return True
+    except Exception as exc:
+        logger.error("=== RESEND FAILED === %s", exc)
+        return False
 
 
 async def verify_otp(db: AsyncSession, email: str, otp: str):
