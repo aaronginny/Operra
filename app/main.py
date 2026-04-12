@@ -113,7 +113,7 @@ def dashboard_page():
     return RedirectResponse(url="/static/dashboard/index.html")
 
 
-@app.get("/health", tags=["Health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
 async def health_check():
-    """Simple liveness probe."""
+    """Simple liveness probe — accepts HEAD for UptimeRobot."""
     return {"status": "ok"}
