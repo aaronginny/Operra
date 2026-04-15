@@ -145,14 +145,21 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
             logger.info("get_ceo_user: suffix match user_id=%s", user2.id)
             return user2
 
-    # 3. FOUNDER_PHONE env var fallback — if the CEO hasn't set whatsapp_number yet
+    # 3. FOUNDER_PHONE env var fallback — if the CEO hasn't set whatsapp_number yet.
+    # Only returns the first user with role 'ceo' or 'founder' to avoid granting
+    # cross-tenant access via a shared phone fallback.
     if settings.founder_phone:
         founder_normalized = normalize_phone_number(settings.founder_phone)
         founder_suffix = re.sub(r"\D", "", founder_normalized)[-10:]
         sender_suffix = re.sub(r"\D", "", normalized)[-10:]
         if founder_suffix and founder_suffix == sender_suffix:
-            # Phone matches FOUNDER_PHONE — find the first User in the matching company
-            stmt3 = select(User).order_by(User.id.asc()).limit(1)
+            # Phone matches FOUNDER_PHONE — find the first CEO/founder User
+            stmt3 = (
+                select(User)
+                .where(User.role.in_(["ceo", "founder"]))
+                .order_by(User.id.asc())
+                .limit(1)
+            )
             result3 = await db.execute(stmt3)
             user3 = result3.scalars().first()
             if user3:
@@ -459,7 +466,7 @@ async def handle_ceo_command(
                 return {"status": "ceo_command", "reply": reply}
 
         # ── AI / rule-based parsing path ──────────────────────────────────
-        employee_names = await get_all_employee_names(db)
+        employee_names = await get_all_employee_names(db, company_id=company_id)
 
         parsed = await parse_ceo_command(text, employee_names)
         logger.info(

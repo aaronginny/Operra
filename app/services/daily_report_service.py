@@ -24,12 +24,14 @@ def _parse_report_time() -> tuple[int, int]:
     return int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
 
 
-async def generate_daily_report(db: AsyncSession) -> str:
-    """Build the daily operations summary text."""
+async def generate_daily_report(db: AsyncSession, company_id: int | None = None) -> str:
+    """Build the daily operations summary text scoped to a single company."""
     today = date.today().strftime("%B %d, %Y")
 
-    # Task counts by status
+    # Task counts by status — always scoped to the founder's company
     stmt = select(Task.status, func.count(Task.id)).group_by(Task.status)
+    if company_id is not None:
+        stmt = stmt.where(Task.company_id == company_id)
     result = await db.execute(stmt)
     counts = {row[0]: row[1] for row in result.all()}
 
@@ -41,8 +43,8 @@ async def generate_daily_report(db: AsyncSession) -> str:
     delayed = counts.get(TaskStatus.delayed, 0)
     needs_help = counts.get(TaskStatus.needs_help, 0)
 
-    # Employee performance
-    perf = await get_employee_performance(db)
+    # Employee performance — scoped to same company
+    perf = await get_employee_performance(db, company_id=company_id)
 
     # Employees needing help (help_requests > 0)
     help_list = [p for p in perf if p["help_requests"] > 0]
@@ -80,9 +82,36 @@ async def generate_daily_report(db: AsyncSession) -> str:
 
 
 async def send_daily_report() -> None:
-    """Generate and send the daily report to the founder."""
+    """Generate and send the daily report to the founder.
+
+    Resolves the founder's company_id from their User record so the report
+    is scoped to their company only — not a cross-tenant aggregate.
+    """
+    from app.models.user import User
+    from app.services.employee_service import normalize_phone_number
+    import re
+
     async with async_session() as db:
-        report = await generate_daily_report(db)
+        # Resolve founder company_id from their User record
+        founder_company_id = None
+        if settings.founder_phone:
+            normalized = normalize_phone_number(settings.founder_phone)
+            suffix = re.sub(r"\D", "", normalized)[-10:]
+            stmt = (
+                select(User)
+                .where(User.whatsapp_number.like(f"%{suffix}"))
+                .order_by(User.id.asc())
+                .limit(1)
+            )
+            result = await db.execute(stmt)
+            founder_user = result.scalars().first()
+            if founder_user:
+                founder_company_id = founder_user.company_id
+                logger.info("Daily report scoped to company_id=%s", founder_company_id)
+            else:
+                logger.warning("send_daily_report: could not resolve founder user — report will aggregate all companies")
+
+        report = await generate_daily_report(db, company_id=founder_company_id)
 
     logger.info("Daily report generated:\n%s", report)
 

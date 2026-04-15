@@ -138,7 +138,7 @@ async def handle_reply(
     else:
         return None  # Not a command
 
-    # Look up employee by phone number
+    # Look up employee by phone number (no company_id needed — phone is globally unique per employee)
     logger.info("handle_reply: looking up employee for phone=%r command=%r", sender, text)
     employee = await get_employee_by_phone(db, sender)
     if not employee:
@@ -147,13 +147,14 @@ async def handle_reply(
             "status": "error",
             "detail": f"No employee found for phone number {sender}",
         }
-    logger.info("handle_reply: found employee id=%s name=%r", employee.id, employee.name)
+    logger.info("handle_reply: found employee id=%s name=%r company_id=%s", employee.id, employee.name, employee.company_id)
 
-    # Find most recent pending/in_progress task for this employee
+    # Find most recent pending/in_progress task for this employee — scoped to their company
     stmt = (
         select(Task)
         .where(
             Task.assigned_employee_id == employee.id,
+            Task.company_id == employee.company_id,
             Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]),
         )
         .order_by(Task.created_at.desc())
@@ -403,8 +404,8 @@ async def process_incoming_message(
         }
 
     # ── Extract task via AI ──────────────────────────────────────
-    # Fetch real employee names (phone-number placeholders are filtered out)
-    known_names = await get_all_employee_names(db)
+    # Fetch real employee names for this company only (phone-number placeholders are filtered out)
+    known_names = await get_all_employee_names(db, company_id=company_id)
 
     logger.info("Incoming message: %s", text)
     
@@ -420,6 +421,7 @@ async def process_incoming_message(
             select(Task)
             .where(
                 Task.assigned_employee_id == employee_for_update.id,
+                Task.company_id == employee_for_update.company_id,
                 Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]),
             )
             .order_by(Task.created_at.desc())
@@ -544,12 +546,13 @@ async def process_incoming_message(
             }
         employee_id = employee.id
 
-    # ── Duplicate task check ─────────────────────────────────────
+    # ── Duplicate task check — scoped to company ────────────────
     dup_stmt = (
         select(Task)
         .where(
             Task.title == extracted["title"],
             Task.assigned_employee_id == employee_id,
+            Task.company_id == company_id,
             Task.status == TaskStatus.pending,
         )
         .limit(1)

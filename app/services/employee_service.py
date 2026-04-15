@@ -51,6 +51,8 @@ async def get_or_create_employee(
     # Step 1: Check by phone number first to catch auto-registered records
     if phone_number:
         phone_stmt = select(Employee).where(Employee.phone_number == phone_number)
+        if company_id is not None:
+            phone_stmt = phone_stmt.where(Employee.company_id == company_id)
         phone_result = await db.execute(phone_stmt)
         phone_employee = phone_result.scalars().first()
 
@@ -70,6 +72,8 @@ async def get_or_create_employee(
     name_stmt = select(Employee).where(
         sa_func.lower(Employee.name) == name.strip().lower()
     )
+    if company_id is not None:
+        name_stmt = name_stmt.where(Employee.company_id == company_id)
     name_result = await db.execute(name_stmt)
     employee = name_result.scalars().first()
 
@@ -112,17 +116,20 @@ async def find_employee_by_name(
 async def get_employee_by_phone(
     db: AsyncSession,
     phone_number: str,
+    company_id: int | None = None,
 ) -> Employee | None:
-    """Look up an employee by phone number.
+    """Look up an employee by phone number scoped to a company when provided.
 
     Tries exact normalized match first, then a suffix match to handle
     stored numbers that are missing the + prefix or country code.
     """
     normalized = normalize_phone_number(phone_number)
-    logger.info("get_employee_by_phone: raw=%r normalized=%r", phone_number, normalized)
+    logger.info("get_employee_by_phone: raw=%r normalized=%r company_id=%s", phone_number, normalized, company_id)
 
     # Exact match
     stmt = select(Employee).where(Employee.phone_number == normalized)
+    if company_id is not None:
+        stmt = stmt.where(Employee.company_id == company_id)
     result = await db.execute(stmt)
     employee = result.scalars().first()
     if employee:
@@ -133,6 +140,8 @@ async def get_employee_by_phone(
     suffix = re.sub(r"\D", "", normalized)[-10:]
     if len(suffix) == 10:
         stmt2 = select(Employee).where(Employee.phone_number.like(f"%{suffix}"))
+        if company_id is not None:
+            stmt2 = stmt2.where(Employee.company_id == company_id)
         result2 = await db.execute(stmt2)
         employee2 = result2.scalars().first()
         if employee2:
@@ -146,9 +155,11 @@ async def get_employee_by_phone(
     return None
 
 
-async def get_all_employee_names(db: AsyncSession) -> list[str]:
-    """Return all employee names, filtering out phone-number placeholders."""
+async def get_all_employee_names(db: AsyncSession, company_id: int | None = None) -> list[str]:
+    """Return all employee names for the given company, filtering out phone-number placeholders."""
     stmt = select(Employee.name)
+    if company_id is not None:
+        stmt = stmt.where(Employee.company_id == company_id)
     result = await db.execute(stmt)
     return [
         row[0] for row in result.all()
