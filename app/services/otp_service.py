@@ -57,7 +57,7 @@ def send_otp_email(email: str, otp: str) -> bool:
 
     try:
         resend.Emails.send({
-            "from": "PhantomPilot <onboarding@resend.dev>",
+            "from": "PhantomPilot <noreply@phantompilot.xyz>",
             "to": email,
             "subject": "Your PhantomPilot verification code",
             "html": html_body,
