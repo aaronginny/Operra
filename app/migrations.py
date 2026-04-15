@@ -204,6 +204,21 @@ _MIGRATIONS = [
         UPDATE users SET is_verified = TRUE WHERE is_verified = FALSE;
         """,
     ),
+    # 017 — Cashfree payment gateway: order ID and payment status columns
+    (
+        "companies.cashfree_order_id",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS cashfree_order_id VARCHAR(255) DEFAULT NULL;
+        """,
+    ),
+    (
+        "companies.payment_status",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) NOT NULL DEFAULT 'unpaid';
+        """,
+    ),
 ]
 
 

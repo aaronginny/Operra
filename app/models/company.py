@@ -39,3 +39,9 @@ class Company(Base):
     trial_ends_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # ── Cashfree Payment Gateway ──────────────────────────────
+    cashfree_order_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    payment_status: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="unpaid"
+    )

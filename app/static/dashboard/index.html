@@ -1224,7 +1224,7 @@
     </div>
   </div>
 
-  <!-- Upgrade Modal — UPI Manual Payment -->
+  <!-- Upgrade Modal — Cashfree Payment -->
   <div class="modal-overlay" id="modalUpgrade">
     <div class="modal" style="max-width:600px;">
 
@@ -1232,7 +1232,7 @@
       <div style="text-align:center; margin-bottom:22px;">
         <div style="font-size:2rem; margin-bottom:8px;">🚀</div>
         <h2 style="color:#fff; font-family:Georgia,serif; font-weight:400; letter-spacing:-0.02em; margin-bottom:6px;">Upgrade PhantomPilot</h2>
-        <p style="font-size:.85rem; color:var(--text-dim);">Pay via UPI &nbsp;·&nbsp; Activated within 1 hour</p>
+        <p style="font-size:.85rem; color:var(--text-dim);">Secure payment &nbsp;·&nbsp; Instant activation</p>
       </div>
 
       <!-- Pricing cards -->
@@ -1251,23 +1251,10 @@
             <li>✅ WhatsApp Control Tower</li>
             <li>✅ AI morning pulse reminders</li>
           </ul>
-          <!-- UPI instruction -->
-          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; display:flex; flex-direction:column; gap:8px;">
-            <div style="font-size:.76rem; color:var(--text-dim); font-weight:600;">Pay ₹2,000 to UPI ID:</div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <code style="font-size:.83rem; color:var(--accent); background:var(--surface-2); padding:4px 8px; border-radius:4px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">aaronginny@okhdfcbank</code>
-              <button id="copyBtnBasic" onclick="copyUPI('basic')"
-                style="font-size:.75rem; padding:4px 10px; border-radius:4px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer; white-space:nowrap; flex-shrink:0;">
-                Copy
-              </button>
-            </div>
-            <div style="font-size:.77rem; color:var(--text-dim); line-height:1.5; border-top:1px solid var(--border); padding-top:8px;">
-              After paying, WhatsApp Aaron on
-              <strong style="color:var(--text);">9150016161</strong>
-              with your payment screenshot and project name.
-              Activated within 1 hour.
-            </div>
-          </div>
+          <button id="payBtnBasic" onclick="startPayment('basic')"
+            style="margin-top:auto; width:100%; padding:11px 0; border-radius:6px; border:none; background:var(--accent); color:#0a0a0f; font-size:.88rem; font-weight:700; cursor:pointer; transition:opacity .2s; letter-spacing:.2px;">
+            Pay ₹2,000 →
+          </button>
         </div>
 
         <!-- Premium card — highlighted with Most Popular badge -->
@@ -1287,26 +1274,16 @@
             <li>✅ Priority support</li>
             <li>✅ White-glove onboarding</li>
           </ul>
-          <!-- UPI instruction -->
-          <div style="background:var(--surface); border:1px solid rgba(255,255,255,.3); border-radius:var(--radius-sm); padding:12px; display:flex; flex-direction:column; gap:8px;">
-            <div style="font-size:.76rem; color:var(--text-dim); font-weight:600;">Pay ₹5,000 to UPI ID:</div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <code style="font-size:.83rem; color:var(--accent); background:var(--surface-2); padding:4px 8px; border-radius:4px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">aaronginny@okhdfcbank</code>
-              <button id="copyBtnPremium" onclick="copyUPI('premium')"
-                style="font-size:.75rem; padding:4px 10px; border-radius:4px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer; white-space:nowrap; flex-shrink:0;">
-                Copy
-              </button>
-            </div>
-            <div style="font-size:.77rem; color:var(--text-dim); line-height:1.5; border-top:1px solid var(--border); padding-top:8px;">
-              After paying, WhatsApp Aaron on
-              <strong style="color:var(--text);">9150016161</strong>
-              with your screenshot. Mention <strong style="color:var(--accent);">PREMIUM</strong>.
-              Activated within 1 hour.
-            </div>
-          </div>
+          <button id="payBtnPremium" onclick="startPayment('premium')"
+            style="margin-top:auto; width:100%; padding:11px 0; border-radius:6px; border:none; background:#fff; color:#0a0a0f; font-size:.88rem; font-weight:700; cursor:pointer; transition:opacity .2s; letter-spacing:.2px;">
+            Pay ₹5,000 →
+          </button>
         </div>
 
       </div>
+
+      <!-- Payment status message (shown after redirect back) -->
+      <div id="paymentStatusMsg" style="display:none; text-align:center; padding:12px; border-radius:6px; font-size:.85rem; margin-bottom:16px;"></div>
 
       <!-- Footer -->
       <div class="modal-actions" style="justify-content:center;">
@@ -1441,26 +1418,47 @@
       document.getElementById("modalUpgrade").classList.add("open");
     }
 
-    /* ── UPI copy helper ─────────────────────────────────────── */
-    function copyUPI(plan) {
-      const UPI_ID = "aaronginny@okhdfcbank";
-      const btnId  = plan === "basic" ? "copyBtnBasic" : "copyBtnPremium";
-      navigator.clipboard.writeText(UPI_ID).then(function() {
-        const btn = document.getElementById(btnId);
-        if (!btn) return;
-        btn.textContent = "Copied!";
-        btn.style.color = "var(--green)";
-        btn.style.borderColor = "var(--green)";
-        setTimeout(function() {
-          btn.textContent = "Copy";
-          btn.style.color = "";
-          btn.style.borderColor = "";
-        }, 2000);
-      }).catch(function() {
-        // Fallback for browsers that block clipboard without HTTPS
-        showToast("UPI ID: " + UPI_ID, "info");
-      });
+    /* ── Cashfree payment flow ───────────────────────────────── */
+    async function startPayment(plan) {
+      const btnId = plan === "basic" ? "payBtnBasic" : "payBtnPremium";
+      const btn = document.getElementById(btnId);
+      if (btn) { btn.disabled = true; btn.textContent = "Creating order…"; }
+
+      try {
+        const data = await api("/billing/create-order", {
+          method: "POST",
+          body: JSON.stringify({ plan }),
+        });
+        if (data.payment_url) {
+          window.location.href = data.payment_url;
+        } else {
+          showToast("Could not get payment URL. Please try again.", "error");
+          if (btn) { btn.disabled = false; btn.textContent = plan === "basic" ? "Pay ₹2,000 →" : "Pay ₹5,000 →"; }
+        }
+      } catch (e) {
+        showToast("Payment error: " + e.message, "error");
+        if (btn) { btn.disabled = false; btn.textContent = plan === "basic" ? "Pay ₹2,000 →" : "Pay ₹5,000 →"; }
+      }
     }
+
+    /* ── Handle return from Cashfree checkout ────────────────── */
+    (function checkPaymentReturn() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("payment") === "success") {
+        // Clean URL
+        history.replaceState({}, "", window.location.pathname);
+        // Show upgrade modal with success message
+        document.getElementById("modalUpgrade").classList.add("open");
+        const msg = document.getElementById("paymentStatusMsg");
+        if (msg) {
+          msg.style.display = "block";
+          msg.style.background = "rgba(0,200,100,.1)";
+          msg.style.border = "1px solid rgba(0,200,100,.3)";
+          msg.style.color = "#00c864";
+          msg.textContent = "Payment received! Your plan is being activated. Refresh in a moment.";
+        }
+      }
+    })();
 
     /* ── API helpers ─────────────────────────────────────────── */
     async function api(path, opts = {}) {

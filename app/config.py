@@ -67,9 +67,17 @@ class Settings(BaseSettings):
     # ── Daily report ──────────────────────────────────────────
     daily_report_time: str = "09:00"
 
-    # ── Payment ───────────────────────────────────────────────
-    # Payment handled manually via UPI — aaronginny@okhdfcbank
-    # Aaron activates plans after verifying WhatsApp screenshot.
+    # ── Cashfree Payment Gateway ──────────────────────────────
+    cashfree_app_id: str | None = None
+    cashfree_secret_key: str | None = None
+    # "sandbox" or "production"
+    cashfree_env: str = "sandbox"
+
+    @property
+    def cashfree_base_url(self) -> str:
+        if self.cashfree_env == "production":
+            return "https://api.cashfree.com/pg"
+        return "https://sandbox.cashfree.com/pg"
 
 
 settings = Settings()
