@@ -674,24 +674,240 @@
       color: var(--red);
     }
 
-    @media (max-width: 700px) {
+    /* ── Mobile Responsive ─────────────────────────────────── */
+    @media (max-width: 768px) {
+      .app {
+        padding: 16px 14px;
+      }
+
+      /* Header */
+      header {
+        margin-bottom: 16px;
+      }
+      header h1 {
+        font-size: 18px !important;
+      }
+      header .subtitle {
+        font-size: .72rem;
+      }
+      #btnNewTask {
+        display: none;
+      }
+
+      /* Nav tabs — horizontal scroll */
+      .nav-tabs-bar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .nav-tabs-bar::-webkit-scrollbar { display: none; }
+      .nav-tabs-bar > div {
+        min-width: max-content;
+      }
+
+      /* Stats — 3 per row */
+      .stats {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .stat-card {
+        padding: 12px 10px;
+      }
+      .stat-card .value {
+        font-size: 1.2rem;
+      }
+      .stat-card .label {
+        font-size: .65rem;
+      }
+
+      /* Filters — horizontal scroll for status tabs, full-width select */
       .filters {
         flex-direction: column;
         align-items: stretch;
+        gap: 8px;
       }
-
-      .stats {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .table-wrap {
+      .status-tabs {
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        white-space: nowrap;
+        display: flex;
+        flex-wrap: nowrap;
       }
-      
-      table {
-        min-width: 600px;
+      .status-tabs::-webkit-scrollbar { display: none; }
+      .filter-select {
+        width: 100%;
+      }
+
+      /* Task table — hide on mobile, show cards */
+      .table-wrap table {
+        display: none;
+      }
+      .task-cards-mobile {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* Employee Performance table — allow horizontal scroll */
+      .perf-section .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .perf-section .table-wrap table {
+        display: table;
+        min-width: 500px;
+      }
+
+      /* Modal — full screen */
+      .modal-overlay {
+        align-items: flex-end;
+      }
+      .modal {
+        max-width: 100% !important;
+        width: 100%;
+        border-radius: var(--radius) var(--radius) 0 0;
+        padding: 24px 20px;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .modal-actions {
+        flex-direction: column;
+      }
+      .modal-actions .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      /* Trial banner */
+      .trial-banner {
+        flex-wrap: wrap;
+        font-size: .78rem;
+        padding: 10px 14px;
+      }
+
+      /* Employees view */
+      #viewEmployees .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #viewEmployees .table-wrap table {
+        display: table;
+        min-width: 400px;
+      }
+
+      /* Enquiries view */
+      #viewEnquiries .table-wrap table {
+        display: none;
+      }
+      .enquiry-cards-mobile {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* Settings view */
+      #viewSettings > div {
+        max-width: 100% !important;
+      }
+      #viewSettings input,
+      #viewSettings select {
+        width: 100% !important;
+      }
+      #viewSettings > div > div > div[style*="display: flex"] {
+        flex-direction: column;
+      }
+
+      /* Floating action button */
+      .fab {
+        display: flex;
+      }
+
+      /* Toast — full width on mobile */
+      .toast-container {
+        bottom: 80px;
+        right: 14px;
+        left: 14px;
+      }
+      .toast {
+        width: 100%;
+      }
+
+      /* Settings WhatsApp row — stack on mobile */
+      .settings-whatsapp-row {
+        flex-direction: column;
+        align-items: stretch !important;
+      }
+      .settings-whatsapp-row .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      /* Upgrade modal pricing grid — single column on mobile */
+      .pricing-grid {
+        grid-template-columns: 1fr !important;
       }
     }
+
+    @media (min-width: 769px) {
+      .fab { display: none !important; }
+      .task-cards-mobile { display: none !important; }
+      .enquiry-cards-mobile { display: none !important; }
+    }
+
+    /* Task card (mobile view) */
+    .task-card-mobile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .task-card-mobile.row-overdue { background: var(--red-bg); border-color: rgba(255,107,107,.3); }
+    .task-card-mobile.row-needs_help { background: var(--orange-bg); border-color: rgba(225,112,85,.3); }
+    .task-card-mobile .tc-title { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .task-card-mobile .tc-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .task-card-mobile .tc-assignee { font-size: .78rem; color: var(--text-dim); }
+    .task-card-mobile .tc-due { font-size: .78rem; }
+    .task-card-mobile .tc-progress { margin-bottom: 8px; }
+    .task-card-mobile .tc-pct { font-size: .78rem; color: var(--text-dim); margin-bottom: 4px; }
+    .task-card-mobile .tc-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .task-card-mobile .tc-actions .btn { flex: 1; justify-content: center; }
+    .task-card-mobile .tc-checkpoints { margin-top: 8px; }
+
+    /* Enquiry card (mobile view) */
+    .enquiry-card-mobile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .enquiry-card-mobile .ec-client { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .enquiry-card-mobile .ec-meta { font-size: .78rem; color: var(--text-dim); margin-bottom: 6px; }
+    .enquiry-card-mobile .ec-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .enquiry-card-mobile .ec-actions .btn { flex: 1; justify-content: center; }
+
+    /* Floating Action Button */
+    .fab {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      z-index: 50;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #0a0a08;
+      border: none;
+      font-size: 1.6rem;
+      font-weight: 300;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .fab:active { transform: scale(.93); }
 
     /* ── Performance Table ─────────────────────────────────── */
     .perf-section {
@@ -858,11 +1074,13 @@
     </header>
 
     <!-- Navigation Tabs -->
-    <div style="display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px;">
-      <button class="nav-tab active" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
-      <button class="nav-tab" id="tabEmployees" onclick="switchTab('employees')">Employees</button>
-      <button class="nav-tab" id="tabEnquiries" onclick="switchTab('enquiries')">Enquiries</button>
-      <button class="nav-tab" id="tabSettings" onclick="switchTab('settings')">⚙ Settings</button>
+    <div class="nav-tabs-bar" style="border-bottom: 1px solid var(--border); margin-bottom: 24px;">
+      <div style="display: flex; gap: 20px;">
+        <button class="nav-tab active" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
+        <button class="nav-tab" id="tabEmployees" onclick="switchTab('employees')">Employees</button>
+        <button class="nav-tab" id="tabEnquiries" onclick="switchTab('enquiries')">Enquiries</button>
+        <button class="nav-tab" id="tabSettings" onclick="switchTab('settings')">⚙ Settings</button>
+      </div>
     </div>
 
     <!-- Dashboard View -->
@@ -938,6 +1156,8 @@
         </tbody>
       </table>
     </div>
+    <!-- Mobile task cards (shown only on mobile) -->
+    <div class="task-cards-mobile" id="taskCardsMobile"></div>
 
       <!-- Employee Performance -->
       <div class="perf-section">
@@ -1011,6 +1231,8 @@
           </tbody>
         </table>
       </div>
+      <!-- Mobile enquiry cards -->
+      <div class="enquiry-cards-mobile" id="enquiryCardsMobile"></div>
     </div> <!-- /Enquiries View -->
 
     <!-- Settings View -->
@@ -1055,7 +1277,7 @@
             Messages from this number are treated as CEO commands in PhantomPilot.
             Include country code, e.g. <strong>+919150016161</strong>
           </p>
-          <div style="display: flex; gap: 10px; align-items: center;">
+          <div class="settings-whatsapp-row" style="display: flex; gap: 10px; align-items: center;">
             <input
               type="tel"
               id="settingsWhatsapp"
@@ -1236,7 +1458,7 @@
       </div>
 
       <!-- Pricing cards -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;">
+      <div class="pricing-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;">
 
         <!-- Basic card -->
         <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:12px;">
@@ -1291,6 +1513,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Floating Action Button (mobile only) -->
+  <button class="fab" onclick="openModal()" aria-label="Add Task">+</button>
 
   <!-- Toast Container -->
   <div class="toast-container" id="toasts"></div>
@@ -1516,12 +1741,39 @@
       });
     }
 
+    function buildCheckpointsHtml(t) {
+      let checkpointsHtml = '';
+      if (t.checkpoints) {
+        try {
+          const cps = JSON.parse(t.checkpoints);
+          if (cps.length) {
+            const doneCount = cps.filter(c => c.done).length;
+            checkpointsHtml = `<ul class="checkpoint-list">`;
+            cps.forEach((cp, idx) => {
+              const checked = cp.done ? 'checked' : '';
+              const doneClass = cp.done ? 'done' : '';
+              checkpointsHtml += `
+                <li class="checkpoint-item ${doneClass}" onclick="toggleCheckpoint(${t.id}, ${idx}, event)">
+                  <input type="checkbox" ${checked} tabindex="-1" />
+                  <span class="cp-text">${esc(cp.text)}</span>
+                </li>`;
+            });
+            checkpointsHtml += `</ul>`;
+            checkpointsHtml += `<div class="checkpoint-progress">${doneCount}/${cps.length} checkpoints done</div>`;
+          }
+        } catch(e) {}
+      }
+      return checkpointsHtml;
+    }
+
     function renderTable() {
       const tasks = filteredTasks();
       const tbody = document.getElementById("taskBody");
+      const mobileContainer = document.getElementById("taskCardsMobile");
 
       if (!tasks.length) {
         tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icon">📋</div>No tasks found</td></tr>`;
+        if (mobileContainer) mobileContainer.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No tasks found</div>`;
         return;
       }
 
@@ -1534,29 +1786,7 @@
         const rowClass = isOverdue ? 'row-overdue' : isHelp ? 'row-needs_help' : '';
         const pct = t.progress_percent || 0;
         const lastUp = t.last_update ? formatDate(t.last_update) : formatDate(t.created_at);
-
-        // Build checkpoints HTML
-        let checkpointsHtml = '';
-        if (t.checkpoints) {
-          try {
-            const cps = JSON.parse(t.checkpoints);
-            if (cps.length) {
-              const doneCount = cps.filter(c => c.done).length;
-              checkpointsHtml = `<ul class="checkpoint-list">`;
-              cps.forEach((cp, idx) => {
-                const checked = cp.done ? 'checked' : '';
-                const doneClass = cp.done ? 'done' : '';
-                checkpointsHtml += `
-                  <li class="checkpoint-item ${doneClass}" onclick="toggleCheckpoint(${t.id}, ${idx}, event)">
-                    <input type="checkbox" ${checked} tabindex="-1" />
-                    <span class="cp-text">${esc(cp.text)}</span>
-                  </li>`;
-              });
-              checkpointsHtml += `</ul>`;
-              checkpointsHtml += `<div class="checkpoint-progress">${doneCount}/${cps.length} checkpoints done</div>`;
-            }
-          } catch(e) {}
-        }
+        const checkpointsHtml = buildCheckpointsHtml(t);
 
         return `
       <tr class="${rowClass}">
@@ -1604,6 +1834,46 @@
         </td>
       </tr>`;
       }).join("");
+
+      // Mobile card view
+      if (mobileContainer) {
+        mobileContainer.innerHTML = tasks.map(t => {
+          const isOverdue = t.status === "overdue";
+          const isHelp = t.status === "needs_help";
+          const canComplete = t.status !== "completed";
+          const due = t.due_at ? formatDate(t.due_at) : "—";
+          const dueClass = isOverdue ? "due-overdue" : "";
+          const rowClass = isOverdue ? 'row-overdue' : isHelp ? 'row-needs_help' : '';
+          const pct = t.progress_percent || 0;
+          const checkpointsHtml = buildCheckpointsHtml(t);
+          const barColor = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--accent)' : 'var(--yellow)';
+
+          return `
+          <div class="task-card-mobile ${rowClass}">
+            <div class="tc-title">${esc(t.title)}</div>
+            <div class="tc-meta">
+              <span class="badge badge-${t.status}">${statusLabel(t.status)}</span>
+              <span class="tc-assignee">${esc(t.assigned_to || "—")}</span>
+              <span class="tc-due ${dueClass}">${due}</span>
+            </div>
+            <div class="tc-progress">
+              <div class="tc-pct">${pct}% complete</div>
+              <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" style="width:${pct}%; background:${barColor};"></div>
+              </div>
+            </div>
+            ${checkpointsHtml ? `<div class="tc-checkpoints">${checkpointsHtml}</div>` : ""}
+            <div class="tc-actions">
+              ${canComplete
+                ? `<button class="btn btn-sm btn-complete" onclick="markComplete(${t.id})">✓ Done</button>`
+                : `<button class="btn btn-sm btn-ghost" disabled style="color:var(--green);">✓ Done</button>`}
+              <button class="btn btn-sm btn-ghost" onclick="archiveTask(${t.id})" title="Delete" style="color:var(--red); border-color:rgba(255,107,107,.2);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
+          </div>`;
+        }).join("");
+      }
     }
 
     /* ── Helpers ─────────────────────────────────────────────── */
@@ -1812,7 +2082,7 @@
         tbody.innerHTML = allEmployees.map(e => `
             <tr>
                 <td><span class="employee-link" onclick="openEmployeeProfile(${e.id})">${esc(e.name)}</span></td>
-                <td>${esc(e.phone_number || "No phone")}</td>
+                <td>${e.phone_number ? `<a href="tel:${esc(e.phone_number)}" style="color:var(--blue); text-decoration:none;">${esc(e.phone_number)}</a>` : "No phone"}</td>
                 <td><span class="badge ${e.active_task_count > 0 ? 'badge-in_progress' : 'badge-completed'}">${e.active_task_count} tasks</span></td>
             </tr>
         `).join("");
@@ -2164,26 +2434,30 @@
 
     function renderEnquiryTable() {
       const tbody = document.getElementById("enquiryBody");
+      const mobileContainer = document.getElementById("enquiryCardsMobile");
+
       if (!allEnquiries.length) {
         tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icon">📋</div>No enquiries yet</td></tr>`;
+        if (mobileContainer) mobileContainer.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No enquiries yet</div>`;
         return;
       }
 
-      tbody.innerHTML = allEnquiries.map(eq => {
+      const rows = allEnquiries.map(eq => {
         const date = formatDate(eq.created_at);
         const stage = eq.stage;
         const stageLabel = stage ? STAGE_LABELS[stage] || stage : "Not started";
         const stageColor = stage ? (STAGE_COLORS[stage] || "var(--text-dim)") : "var(--text-dim)";
         const stageBg = stage ? (STAGE_BG[stage] || "transparent") : "transparent";
         const nextLabel = nextStageLabel(stage);
-        const empName = eq.assigned_employee_name || "";
 
-        // Build employee assignment dropdown
         const empOptions = allEmployees.map(e =>
           `<option value="${e.id}" ${e.id === eq.assigned_employee_id ? "selected" : ""}>${esc(e.name)}</option>`
         ).join("");
 
-        return `
+        return { eq, date, stageLabel, stageColor, stageBg, nextLabel, empOptions };
+      });
+
+      tbody.innerHTML = rows.map(({ eq, date, stageLabel, stageColor, stageBg, nextLabel, empOptions }) => `
         <tr id="eq-row-${eq.id}">
           <td style="white-space:nowrap; font-size:.82rem">${date}</td>
           <td style="font-weight:600">${esc(eq.client_name)}</td>
@@ -2197,7 +2471,7 @@
           <td>
             <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
               <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:.75rem; font-weight:600; background:${stageBg}; color:${stageColor};">${stageLabel}</span>
-              ${nextLabel && stage !== "done"
+              ${nextLabel && eq.stage !== "done"
                 ? `<button class="btn btn-sm btn-primary" style="padding:3px 10px; font-size:.72rem;" onclick="advanceStage(${eq.id})" ${!eq.assigned_employee_id ? 'disabled title="Assign an employee first"' : ''}>${nextLabel} &rarr;</button>`
                 : ""}
             </div>
@@ -2210,8 +2484,35 @@
               <button class="btn btn-sm btn-ghost" onclick="deleteEnquiry(${eq.id})" title="Delete" style="color:var(--red);">🗑️</button>
             </div>
           </td>
-        </tr>`;
-      }).join("");
+        </tr>`).join("");
+
+      // Mobile card view
+      if (mobileContainer) {
+        mobileContainer.innerHTML = rows.map(({ eq, date, stageLabel, stageColor, stageBg, nextLabel, empOptions }) => `
+          <div class="enquiry-card-mobile">
+            <div class="ec-client">${esc(eq.client_name)}</div>
+            <div class="ec-meta">${esc(eq.service_requested || "No service specified")} &middot; ${date}</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+              <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:.75rem; font-weight:600; background:${stageBg}; color:${stageColor};">${stageLabel}</span>
+              ${eq.assigned_employee_name ? `<span style="font-size:.78rem; color:var(--text-dim);">${esc(eq.assigned_employee_name)}</span>` : ""}
+            </div>
+            ${eq.notes ? `<div style="font-size:.78rem; color:var(--text-dim); margin-bottom:8px;">${esc(eq.notes)}</div>` : ""}
+            <div style="margin-bottom:10px;">
+              <select class="form-input" style="padding:6px 10px; font-size:.82rem; width:100%;" onchange="assignEnquiryEmployee(${eq.id}, this.value)">
+                <option value="">— Assign Employee —</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="ec-actions">
+              ${nextLabel && eq.stage !== "done"
+                ? `<button class="btn btn-sm btn-primary" onclick="advanceStage(${eq.id})" ${!eq.assigned_employee_id ? 'disabled' : ''}>${nextLabel} →</button>`
+                : ""}
+              <button class="btn btn-sm btn-ghost" onclick="convertToTask(${eq.id})" style="color:var(--accent);">→ Task</button>
+              <button class="btn btn-sm btn-ghost" onclick="editEnquiry(${eq.id})">✏️</button>
+              <button class="btn btn-sm btn-ghost" onclick="deleteEnquiry(${eq.id})" style="color:var(--red);">🗑️</button>
+            </div>
+          </div>`).join("");
+      }
     }
 
     async function assignEnquiryEmployee(eqId, empId) {
