@@ -23,6 +23,7 @@ be locked out of their own product.
 
 import json
 import logging
+import math
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,7 +92,7 @@ def _trial_days_remaining(company: Company | None) -> int:
         trial_end = trial_end.replace(tzinfo=timezone.utc)
     if now >= trial_end:
         return 0
-    return max(0, (trial_end - now).days)
+    return max(1, math.ceil((trial_end - now).total_seconds() / 86400))
 
 
 def _get_effective_tier(company: Company | None, is_founder_user: bool) -> str:

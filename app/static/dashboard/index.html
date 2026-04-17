@@ -1401,7 +1401,7 @@
       // Trial banner
       const banner = document.getElementById("trialBanner");
       if (banner) {
-        if (b.is_trial_active && b.trial_days_remaining > 0) {
+        if (b.is_trial_active) {
           const d = b.trial_days_remaining;
           banner.style.display = "flex";
           banner.innerHTML = `<span>🎉 Free trial — <strong>${d} day${d !== 1 ? "s" : ""} remaining</strong>. Upgrade to keep full access.</span><div style="display:flex;gap:8px;align-items:center;flex-shrink:0;"><button class="trial-upgrade-btn" onclick="openUpgradeModal()">Upgrade</button><button class="trial-dismiss" onclick="document.getElementById('trialBanner').style.display='none'">✕</button></div>`;
