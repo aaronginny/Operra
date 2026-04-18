@@ -145,6 +145,12 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1
       <label>Your WhatsApp Number <span class="hint">(for CEO commands)</span></label>
       <input type="tel" id="signupWhatsapp" placeholder="+91XXXXXXXXXX" />
     </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.82rem;color:#64748b;font-weight:400">
+        <input type="checkbox" id="termsCheckbox" style="margin-top:2px;flex-shrink:0;accent-color:#fff;width:14px;height:14px;cursor:pointer" />
+        <span>I agree to the <a href="/static/terms.html" target="_blank" style="color:#94a3b8;text-decoration:underline;text-underline-offset:3px">Terms of Service</a> and <a href="/static/privacy.html" target="_blank" style="color:#94a3b8;text-decoration:underline;text-underline-offset:3px">Privacy Policy</a></span>
+      </label>
+    </div>
     <button type="submit" class="submit-btn">Create Company Account</button>
     <div id="signupError" class="error"></div>
   </form>
@@ -523,6 +529,12 @@ function handleSignup(e) {
   e.preventDefault();
   var btn = e.target.querySelector("button");
   var err = document.getElementById("signupError");
+
+  if (!document.getElementById("termsCheckbox").checked) {
+    err.innerText = "Please agree to the Terms of Service to continue";
+    return;
+  }
+
   btn.textContent = "Loading...";
 
   var waNum = document.getElementById("signupWhatsapp").value.trim();
