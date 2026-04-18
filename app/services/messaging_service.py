@@ -71,6 +71,7 @@ def _send_via_meta(to_clean: str, body: str) -> bool:
     phone_number_id = settings.meta_phone_number_id
     access_token = settings.meta_access_token
 
+    logger.info("=== META PHONE_NUMBER_ID === %s", phone_number_id)
     if not phone_number_id or not access_token:
         logger.error("=== META NOT CONFIGURED === META_PHONE_NUMBER_ID or META_ACCESS_TOKEN missing")
         return False
