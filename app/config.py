@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     twilio_auth_token: str | None = None
     twilio_whatsapp_number: str | None = None
 
+    # ── Meta WhatsApp Cloud API ───────────────────────────────
+    meta_phone_number_id: str | None = None
+    meta_access_token: str | None = None
+
     # ── WhatsApp webhook verification ─────────────────────────
     whatsapp_verify_token: str = ""
 

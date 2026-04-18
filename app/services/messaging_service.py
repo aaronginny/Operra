@@ -68,8 +68,8 @@ def _normalize_whatsapp_phone(phone_number: str) -> str:
 
 def _send_via_meta(to_clean: str, body: str) -> bool:
     """Synchronous Meta Cloud API call (run inside asyncio.to_thread)."""
-    phone_number_id = os.getenv("META_PHONE_NUMBER_ID")
-    access_token = os.getenv("META_ACCESS_TOKEN")
+    phone_number_id = settings.meta_phone_number_id
+    access_token = settings.meta_access_token
 
     if not phone_number_id or not access_token:
         logger.error("=== META NOT CONFIGURED === META_PHONE_NUMBER_ID or META_ACCESS_TOKEN missing")
