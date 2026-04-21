@@ -1,14 +1,27 @@
 import type { Metadata } from "next";
+import { Playfair_Display, DM_Sans } from "next/font/google";
 import "./globals.css";
 
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "PhantomPilot — Run Your Team from WhatsApp",
-  description: "Assign tasks, track progress, and manage your entire operation from WhatsApp. No app downloads. Built for Indian businesses.",
+  title: "PhantomPilot — Your Team Runs on WhatsApp",
+  description: "Assign tasks, get updates, and manage your team — all from WhatsApp. No app downloads. No training needed.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${playfair.variable} ${dmSans.variable}`}>
       <body>{children}</body>
     </html>
   );

@@ -1,215 +1,150 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import * as THREE from "three";
+import { useRef, useState, useEffect } from "react";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import GhostMascot from "./GhostMascot";
 
-function ParticleField() {
-  const mountRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = mountRef.current;
-    if (!el) return;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(el.clientWidth, el.clientHeight);
-    el.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, el.clientWidth / el.clientHeight, 0.1, 1000);
-    camera.position.z = 80;
-
-    const COUNT = 1800;
-    const geo = new THREE.BufferGeometry();
-    const pos = new Float32Array(COUNT * 3);
-    for (let i = 0; i < COUNT * 3; i++) pos[i] = (Math.random() - 0.5) * 200;
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-
-    const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, transparent: true, opacity: 0.35, sizeAttenuation: true });
-    const points = new THREE.Points(geo, mat);
-    scene.add(points);
-
-    let frameId: number;
-    const animate = () => {
-      frameId = requestAnimationFrame(animate);
-      points.rotation.y += 0.00015;
-      points.rotation.x += 0.00008;
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    const onResize = () => {
-      renderer.setSize(el.clientWidth, el.clientHeight);
-      camera.aspect = el.clientWidth / el.clientHeight;
-      camera.updateProjectionMatrix();
-    };
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", onResize);
-      renderer.dispose();
-      if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
-    };
-  }, []);
-
-  return <div ref={mountRef} style={{ position: "absolute", inset: 0, zIndex: 0 }} />;
-}
-
-const fadeUp = { hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0 } };
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+const fadeUp = {
+  hidden: { opacity: 0, y: 32 },
+  show: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.13, duration: 0.75, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } }),
 };
 
-export default function Hero() {
+function WaBubble({ text, delay, fromRight }: { text: string; delay: number; fromRight?: boolean }) {
   return (
-    <section style={{
-      minHeight: "100vh", display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center",
-      textAlign: "center", padding: "140px 24px 80px",
-      position: "relative", overflow: "hidden",
-    }}>
-      <ParticleField />
+    <motion.div
+      initial={{ opacity: 0, x: fromRight ? 40 : -40, scale: 0.85 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      transition={{ delay, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        background: fromRight ? "rgba(16,185,129,.15)" : "rgba(255,255,255,.06)",
+        border: `1px solid ${fromRight ? "rgba(16,185,129,.3)" : "rgba(255,255,255,.1)"}`,
+        borderRadius: fromRight ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+        padding: "10px 16px", fontSize: ".85rem",
+        color: fromRight ? "#10B981" : "rgba(255,255,255,.8)",
+        backdropFilter: "blur(12px)",
+        alignSelf: fromRight ? "flex-end" : "flex-start",
+        boxShadow: fromRight ? "0 4px 24px rgba(16,185,129,.2)" : "0 4px 16px rgba(0,0,0,.3)",
+      }}>
+      {text}
+    </motion.div>
+  );
+}
 
-      {/* Rock side panels */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, height: "100%", width: "22%",
-        background: "linear-gradient(to right,#020206 0%,rgba(4,4,10,.75) 60%,transparent 100%)",
-        clipPath: "polygon(0 0,100% 0,72% 3%,88% 8%,62% 14%,82% 21%,56% 29%,76% 37%,50% 45%,72% 53%,46% 61%,68% 69%,42% 77%,64% 84%,38% 91%,56% 100%,0 100%)",
-        zIndex: 1, pointerEvents: "none",
-      }} className="rock-panel" />
-      <div style={{
-        position: "absolute", top: 0, right: 0, height: "100%", width: "22%",
-        background: "linear-gradient(to left,#020206 0%,rgba(4,4,10,.75) 60%,transparent 100%)",
-        clipPath: "polygon(0 0,100% 0,100% 100%,44% 100%,62% 91%,36% 84%,58% 77%,32% 69%,54% 61%,28% 53%,50% 45%,24% 37%,44% 29%,18% 21%,38% 14%,12% 8%,28% 3%)",
-        zIndex: 1, pointerEvents: "none",
-      }} className="rock-panel" />
+export default function Hero() {
+  const heroRef = useRef<HTMLElement>(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const springX = useSpring(mouseX, { stiffness: 60, damping: 20 });
+  const springY = useSpring(mouseY, { stiffness: 60, damping: 20 });
+  const orbX = useTransform(springX, [-1, 1], [-18, 18]);
+  const orbY = useTransform(springY, [-1, 1], [-12, 12]);
+  const ghostX = useTransform(springX, [-1, 1], [-10, 10]);
+  const ghostY = useTransform(springY, [-1, 1], [-6, 6]);
 
-      <motion.div variants={container} initial="hidden" animate="show"
-        style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
+  const [showBubble, setShowBubble] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShowBubble(true), 2200);
+    return () => clearTimeout(t);
+  }, []);
 
-        {/* Badge */}
-        <motion.div variants={fadeUp}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            fontSize: ".72rem", letterSpacing: "2px", textTransform: "uppercase",
-            color: "#888", border: "1px solid rgba(255,255,255,.08)",
-            padding: "7px 18px", borderRadius: 100, marginBottom: 36,
-            position: "relative", overflow: "hidden",
-          }}>
-          <span style={{
-            width: 6, height: 6, borderRadius: "50%", background: "#10B981", flexShrink: 0,
-            animation: "pulse-dot 2s ease infinite",
-          }} />
-          Task management via WhatsApp
-          <span style={{
-            position: "absolute", top: 0, left: 0, width: "60%", height: "100%",
-            background: "linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent)",
-            animation: "shimmer 3s ease infinite 1s",
-          }} />
-        </motion.div>
+  const onMouseMove = (e: React.MouseEvent) => {
+    const rect = heroRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    mouseX.set(((e.clientX - rect.left) / rect.width - 0.5) * 2);
+    mouseY.set(((e.clientY - rect.top) / rect.height - 0.5) * 2);
+  };
 
-        {/* H1 */}
-        <motion.h1 variants={fadeUp}
-          style={{ fontSize: "clamp(2.4rem,6vw,4.4rem)", lineHeight: 1.06, letterSpacing: "-.04em", marginBottom: 24, maxWidth: 720 }}>
-          Manage your team<br />on WhatsApp.
-        </motion.h1>
+  return (
+    <section ref={heroRef} onMouseMove={onMouseMove} id="hero"
+      style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "120px 24px 80px", position: "relative", overflow: "hidden" }}>
 
-        {/* Subtitle */}
-        <motion.p variants={fadeUp}
-          style={{ fontSize: "1.05rem", color: "#666", maxWidth: 480, margin: "0 auto 44px", lineHeight: 1.7 }}>
-          Assign tasks, track progress, and keep your team accountable — all from WhatsApp. No app downloads. No training needed.
-        </motion.p>
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 40%, rgba(16,185,129,.07) 0%, transparent 65%), linear-gradient(180deg, rgba(6,6,10,0) 60%, rgba(6,6,10,1) 100%)", pointerEvents: "none", zIndex: 1 }} />
 
-        {/* CTA */}
-        <motion.div variants={fadeUp} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-          <motion.a
-            href="https://operra-bo0x.onrender.com/dashboard"
-            whileHover={{ y: -3, boxShadow: "0 20px 60px rgba(255,255,255,.13)" }}
-            whileTap={{ scale: .97 }}
-            style={{
-              display: "inline-block", background: "#fff", color: "#06060a",
-              padding: "16px 44px", borderRadius: 8, fontWeight: 700,
-              fontSize: ".9rem", letterSpacing: ".3px", cursor: "pointer",
-            }}>
-            Get Started For Free
-          </motion.a>
-          <span style={{ fontSize: ".75rem", color: "#444", letterSpacing: ".3px" }}>
-            Free 7-day trial — no credit card required
-          </span>
-        </motion.div>
+      {/* CSS parallax orbs */}
+      <motion.div style={{ x: orbX, y: orbY, position: "absolute", top: "12%", right: "8%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,.09) 0%, transparent 70%)", filter: "blur(40px)", pointerEvents: "none", zIndex: 1 }} />
+      <motion.div style={{ x: useTransform(springX,[-1,1],[12,-12]), y: useTransform(springY,[-1,1],[8,-8]), position: "absolute", bottom: "18%", left: "6%", width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,.06) 0%, transparent 70%)", filter: "blur(30px)", pointerEvents: "none", zIndex: 1 }} />
 
-        {/* Dashboard mockup */}
-        <motion.div variants={fadeUp}
-          style={{ marginTop: 80, width: "100%", maxWidth: 860, position: "relative" }}>
-          <div style={{
-            position: "absolute", top: "50%", left: "50%",
-            transform: "translate(-50%,-50%)", width: 700, height: 350,
-            background: "radial-gradient(ellipse,rgba(255,255,255,.05) 0%,transparent 70%)",
-            pointerEvents: "none", zIndex: -1,
-          }} />
-          <motion.div
-            whileHover={{ rotateX: 0, rotateY: 0 }}
-            initial={{ rotateX: 4 }}
-            style={{
-              background: "#0e0e14", border: "1px solid rgba(255,255,255,.07)",
-              borderRadius: 14, overflow: "hidden",
-              boxShadow: "0 60px 120px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05)",
-              transformStyle: "preserve-3d", perspective: 1200,
-            }}>
-            {/* Browser bar */}
-            <div style={{ height: 36, background: "#0a0a10", borderBottom: "1px solid rgba(255,255,255,.04)", display: "flex", alignItems: "center", padding: "0 14px", gap: 7 }}>
-              {[["#EF4444",.6],["#F59E0B",.6],["#10B981",.6]].map(([c,o],i) => (
-                <div key={i} style={{ width: 9, height: 9, borderRadius: "50%", background: c as string, opacity: o as number }} />
-              ))}
-            </div>
-            {/* Stats row */}
-            <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-              {[
-                { label: "Active Tasks", value: "24", bar: "72%", color: "#fff" },
-                { label: "Completed", value: "156", bar: "88%", color: "#10B981" },
-                { label: "On-Time Rate", value: "98%", bar: "98%", color: "#fff" },
-              ].map(card => (
-                <div key={card.label} style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.05)", borderRadius: 10, padding: 16 }}>
-                  <div style={{ fontSize: ".68rem", color: "#555", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: 10 }}>{card.label}</div>
-                  <div style={{ fontFamily: "Georgia, serif", fontSize: "1.7rem", color: "#fff" }}>{card.value}</div>
-                  <div style={{ height: 3, background: "rgba(255,255,255,.05)", borderRadius: 2, marginTop: 14, overflow: "hidden" }}>
-                    <motion.div initial={{ width: 0 }} animate={{ width: card.bar }} transition={{ duration: 1.2, delay: .8, ease: [.16,1,.3,1] }}
-                      style={{ height: "100%", background: card.color, borderRadius: 2 }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Task rows */}
-            <div style={{ padding: "4px 24px 16px" }}>
-              {[
-                { dot: "#10B981", label: "Fix plumbing at Site 3", badge: "Done", badgeBg: "rgba(16,185,129,.1)", badgeColor: "#10B981" },
-                { dot: "#74b9ff", label: "Paint walls at Prestige Tower", badge: "In Progress", badgeBg: "rgba(116,185,255,.1)", badgeColor: "#74b9ff" },
-                { dot: "#444", label: "Inspect wiring at Block C", badge: "Pending", badgeBg: "rgba(255,255,255,.04)", badgeColor: "#555" },
-              ].map((row, i) => (
-                <motion.div key={row.label} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.1 + i * 0.15, duration: .5 }}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < 2 ? "1px solid rgba(255,255,255,.03)" : "none" }}>
-                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: row.dot, flexShrink: 0 }} />
-                  <div style={{ flex: 1, fontSize: ".7rem", color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.label}</div>
-                  <div style={{ fontSize: ".58rem", padding: "3px 9px", borderRadius: 4, fontWeight: 600, background: row.badgeBg, color: row.badgeColor }}>{row.badge}</div>
-                </motion.div>
-              ))}
-            </div>
-            {/* Typing row */}
-            <div style={{ padding: "10px 24px 16px", borderTop: "1px solid rgba(255,255,255,.04)", display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: ".6rem", color: "#777", flexShrink: 0 }}>You</div>
-              <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 8, padding: "7px 12px", fontSize: ".68rem", color: "#666", overflow: "hidden", whiteSpace: "nowrap" }}>
-                <span style={{ display: "inline-block", overflow: "hidden", whiteSpace: "nowrap", borderRight: "2px solid rgba(255,255,255,.35)", animation: "typing 4s steps(45,end) 1s infinite, blink .7s step-end 1s infinite" }}>
-                  Fix the AC at Sector 7 by tomorrow 5pm → Rajesh
-                </span>
+      <div style={{ maxWidth: 1100, width: "100%", margin: "0 auto", position: "relative", zIndex: 2 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 60, alignItems: "center" }} className="hero-grid">
+
+          {/* LEFT */}
+          <div>
+            <motion.div custom={0} variants={fadeUp} initial="hidden" animate="show" style={{ marginBottom: 32 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.3)", borderRadius: 100, padding: "7px 18px", fontSize: ".75rem", color: "#10B981", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: 600, animation: "badge-pulse 2.5s ease infinite" }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", boxShadow: "0 0 10px #10B981" }} />
+                Early Access — Free
+              </span>
+            </motion.div>
+
+            <motion.h1 custom={1} variants={fadeUp} initial="hidden" animate="show"
+              style={{ fontSize: "clamp(2.6rem,5.5vw,4.8rem)", lineHeight: 1.04, letterSpacing: "-.03em", marginBottom: 24 }}>
+              Your team runs<br />
+              <span style={{ color: "#10B981", textShadow: "0 0 40px rgba(16,185,129,.5)" }}>on WhatsApp.</span>
+            </motion.h1>
+
+            <motion.p custom={2} variants={fadeUp} initial="hidden" animate="show"
+              style={{ fontSize: "1.1rem", color: "#6a7a8a", lineHeight: 1.75, marginBottom: 44, maxWidth: 460 }}>
+              Assign tasks. Get updates. No app downloads. No training.<br />
+              <span style={{ color: "rgba(255,255,255,.4)" }}>Built for Indian teams who already use WhatsApp.</span>
+            </motion.p>
+
+            <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show"
+              style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <a href="/signup">
+                <button className="btn-green" style={{ padding: "15px 36px", borderRadius: 12, fontSize: "1rem" }}>
+                  Start Free Trial →
+                </button>
+              </a>
+              <a href="#how">
+                <button className="btn-ghost" style={{ padding: "15px 28px", borderRadius: 12, fontSize: ".95rem" }}>
+                  See How It Works
+                </button>
+              </a>
+            </motion.div>
+
+            <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show"
+              style={{ marginTop: 28, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex" }}>
+                {["R","P","S","A"].map((l, i) => (
+                  <div key={i} style={{ width: 28, height: 28, borderRadius: "50%", background: `hsl(${155+i*15},50%,25%)`, border: "2px solid #06060a", marginLeft: i > 0 ? -8 : 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: ".58rem", color: "#10B981", fontWeight: 700 }}>{l}</div>
+                ))}
               </div>
+              <span style={{ fontSize: ".8rem", color: "#444" }}>48 teams · <span style={{ color: "#10B981" }}>Free while in beta</span></span>
+            </motion.div>
+          </div>
+
+          {/* RIGHT */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <motion.div style={{ x: ghostX, y: ghostY }}>
+              <GhostMascot size={175} glowIntensity={1.2} />
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, scale: .85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.1, duration: .5, ease: [.16,1,.3,1] }}
+              style={{ marginTop: -16, background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.25)", borderRadius: "16px 16px 16px 4px", padding: "9px 16px", fontSize: ".85rem", color: "#10B981", fontStyle: "italic", backdropFilter: "blur(12px)", textAlign: "center" }}>
+              I&apos;ll handle your team. 👻
+            </motion.div>
+
+            <div style={{ marginTop: 28, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+              <WaBubble text="Fix the AC at Site 3 by 5pm → Arjun" delay={1.5} />
+              <WaBubble text="✅ Task done boss!" delay={2.1} fromRight />
+              {showBubble && (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .35 }}
+                  style={{ alignSelf: "flex-end", background: "rgba(16,185,129,.07)", border: "1px solid rgba(16,185,129,.2)", borderRadius: "18px 4px 18px 18px", padding: "8px 14px", display: "flex", gap: 5, alignItems: "center" }}>
+                  {[0,1,2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", display: "inline-block", animation: `dot-bounce 1.2s ease ${i*.2}s infinite` }} />)}
+                </motion.div>
+              )}
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
+      </div>
+
+      <motion.div animate={{ y: [0,10,0] }} transition={{ duration: 1.8, repeat: Infinity }}
+        style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 2 }}>
+        <span style={{ fontSize: ".65rem", color: "#2a3a2a", letterSpacing: "2px", textTransform: "uppercase" }}>Scroll</span>
+        <div style={{ width: 1, height: 36, background: "linear-gradient(to bottom, rgba(16,185,129,.4), transparent)" }} />
       </motion.div>
 
-      <style>{`@media(max-width:900px){.rock-panel{display:none!important}}`}</style>
+      <style>{`@media(max-width:860px){.hero-grid{grid-template-columns:1fr!important}}`}</style>
     </section>
   );
 }

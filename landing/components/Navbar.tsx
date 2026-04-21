@@ -14,7 +14,6 @@ export default function Navbar() {
 
   const links = [
     { href: "#features", label: "Features" },
-    { href: "#pricing", label: "Pricing" },
     { href: "#how", label: "How It Works" },
   ];
 
@@ -27,35 +26,37 @@ export default function Navbar() {
         backdropFilter: scrolled ? "blur(20px)" : "none",
         borderBottom: scrolled ? "1px solid rgba(255,255,255,.05)" : "none",
         transition: "all .35s ease",
-      }}
-    >
+      }}>
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <a href="#" style={{ fontFamily: "Georgia, serif", fontSize: "1.2rem", color: "#fff", letterSpacing: "-.3px" }}>
+        <a href="#" style={{ fontFamily: "var(--font-playfair), Georgia, serif", fontSize: "1.2rem", color: "#fff", letterSpacing: "-.3px", textDecoration: "none" }}>
           PhantomPilot
         </a>
 
-        {/* Desktop links */}
         <div style={{ display: "flex", alignItems: "center", gap: 36 }} className="desktop-nav">
           {links.map(l => (
-            <a key={l.href} href={l.href} style={{ fontSize: ".82rem", color: "#666", letterSpacing: ".5px", transition: "color .2s" }}
+            <a key={l.href} href={l.href} style={{ fontSize: ".82rem", color: "#666", letterSpacing: ".5px", transition: "color .2s", textDecoration: "none" }}
               onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
               onMouseLeave={e => (e.currentTarget.style.color = "#666")}>
               {l.label}
             </a>
           ))}
           <a href="https://operra-bo0x.onrender.com/dashboard"
-            style={{ fontSize: ".82rem", background: "#fff", color: "#06060a", padding: "9px 24px", borderRadius: 6, fontWeight: 600, transition: "opacity .2s" }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = ".85")}
-            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}>
-            Get Started Free
+            style={{ fontSize: ".82rem", color: "#888", padding: "9px 0", transition: "color .2s", textDecoration: "none" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#888")}>
+            Login
+          </a>
+          <a href="/signup"
+            className="btn-green"
+            style={{ fontSize: ".82rem", padding: "9px 24px", borderRadius: 8, fontWeight: 600, textDecoration: "none" }}>
+            Get Early Access
           </a>
         </div>
 
-        {/* Mobile toggle */}
         <button onClick={() => setOpen(o => !o)}
           style={{ display: "none", background: "none", border: "none", cursor: "pointer", padding: 4, zIndex: 201 }}
           className="mobile-toggle" aria-label="Menu">
-          {[0,1,2].map(i => (
+          {[0, 1, 2].map(i => (
             <span key={i} style={{
               display: "block", width: 22, height: 1.5, background: "#fff", margin: "5px 0",
               transition: "all .3s",
@@ -66,26 +67,25 @@ export default function Navbar() {
         </button>
       </div>
 
-      {/* Mobile menu */}
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ position: "fixed", inset: 0, background: "rgba(6,6,10,.98)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 28, zIndex: 199 }}>
             {links.map(l => (
               <a key={l.href} href={l.href} onClick={() => setOpen(false)}
-                style={{ fontSize: "1.1rem", color: "#999" }}>{l.label}</a>
+                style={{ fontSize: "1.1rem", color: "#999", textDecoration: "none" }}>{l.label}</a>
             ))}
             <a href="https://operra-bo0x.onrender.com/dashboard" onClick={() => setOpen(false)}
-              style={{ fontSize: "1rem", background: "#fff", color: "#06060a", padding: "12px 32px", borderRadius: 8, fontWeight: 600 }}>
-              Get Started Free
+              style={{ fontSize: "1rem", color: "#666", textDecoration: "none" }}>Login</a>
+            <a href="/signup" onClick={() => setOpen(false)} className="btn-green"
+              style={{ fontSize: "1rem", padding: "12px 32px", borderRadius: 8, fontWeight: 600, textDecoration: "none" }}>
+              Get Early Access
             </a>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <style>{`
-        @media(max-width:768px){.desktop-nav{display:none!important}.mobile-toggle{display:block!important}}
-      `}</style>
+      <style>{`@media(max-width:768px){.desktop-nav{display:none!important}.mobile-toggle{display:block!important}}`}</style>
     </motion.nav>
   );
 }
