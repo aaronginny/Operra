@@ -91,11 +91,11 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
 .hero-actions{display:flex;flex-direction:column;align-items:center;gap:14px}
 
 /* JS-driven hero entrance — only animate when .js-ready is added */
-.js-ready .hero-badge{animation:fadeDown .8s cubic-bezier(.16,1,.3,1) both}
-.js-ready .hero h1{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .15s both}
-.js-ready .hero-sub{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .25s both}
-.js-ready .hero-actions{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .35s both}
-.js-ready .hero-mockup{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .45s both}
+.js-ready .hero-badge{animation:fadeDown .8s cubic-bezier(.16,1,.3,1) forwards}
+.js-ready .hero h1{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .15s forwards}
+.js-ready .hero-sub{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .25s forwards}
+.js-ready .hero-actions{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .35s forwards}
+.js-ready .hero-mockup{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .45s forwards}
 .hero-cta{display:inline-block;background:#fff;color:#06060a;padding:16px 44px;border-radius:8px;font-weight:700;font-size:.9rem;letter-spacing:.3px;transition:all .3s cubic-bezier(.16,1,.3,1);border:1px solid #fff;position:relative;overflow:hidden}
 .hero-cta::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;background:rgba(6,6,10,.08);border-radius:50%;transform:translate(-50%,-50%);transition:width .6s,height .6s}
 .hero-cta:hover{transform:translateY(-3px);box-shadow:0 20px 60px rgba(255,255,255,.12)}
@@ -103,7 +103,7 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
 .hero-trial{font-size:.75rem;color:#444;letter-spacing:.3px}
 
 /* Mockup */
-.hero-mockup{margin-top:80px;width:100%;max-width:860px;position:relative;animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .45s both}
+.hero-mockup{margin-top:80px;width:100%;max-width:860px;position:relative}
 .mockup-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:700px;height:350px;background:radial-gradient(ellipse,rgba(255,255,255,.05) 0%,transparent 70%);pointer-events:none;z-index:-1;animation:glowPulse 4s ease-in-out infinite}
 @keyframes glowPulse{0%,100%{opacity:.6}50%{opacity:1}}
 .mockup-frame{background:#0e0e14;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden;box-shadow:0 60px 120px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.03),inset 0 1px 0 rgba(255,255,255,.05);transform:perspective(1200px) rotateX(4deg);transition:transform .6s cubic-bezier(.16,1,.3,1)}
@@ -119,10 +119,10 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
 .mockup-card-title{font-family:Inter,sans-serif;font-size:.68rem;color:#555;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px}
 .mockup-card-num{font-family:Georgia,serif;font-size:1.7rem;color:#fff}
 .mockup-card-bar{height:3px;background:rgba(255,255,255,.05);border-radius:2px;margin-top:14px;overflow:hidden}
-.mockup-card-bar span{display:block;height:100%;border-radius:2px;animation:barGrow 1.5s cubic-bezier(.16,1,.3,1) 1s both}
+.mockup-card-bar span{display:block;height:100%;border-radius:2px}
 @keyframes barGrow{from{width:0 !important}to{}}
 .mockup-tasks{padding:4px 24px 20px;display:flex;flex-direction:column}
-.mockup-task-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.03);animation:taskSlide .5s cubic-bezier(.16,1,.3,1) both}
+.mockup-task-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.03)}
 .mockup-task-row:nth-child(1){animation-delay:1.1s}
 .mockup-task-row:nth-child(2){animation-delay:1.25s}
 .mockup-task-row:nth-child(3){animation-delay:1.4s}
