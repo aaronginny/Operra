@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PhantomPilot — Run Your Team from WhatsApp</title>
 <meta name="description" content="Assign tasks, track progress, and manage your entire operation from WhatsApp. No app downloads. Built for Indian businesses.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ── Reset ────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -80,18 +77,25 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
 .hero>*{position:relative;z-index:2}
 
 /* Hero badge with shimmer */
-.hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:.72rem;letter-spacing:2px;text-transform:uppercase;color:#888;border:1px solid rgba(255,255,255,.08);padding:7px 18px;border-radius:100px;margin-bottom:36px;position:relative;overflow:hidden;animation:fadeDown .8s cubic-bezier(.16,1,.3,1) both}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:.72rem;letter-spacing:2px;text-transform:uppercase;color:#888;border:1px solid rgba(255,255,255,.08);padding:7px 18px;border-radius:100px;margin-bottom:36px;position:relative;overflow:hidden}
 .hero-badge::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);animation:shimmer 3s ease infinite 1s}
 .badge-dot{width:6px;height:6px;border-radius:50%;background:#10B981;box-shadow:0 0 8px rgba(16,185,129,.6);animation:pulse 2s ease infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
 @keyframes shimmer{0%{left:-100%}100%{left:100%}}
 @keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
 
-.hero h1{font-size:clamp(2.6rem,6vw,4.4rem);line-height:1.06;letter-spacing:-.04em;margin-bottom:24px;max-width:720px;animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .15s both}
-.hero-sub{font-size:1.05rem;color:#666;max-width:480px;margin:0 auto 44px;line-height:1.7;animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .25s both}
+.hero h1{font-size:clamp(2.6rem,6vw,4.4rem);line-height:1.06;letter-spacing:-.04em;margin-bottom:24px;max-width:720px}
+.hero-sub{font-size:1.05rem;color:#666;max-width:480px;margin:0 auto 44px;line-height:1.7}
 @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
 
-.hero-actions{display:flex;flex-direction:column;align-items:center;gap:14px;animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .35s both}
+.hero-actions{display:flex;flex-direction:column;align-items:center;gap:14px}
+
+/* JS-driven hero entrance — only animate when .js-ready is added */
+.js-ready .hero-badge{animation:fadeDown .8s cubic-bezier(.16,1,.3,1) both}
+.js-ready .hero h1{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .15s both}
+.js-ready .hero-sub{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .25s both}
+.js-ready .hero-actions{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .35s both}
+.js-ready .hero-mockup{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .45s both}
 .hero-cta{display:inline-block;background:#fff;color:#06060a;padding:16px 44px;border-radius:8px;font-weight:700;font-size:.9rem;letter-spacing:.3px;transition:all .3s cubic-bezier(.16,1,.3,1);border:1px solid #fff;position:relative;overflow:hidden}
 .hero-cta::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;background:rgba(6,6,10,.08);border-radius:50%;transform:translate(-50%,-50%);transition:width .6s,height .6s}
 .hero-cta:hover{transform:translateY(-3px);box-shadow:0 20px 60px rgba(255,255,255,.12)}
@@ -331,7 +335,7 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
     <span class="hero-trial">Free 7-day trial &mdash; no credit card required</span>
   </div>
 
-  <div class="hero-mockup">
+  <div class="hero-mockup" style="margin-top:80px;width:100%;max-width:860px;position:relative">
     <div class="mockup-glow"></div>
     <div class="mockup-frame">
       <div class="mockup-bar">
@@ -676,6 +680,9 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
 
 <!-- ═══════════════ JS ═══════════════ -->
 <script>
+/* Mark JS available — enables hero entrance animations safely */
+document.documentElement.classList.add('js-ready');
+
 /* ── Cursor glow ── */
 var cg = document.getElementById('cursorGlow');
 var cgActive = false;
