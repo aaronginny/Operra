@@ -4,9 +4,17 @@
 <head>
   <meta charset="UTF-8" />
   <script>
-    if (!localStorage.getItem("company_id")) {
-      window.location.replace("/static/login.html");
-    }
+    (function() {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('token')) localStorage.setItem('token', p.get('token'));
+      if (p.get('company_id')) localStorage.setItem('company_id', p.get('company_id'));
+      if (p.get('token') || p.get('company_id')) {
+        window.history.replaceState({}, '', '/static/dashboard/index.html');
+      }
+      if (!localStorage.getItem("company_id")) {
+        window.location.replace("https://phantompilot.xyz/auth.html");
+      }
+    })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PhantomPilot — Dashboard</title>
