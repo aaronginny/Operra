@@ -107,10 +107,16 @@
     }
     .me-info .name { font-size: 13px; font-weight: 700; color: var(--text); }
     .me-info .plan { font-size: 10px; color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; margin-top: 2px; }
-    .me-logout {
+    .me-settings {
       margin-left: auto; width: 28px; height: 28px; border-radius: 8px;
       border: 1px solid var(--hairline); background: transparent; color: var(--text-3);
-      display: grid; place-items: center; cursor: pointer; transition: all 0.16s;
+      display: grid; place-items: center; cursor: pointer; transition: all 0.16s; flex: 0 0 28px;
+    }
+    .me-settings:hover { color: var(--accent); border-color: rgba(168,127,255,0.3); }
+    .me-logout {
+      width: 28px; height: 28px; border-radius: 8px;
+      border: 1px solid var(--hairline); background: transparent; color: var(--text-3);
+      display: grid; place-items: center; cursor: pointer; transition: all 0.16s; flex: 0 0 28px;
     }
     .me-logout:hover { color: var(--danger); border-color: rgba(255,122,138,0.3); }
 
@@ -406,6 +412,17 @@
     .pipeline-card.expanded .pipeline-tasks { display: block; }
     .pipeline-tasks .task-row { grid-template-columns: 1fr 148px 148px 120px 128px 82px; }
 
+    /* ─── SETTINGS PAGE ─── */
+    .settings-wrap { max-width: 560px; }
+    .settings-section { margin-bottom: 32px; opacity: 0; animation: rise .5s .38s ease-out forwards; }
+    .settings-card { background: var(--row); border: 1px solid var(--hairline); border-radius: 16px; padding: 24px; }
+    .settings-row { display: flex; gap: 32px; align-items: flex-start; }
+    .settings-row-info { flex: 1; min-width: 0; }
+    .settings-row-control { width: 220px; flex: 0 0 220px; }
+    .settings-label { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .settings-hint { font-size: 12px; color: var(--text-3); font-weight: 500; line-height: 1.5; }
+    .settings-static { font-size: 13px; font-weight: 600; color: var(--text-2); padding: 11px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--hairline); border-radius: 10px; }
+
     /* ─── PLACEHOLDER PAGES ─── */
     .placeholder-page {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -544,32 +561,15 @@
     </button>
   </div>
 
-  <div class="nav-group">
-    <div class="nav-label">Manage</div>
-    <button class="nav-item" data-nav="pipelines">
-      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 16V8a2 2 0 00-1-1.7l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.7l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></svg>
-      Pipelines
-    </button>
-    <button class="nav-item" data-nav="schedule">
-      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-      Schedule
-    </button>
-    <button class="nav-item" data-nav="team">
-      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16.5 7.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/><path d="M22 22a10 10 0 00-20 0"/></svg>
-      Team
-    </button>
-    <button class="nav-item" data-nav="settings">
-      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1-.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
-      Settings
-    </button>
-  </div>
-
   <div class="sidebar-foot">
     <div class="me-av" id="meAvatar">A</div>
     <div class="me-info">
       <div class="name" id="meName">—</div>
       <div class="plan" id="mePlan">Owner · Beta</div>
     </div>
+    <button class="me-settings" id="btnSettings" aria-label="Settings" title="Settings">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1-.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+    </button>
     <button class="me-logout" id="btnLogout" aria-label="Logout">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
     </button>
@@ -718,9 +718,31 @@
 
     <!-- ══ SETTINGS PAGE ══ -->
     <div class="page-section" id="page-settings">
-      <div class="placeholder-page">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1-.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
-        <p>Settings — coming soon</p>
+      <div class="settings-wrap">
+        <div class="settings-section">
+          <div class="section-title">Profile</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-label">Display name</div>
+                <div class="settings-hint">This is how you appear in greetings and the sidebar.</div>
+              </div>
+              <div class="settings-row-control">
+                <input class="form-input" id="settingsUsername" type="text" placeholder="Your name" />
+                <button class="btn-submit" id="btnSaveUsername" style="margin-top:10px;width:100%">Save</button>
+              </div>
+            </div>
+            <div class="settings-row" style="border-top:1px solid var(--hairline);margin-top:16px;padding-top:16px">
+              <div class="settings-row-info">
+                <div class="settings-label">Email</div>
+                <div class="settings-hint">Your login email — cannot be changed here.</div>
+              </div>
+              <div class="settings-row-control">
+                <div class="settings-static" id="settingsEmail">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -903,11 +925,16 @@
 
     try {
       const payload = JSON.parse(atob(token().split('.')[1]));
-      const name = payload.name || payload.sub || 'Aaron';
+      const email = payload.sub || '';
+      // name from JWT; fallback: capitalize the part before '@'
+      const name = payload.name || (email ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : 'User');
       document.getElementById('meName').textContent = name;
       document.getElementById('meAvatar').textContent = name[0].toUpperCase();
       document.getElementById('heroGreeting').innerHTML =
         `${greeting()}, ${name}.<br><em>Here's where your team stands.</em>`;
+      // Pre-fill settings page
+      document.getElementById('settingsUsername').value = name;
+      document.getElementById('settingsEmail').textContent = email;
     } catch(_) {}
   }
 
@@ -1385,6 +1412,38 @@
     } finally {
       btn.disabled = false;
       btn.textContent = 'Create task';
+    }
+  });
+
+  /* ── Settings gear button ── */
+  document.getElementById('btnSettings').addEventListener('click', () => navigateTo('settings'));
+
+  /* ── Save username ── */
+  document.getElementById('btnSaveUsername').addEventListener('click', async () => {
+    const newName = document.getElementById('settingsUsername').value.trim();
+    if (!newName) { toast('Please enter a name.', 'error'); return; }
+    const btn = document.getElementById('btnSaveUsername');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+      const res = await fetch(`${API}/auth/profile`, {
+        method: 'PATCH', headers: headers(), body: JSON.stringify({ username: newName }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      // Store fresh token so name is reflected immediately
+      if (data.access_token) localStorage.setItem('token', data.access_token);
+      // Update UI
+      document.getElementById('meName').textContent = newName;
+      document.getElementById('meAvatar').textContent = newName[0].toUpperCase();
+      document.getElementById('heroGreeting').innerHTML =
+        `${greeting()}, ${newName}.<br><em>Here's where your team stands.</em>`;
+      toast('Display name updated.');
+    } catch {
+      toast('Could not save name.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save';
     }
   });
 

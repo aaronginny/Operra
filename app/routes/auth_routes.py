@@ -83,6 +83,7 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
             "user_id": user.id,
             "company_id": user.company_id,
             "role": user.role.value,
+            "name": user.name,
         })
         return {"success": True, "access_token": token, "token_type": "bearer", "company_id": user.company_id}
 
@@ -139,6 +140,7 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
         "user_id": user.id,
         "company_id": user.company_id,
         "role": user.role.value,
+        "name": user.name,
     })
     logger.info("[PhantomPilot] Login OK for: %s  |  company_id=%s", payload.email, user.company_id)
     return {"success": True, "access_token": token, "token_type": "bearer", "company_id": user.company_id}
@@ -193,6 +195,7 @@ async def verify_otp(payload: VerifyOtpRequest, db: AsyncSession = Depends(get_d
         "user_id": user.id,
         "company_id": user.company_id,
         "role": user.role.value,
+        "name": user.name,
     })
     logger.info("[PhantomPilot] OTP verified — issuing token for %s", user.email)
     return {
@@ -209,6 +212,7 @@ async def verify_otp(payload: VerifyOtpRequest, db: AsyncSession = Depends(get_d
 class ProfileUpdate(BaseModel):
     whatsapp_number: str | None = None
     name: str | None = None
+    username: str | None = None
 
 
 @router.get("/me")
@@ -232,22 +236,35 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update the current user's profile (WhatsApp number, name)."""
+    """Update the current user's profile (WhatsApp number, name/username)."""
     if payload.whatsapp_number is not None:
         current_user.whatsapp_number = _normalize_whatsapp(payload.whatsapp_number)
         logger.info(
             "User %s updated whatsapp_number to %r",
             current_user.email, current_user.whatsapp_number,
         )
-    if payload.name:
-        current_user.name = payload.name.strip()
+    # username is an alias for name — both update the same field
+    new_name = (payload.username or payload.name or "").strip()
+    if new_name:
+        current_user.name = new_name
+        logger.info("User %s updated name to %r", current_user.email, new_name)
 
     await db.flush()
+
+    # Issue a fresh token so the new name is reflected immediately
+    new_token = create_access_token({
+        "sub": current_user.email,
+        "user_id": current_user.id,
+        "company_id": current_user.company_id,
+        "role": current_user.role.value,
+        "name": current_user.name,
+    })
 
     return {
         "success": True,
         "whatsapp_number": current_user.whatsapp_number,
         "name": current_user.name,
+        "access_token": new_token,
     }
 
 
