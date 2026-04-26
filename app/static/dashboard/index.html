@@ -157,7 +157,61 @@
     /* ─── CONTENT ─── */
     .content { padding: 30px 40px 60px; }
 
-    /* STATS */
+    /* ─── PAGE SECTIONS ─── */
+    .page-section { display: none; }
+    .page-section.active { display: block; }
+
+    /* ─── COMMAND CENTER (Dashboard) ─── */
+    .cmd-stats {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 32px;
+      opacity: 0; animation: rise .5s .38s ease-out forwards;
+    }
+    .cmd-card {
+      background: var(--row); border: 1px solid var(--hairline); border-radius: 16px; padding: 22px 22px 20px;
+      position: relative; overflow: hidden; transition: all 0.18s ease;
+    }
+    .cmd-card:hover { transform: translateY(-2px); border-color: var(--hairline-2); }
+    .cmd-card::before { content: ""; position: absolute; inset: 0; border-radius: 16px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .cmd-card:hover::before { opacity: 1; }
+    .cmd-card.danger::before { background: radial-gradient(100px 60px at 80% 0%, rgba(255,122,138,0.08), transparent 65%); }
+    .cmd-card.warn::before { background: radial-gradient(100px 60px at 80% 0%, rgba(255,184,122,0.08), transparent 65%); }
+    .cmd-card.blue::before { background: radial-gradient(100px 60px at 80% 0%, rgba(111,184,255,0.08), transparent 65%); }
+    .cmd-card.ok::before { background: radial-gradient(100px 60px at 80% 0%, rgba(126,232,182,0.08), transparent 65%); }
+    .cmd-card .c-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-3); font-weight: 700; margin-bottom: 12px; }
+    .cmd-card .c-val { font-family: var(--mono); font-size: 42px; font-weight: 700; letter-spacing: -0.04em; color: var(--text); line-height: 1; font-variant-numeric: tabular-nums; }
+    .cmd-card.danger .c-val { color: var(--danger); }
+    .cmd-card.warn .c-val { color: var(--warn); }
+    .cmd-card.blue .c-val { color: var(--accent-2); }
+    .cmd-card.ok .c-val { color: var(--ok); }
+
+    /* Activity Feed */
+    .activity-section {
+      opacity: 0; animation: rise .5s .5s ease-out forwards;
+    }
+    .section-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--text-3); margin-bottom: 14px;
+    }
+    .activity-list {
+      background: var(--row); border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden;
+    }
+    .activity-item {
+      display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px;
+      border-bottom: 1px solid var(--hairline); transition: background 0.14s;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-item:hover { background: var(--row-hover); }
+    .act-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; margin-top: 5px; }
+    .act-dot.red { background: var(--danger); }
+    .act-dot.orange { background: var(--warn); }
+    .act-dot.green { background: var(--ok); }
+    .act-dot.blue { background: var(--accent-2); }
+    .act-dot.purple { background: var(--accent); }
+    .act-body { flex: 1; min-width: 0; }
+    .act-desc { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.5; }
+    .act-time { font-size: 11px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
+
+    /* ─── TASKS PAGE ─── */
     .stats-grid {
       display: grid; grid-template-columns: 200px 1fr; gap: 14px; margin-bottom: 28px;
       opacity: 0; animation: rise .5s .38s ease-out forwards;
@@ -250,11 +304,12 @@
     .task-row:hover { background: var(--row-hover); }
     .task-cell { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
     .t-name { font-size: 13.5px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .t-dot { color: var(--text-4); margin: 0 8px; }
-    .t-proj { font-weight: 700; color: var(--accent); }
-    .t-proj.warm { color: var(--warn); }
-    .t-proj.blue { color: var(--accent-2); }
     .t-sub { font-size: 11.5px; color: var(--text-3); font-weight: 500; }
+    .t-pipeline-tag {
+      display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; padding: 2px 8px;
+      border-radius: 5px; background: rgba(168,127,255,0.1); color: var(--accent);
+      border: 1px solid rgba(168,127,255,0.2); margin-top: 2px; width: fit-content;
+    }
     .assignee-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
     .av {
       width: 28px; height: 28px; border-radius: 50%; flex: 0 0 28px;
@@ -303,6 +358,61 @@
       padding: 32px 20px; text-align: center; color: var(--text-3);
       font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
     }
+
+    /* ─── PIPELINES PAGE ─── */
+    .pipelines-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;
+      opacity: 0; animation: rise .5s .38s ease-out forwards;
+    }
+    .pipelines-header h2 { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--text); }
+    .btn-new-pipeline {
+      font-family: var(--font); font-size: 12px; font-weight: 700; padding: 10px 18px;
+      border-radius: 10px; border: 1px solid var(--hairline-2); background: rgba(168,127,255,0.08);
+      color: var(--accent); cursor: pointer; transition: all 0.16s; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-new-pipeline:hover { background: rgba(168,127,255,0.14); border-color: rgba(168,127,255,0.3); }
+    .pipeline-card {
+      background: var(--row); border: 1px solid var(--hairline); border-radius: 16px;
+      margin-bottom: 14px; overflow: hidden; opacity: 0; animation: rise .5s ease-out forwards;
+    }
+    .pipeline-card:nth-child(1) { animation-delay: .44s; }
+    .pipeline-card:nth-child(2) { animation-delay: .50s; }
+    .pipeline-card:nth-child(3) { animation-delay: .56s; }
+    .pipeline-card:nth-child(n+4) { animation-delay: .62s; }
+    .pipeline-head {
+      display: flex; align-items: center; gap: 16px; padding: 18px 22px; cursor: pointer;
+      transition: background 0.14s;
+    }
+    .pipeline-head:hover { background: var(--row-hover); }
+    .pipeline-name-wrap { flex: 1; min-width: 0; }
+    .pipeline-name {
+      font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.01em;
+      background: transparent; border: none; outline: none; font-family: var(--font);
+      width: 100%; cursor: text;
+    }
+    .pipeline-name:focus { color: var(--accent); }
+    .pipeline-meta { font-size: 11px; color: var(--text-3); font-weight: 600; margin-top: 3px; }
+    .pipeline-progress-wrap { width: 160px; flex: 0 0 160px; }
+    .pipeline-pct { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 5px; text-align: right; }
+    .pipeline-bar { height: 4px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+    .pipeline-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 4px; transition: width 0.4s ease; }
+    .pipeline-chevron {
+      width: 28px; height: 28px; display: grid; place-items: center; color: var(--text-3);
+      border-radius: 7px; transition: all 0.2s;
+    }
+    .pipeline-chevron svg { transition: transform 0.22s; }
+    .pipeline-card.expanded .pipeline-chevron svg { transform: rotate(90deg); }
+    .pipeline-tasks { display: none; border-top: 1px solid var(--hairline); }
+    .pipeline-card.expanded .pipeline-tasks { display: block; }
+    .pipeline-tasks .task-row { grid-template-columns: 1fr 148px 148px 120px 128px 82px; }
+
+    /* ─── PLACEHOLDER PAGES ─── */
+    .placeholder-page {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 300px; color: var(--text-3); gap: 12px;
+    }
+    .placeholder-page svg { width: 48px; height: 48px; opacity: 0.2; }
+    .placeholder-page p { font-size: 14px; font-weight: 600; }
 
     /* FOOTER */
     .footer {
@@ -375,15 +485,17 @@
 
     @media (max-width: 1200px) {
       .stats-grid { grid-template-columns: 1fr; }
+      .cmd-stats { grid-template-columns: repeat(2,1fr); }
       .task-row { grid-template-columns: 1fr 120px 110px 110px 118px 70px; gap: 10px; }
+      .pipeline-tasks .task-row { grid-template-columns: 1fr 120px 110px 110px 118px 70px; }
     }
     @media (max-width: 900px) {
       .sidebar { display: none; }
       .hero { padding: 24px 20px; }
       .content { padding: 20px 20px 40px; }
+      .cmd-stats { grid-template-columns: repeat(2,1fr); }
       .task-row { grid-template-columns: 1fr 100px 90px 80px; }
-      .task-row > .prog-cell,
-      .task-row > .row-actions { display: none; }
+      .task-row > .prog-cell { display: none; }
       .task-row > .row-actions { display: flex; }
     }
   </style>
@@ -434,9 +546,9 @@
 
   <div class="nav-group">
     <div class="nav-label">Manage</div>
-    <button class="nav-item" data-nav="projects">
+    <button class="nav-item" data-nav="pipelines">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 16V8a2 2 0 00-1-1.7l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.7l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></svg>
-      Projects
+      Pipelines
     </button>
     <button class="nav-item" data-nav="schedule">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
@@ -482,51 +594,136 @@
 
   <div class="content">
 
-    <!-- STATS -->
-    <section class="stats-grid">
-      <div class="stat-hero">
-        <div class="s-label">Total active</div>
-        <div class="s-big" id="statTotal">—<sup>tasks</sup></div>
-        <div class="stat-breakdown">
-          <div class="row-b"><span class="k">Pending</span><span class="v warn" id="statPending">—</span></div>
-          <div class="row-b"><span class="k">In Progress</span><span class="v" id="statInProgress">—</span></div>
-          <div class="row-b"><span class="k">Overdue</span><span class="v danger" id="statOverdue">—</span></div>
-          <div class="row-b"><span class="k">Completed</span><span class="v ok" id="statCompleted">—</span></div>
+    <!-- ══ DASHBOARD PAGE ══ -->
+    <div class="page-section active" id="page-dashboard">
+      <div class="cmd-stats">
+        <div class="cmd-card danger">
+          <div class="c-label">Tasks Overdue</div>
+          <div class="c-val" id="cmdOverdue">—</div>
+        </div>
+        <div class="cmd-card warn">
+          <div class="c-label">Pending Enquiries</div>
+          <div class="c-val" id="cmdEnquiries">—</div>
+        </div>
+        <div class="cmd-card blue">
+          <div class="c-label">Team Members</div>
+          <div class="c-val" id="cmdTeam">—</div>
+        </div>
+        <div class="cmd-card ok">
+          <div class="c-label">Due This Week</div>
+          <div class="c-val" id="cmdDueWeek">—</div>
         </div>
       </div>
-      <div class="stats-minis">
-        <div class="mini-card warn"><div class="mini-left"><div class="m-label">Pending</div><div class="m-val" id="miniPending">—</div></div></div>
-        <div class="mini-card blue"><div class="mini-left"><div class="m-label">In Progress</div><div class="m-val" id="miniInProgress">—</div></div></div>
-        <div class="mini-card danger"><div class="mini-left"><div class="m-label">Overdue</div><div class="m-val" id="miniOverdue">—</div></div></div>
-        <div class="mini-card"><div class="mini-left"><div class="m-label">Delayed</div><div class="m-val" id="miniDelayed">—</div></div></div>
-        <div class="mini-card"><div class="mini-left"><div class="m-label">Needs Help</div><div class="m-val" id="miniNeedsHelp">—</div></div></div>
-        <div class="mini-card ok"><div class="mini-left"><div class="m-label">Completed</div><div class="m-val" id="miniCompleted">—</div></div></div>
-      </div>
-    </section>
 
-    <!-- FILTER BAR -->
-    <div class="filter-bar">
-      <div class="pills" id="pillsBar">
-        <button class="pill active" data-filter="all">Active <span class="n" id="pillAll">—</span></button>
-        <button class="pill" data-filter="pending">Pending <span class="n" id="pillPending">—</span></button>
-        <button class="pill" data-filter="in_progress">In Progress <span class="n" id="pillInProgress">—</span></button>
-        <button class="pill" data-filter="overdue">Overdue <span class="n" id="pillOverdue">—</span></button>
-        <button class="pill" data-filter="delayed">Delayed <span class="n" id="pillDelayed">—</span></button>
-        <button class="pill" data-filter="needs_help">Needs Help <span class="n" id="pillNeedsHelp">—</span></button>
-        <button class="pill" data-filter="completed">Completed <span class="n" id="pillCompleted">—</span></button>
+      <div class="activity-section">
+        <div class="section-title">Recent Activity</div>
+        <div class="activity-list" id="activityFeed"></div>
       </div>
-      <select class="emp-select" id="empFilter">
-        <option value="">All Employees</option>
-      </select>
+
+      <div class="footer">
+        <div class="live-dot">Phantom is watching &nbsp;·&nbsp; live sync</div>
+        <div>v 0.4.1 · beta</div>
+      </div>
     </div>
 
-    <!-- TASK GROUPS -->
-    <div id="taskGroups"></div>
+    <!-- ══ TASKS PAGE ══ -->
+    <div class="page-section" id="page-tasks">
+      <section class="stats-grid">
+        <div class="stat-hero">
+          <div class="s-label">Total active</div>
+          <div class="s-big" id="statTotal">—<sup>tasks</sup></div>
+          <div class="stat-breakdown">
+            <div class="row-b"><span class="k">Pending</span><span class="v warn" id="statPending">—</span></div>
+            <div class="row-b"><span class="k">In Progress</span><span class="v" id="statInProgress">—</span></div>
+            <div class="row-b"><span class="k">Overdue</span><span class="v danger" id="statOverdue">—</span></div>
+            <div class="row-b"><span class="k">Completed</span><span class="v ok" id="statCompleted">—</span></div>
+          </div>
+        </div>
+        <div class="stats-minis">
+          <div class="mini-card warn"><div class="mini-left"><div class="m-label">Pending</div><div class="m-val" id="miniPending">—</div></div></div>
+          <div class="mini-card blue"><div class="mini-left"><div class="m-label">In Progress</div><div class="m-val" id="miniInProgress">—</div></div></div>
+          <div class="mini-card danger"><div class="mini-left"><div class="m-label">Overdue</div><div class="m-val" id="miniOverdue">—</div></div></div>
+          <div class="mini-card"><div class="mini-left"><div class="m-label">Delayed</div><div class="m-val" id="miniDelayed">—</div></div></div>
+          <div class="mini-card"><div class="mini-left"><div class="m-label">Needs Help</div><div class="m-val" id="miniNeedsHelp">—</div></div></div>
+          <div class="mini-card ok"><div class="mini-left"><div class="m-label">Completed</div><div class="m-val" id="miniCompleted">—</div></div></div>
+        </div>
+      </section>
 
-    <div class="footer">
-      <div class="live-dot">Phantom is watching &nbsp;·&nbsp; live sync</div>
-      <div>v 0.4.1 · beta</div>
+      <div class="filter-bar">
+        <div class="pills" id="pillsBar">
+          <button class="pill active" data-filter="all">Active <span class="n" id="pillAll">—</span></button>
+          <button class="pill" data-filter="pending">Pending <span class="n" id="pillPending">—</span></button>
+          <button class="pill" data-filter="in_progress">In Progress <span class="n" id="pillInProgress">—</span></button>
+          <button class="pill" data-filter="overdue">Overdue <span class="n" id="pillOverdue">—</span></button>
+          <button class="pill" data-filter="delayed">Delayed <span class="n" id="pillDelayed">—</span></button>
+          <button class="pill" data-filter="needs_help">Needs Help <span class="n" id="pillNeedsHelp">—</span></button>
+          <button class="pill" data-filter="completed">Completed <span class="n" id="pillCompleted">—</span></button>
+        </div>
+        <select class="emp-select" id="empFilter">
+          <option value="">All Employees</option>
+        </select>
+      </div>
+
+      <div id="taskGroups"></div>
+
+      <div class="footer">
+        <div class="live-dot">Phantom is watching &nbsp;·&nbsp; live sync</div>
+        <div>v 0.4.1 · beta</div>
+      </div>
     </div>
+
+    <!-- ══ EMPLOYEES PAGE ══ -->
+    <div class="page-section" id="page-employees">
+      <div class="placeholder-page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0112 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 016-4.5"/></svg>
+        <p>Employees — coming soon</p>
+      </div>
+    </div>
+
+    <!-- ══ ENQUIRIES PAGE ══ -->
+    <div class="page-section" id="page-enquiries">
+      <div class="placeholder-page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a4 4 0 01-4 4H8l-5 4V6a4 4 0 014-4h10a4 4 0 014 4z"/></svg>
+        <p>Enquiries — coming soon</p>
+      </div>
+    </div>
+
+    <!-- ══ PIPELINES PAGE ══ -->
+    <div class="page-section" id="page-pipelines">
+      <div class="pipelines-header">
+        <h2>Pipelines</h2>
+        <button class="btn-new-pipeline" id="btnNewPipeline">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+          New Pipeline
+        </button>
+      </div>
+      <div id="pipelinesContainer"></div>
+    </div>
+
+    <!-- ══ SCHEDULE PAGE ══ -->
+    <div class="page-section" id="page-schedule">
+      <div class="placeholder-page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+        <p>Schedule — coming soon</p>
+      </div>
+    </div>
+
+    <!-- ══ TEAM PAGE ══ -->
+    <div class="page-section" id="page-team">
+      <div class="placeholder-page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M16.5 7.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/><path d="M22 22a10 10 0 00-20 0"/></svg>
+        <p>Team — coming soon</p>
+      </div>
+    </div>
+
+    <!-- ══ SETTINGS PAGE ══ -->
+    <div class="page-section" id="page-settings">
+      <div class="placeholder-page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1-.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        <p>Settings — coming soon</p>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -549,6 +746,11 @@
       </select>
     </div>
     <div class="form-group">
+      <label>Pipeline (optional)</label>
+      <input class="form-input" id="fPipeline" type="text" placeholder="e.g. Client onboarding, Website redesign…" list="pipelineSuggestions" />
+      <datalist id="pipelineSuggestions"></datalist>
+    </div>
+    <div class="form-group">
       <label>Due date &amp; time</label>
       <input class="form-input" id="fDue" type="datetime-local" />
     </div>
@@ -569,6 +771,10 @@
   const headers = () => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` });
 
   function pad(n) { return String(n).padStart(2, '0'); }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
   function toast(msg, type = 'success') {
     const el = document.createElement('div');
@@ -621,11 +827,23 @@
     return `Updated · ${months[d.getMonth()]} ${d.getDate()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
+  function timeAgo(iso) {
+    if (!iso) return '';
+    const diff = (Date.now() - new Date(iso)) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hour${Math.floor(diff/3600)!==1?'s':''} ago`;
+    return `${Math.floor(diff / 86400)} day${Math.floor(diff/86400)!==1?'s':''} ago`;
+  }
+
   /* ── State ── */
   let allTasks = [];
   let employees = [];
+  let enquiries = [];
   let activeFilter = 'all';
   let empFilter = '';
+  let pipelines = {};  // name → { tasks: [] }
+  let currentPage = 'dashboard';
 
   /* ── Init ── */
   document.getElementById('heroDate').textContent = heroDate();
@@ -633,9 +851,10 @@
   /* ── Fetch data ── */
   async function loadData() {
     try {
-      const [tRes, eRes] = await Promise.all([
+      const [tRes, eRes, enqRes] = await Promise.all([
         fetch(`${API}/api/dashboard/tasks`, { headers: headers() }),
         fetch(`${API}/api/dashboard/employees`, { headers: headers() }),
+        fetch(`${API}/enquiries`, { headers: headers() }),
       ]);
       if (tRes.status === 401 || eRes.status === 401) {
         window.location.replace('https://phantompilot.xyz/auth.html');
@@ -643,6 +862,9 @@
       }
       allTasks = await tRes.json();
       employees = await eRes.json();
+      enquiries = enqRes.ok ? (await enqRes.json()) : [];
+
+      rebuildPipelines();
       render();
       populateEmployeeFilters();
     } catch (e) {
@@ -650,17 +872,35 @@
     }
   }
 
+  function rebuildPipelines() {
+    const newPipelines = {};
+    allTasks.forEach(t => {
+      const key = (t.pipeline || '').trim() || '__unassigned__';
+      if (!newPipelines[key]) newPipelines[key] = { tasks: [] };
+      newPipelines[key].tasks.push(t);
+    });
+    // Preserve any manually added empty pipelines
+    Object.keys(pipelines).forEach(k => {
+      if (!newPipelines[k]) newPipelines[k] = pipelines[k];
+    });
+    pipelines = newPipelines;
+  }
+
   function populateEmployeeFilters() {
     const sel = document.getElementById('empFilter');
     const fSel = document.getElementById('fEmployee');
+    const datalist = document.getElementById('pipelineSuggestions');
     sel.innerHTML = '<option value="">All Employees</option>';
     fSel.innerHTML = '<option value="">Unassigned</option>';
     employees.forEach(e => {
-      sel.innerHTML += `<option value="${e.name}">${e.name}</option>`;
-      fSel.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+      sel.innerHTML += `<option value="${escHtml(e.name)}">${escHtml(e.name)}</option>`;
+      fSel.innerHTML += `<option value="${e.id}">${escHtml(e.name)}</option>`;
     });
 
-    // Try to get user name from token
+    // Pipeline suggestions from existing pipeline names
+    const pipelineNames = Object.keys(pipelines).filter(k => k !== '__unassigned__');
+    datalist.innerHTML = pipelineNames.map(n => `<option value="${escHtml(n)}">`).join('');
+
     try {
       const payload = JSON.parse(atob(token().split('.')[1]));
       const name = payload.name || payload.sub || 'Aaron';
@@ -671,25 +911,19 @@
     } catch(_) {}
   }
 
-  /* ── Render ── */
-  function filteredTasks() {
-    let tasks = allTasks;
-    if (empFilter) tasks = tasks.filter(t => (t.employee || '').toLowerCase() === empFilter.toLowerCase());
-    if (activeFilter === 'all') return tasks.filter(t => t.status !== 'completed' && t.status !== 'archived');
-    return tasks.filter(t => t.status === activeFilter);
-  }
-
+  /* ── Counts ── */
   function counts() {
     const c = { pending: 0, in_progress: 0, overdue: 0, delayed: 0, needs_help: 0, completed: 0 };
     allTasks.forEach(t => { if (c[t.status] !== undefined) c[t.status]++; });
     return c;
   }
 
+  /* ── Render all ── */
   function render() {
     const c = counts();
     const active = allTasks.filter(t => t.status !== 'completed' && t.status !== 'archived').length;
 
-    // Stats
+    // Tasks page stats
     document.getElementById('statTotal').innerHTML = `${active}<sup>tasks</sup>`;
     document.getElementById('statPending').textContent = pad(c.pending);
     document.getElementById('statInProgress').textContent = pad(c.in_progress);
@@ -701,8 +935,6 @@
     document.getElementById('miniDelayed').textContent = pad(c.delayed);
     document.getElementById('miniNeedsHelp').textContent = pad(c.needs_help);
     document.getElementById('miniCompleted').textContent = pad(c.completed);
-
-    // Pills
     document.getElementById('pillAll').textContent = active;
     document.getElementById('pillPending').textContent = c.pending;
     document.getElementById('pillInProgress').textContent = c.in_progress;
@@ -712,20 +944,106 @@
     document.getElementById('pillCompleted').textContent = c.completed;
 
     // Sidebar badge
-    const badge = document.getElementById('sidebarTaskBadge');
-    badge.textContent = active;
+    document.getElementById('sidebarTaskBadge').textContent = active;
 
     // Hero summary
-    const overdueCount = c.overdue;
-    const pendingCount = c.pending;
     document.getElementById('heroSummary').innerHTML =
       `You have <b>${active} active task${active !== 1 ? 's' : ''}</b> across the team` +
-      (overdueCount > 0 ? ` — <span class="alert">${overdueCount} overdue</span>` : '') +
-      (pendingCount > 0 ? ` and <b>${pendingCount} pending</b>` : '') +
+      (c.overdue > 0 ? ` — <span class="alert">${c.overdue} overdue</span>` : '') +
+      (c.pending > 0 ? ` and <b>${c.pending} pending</b>` : '') +
       `. Phantom is following up on WhatsApp; no action needed right now.`;
 
-    // Task groups
+    // Dashboard command center
+    const now = new Date();
+    const weekMs = 7 * 24 * 3600 * 1000;
+    const dueThisWeek = allTasks.filter(t => {
+      if (!t.deadline || t.deadline === 'No deadline') return false;
+      const d = new Date(t.deadline);
+      return d > now && d <= new Date(now.getTime() + weekMs);
+    }).length;
+    const pendingEnquiries = enquiries.filter(e => e.status === 'new' || e.status === 'pending' || e.status === 'assigned').length;
+
+    document.getElementById('cmdOverdue').textContent = c.overdue;
+    document.getElementById('cmdEnquiries').textContent = pendingEnquiries;
+    document.getElementById('cmdTeam').textContent = employees.length;
+    document.getElementById('cmdDueWeek').textContent = dueThisWeek;
+
+    renderActivityFeed();
     renderGroups(filteredTasks());
+    if (currentPage === 'pipelines') renderPipelines();
+  }
+
+  /* ── Activity Feed ── */
+  function renderActivityFeed() {
+    const feed = document.getElementById('activityFeed');
+
+    // Build events from tasks and enquiries
+    const events = [];
+
+    allTasks.forEach(t => {
+      const ts = t.last_update || t.created_at;
+      if (!ts) return;
+      let dot = 'purple', desc = '';
+      if (t.status === 'completed') {
+        dot = 'green';
+        desc = `${t.employee || 'Someone'} completed "${escHtml(t.task)}"`;
+      } else if (t.status === 'overdue') {
+        dot = 'red';
+        desc = `"${escHtml(t.task)}" is overdue — assigned to ${t.employee || 'Unassigned'}`;
+      } else if (t.status === 'needs_help') {
+        dot = 'orange';
+        desc = `${t.employee || 'Someone'} requested help on "${escHtml(t.task)}"`;
+      } else if (t.status === 'in_progress') {
+        dot = 'blue';
+        desc = `"${escHtml(t.task)}" is in progress`;
+      } else {
+        dot = 'purple';
+        desc = `Task "${escHtml(t.task)}" created`;
+      }
+      events.push({ ts: new Date(ts), dot, desc });
+    });
+
+    enquiries.forEach(eq => {
+      if (!eq.created_at) return;
+      events.push({
+        ts: new Date(eq.created_at),
+        dot: 'orange',
+        desc: `New enquiry from ${escHtml(eq.client_name)}` + (eq.service_requested ? ` — ${escHtml(eq.service_requested)}` : ''),
+      });
+    });
+
+    events.sort((a, b) => b.ts - a.ts);
+    const latest = events.slice(0, 10);
+
+    if (latest.length === 0) {
+      feed.innerHTML = `
+        <div class="activity-item">
+          <div class="act-dot purple"></div>
+          <div class="act-body">
+            <div class="act-desc">No activity yet — tasks and enquiries will appear here.</div>
+            <div class="act-time">—</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    feed.innerHTML = latest.map(ev => `
+      <div class="activity-item">
+        <div class="act-dot ${ev.dot}"></div>
+        <div class="act-body">
+          <div class="act-desc">${ev.desc}</div>
+          <div class="act-time">${timeAgo(ev.ts.toISOString())}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  /* ── Task filtering ── */
+  function filteredTasks() {
+    let tasks = allTasks;
+    if (empFilter) tasks = tasks.filter(t => (t.employee || '').toLowerCase() === empFilter.toLowerCase());
+    if (activeFilter === 'all') return tasks.filter(t => t.status !== 'completed' && t.status !== 'archived');
+    return tasks.filter(t => t.status === activeFilter);
   }
 
   function renderGroups(tasks) {
@@ -737,18 +1055,13 @@
       return;
     }
 
-    // Group: overdue / needs_help first, then the rest
     const attention = tasks.filter(t => t.status === 'overdue' || t.status === 'needs_help');
     const rest = tasks.filter(t => t.status !== 'overdue' && t.status !== 'needs_help');
 
     if (attention.length > 0) {
       container.appendChild(buildGroup({
-        label: 'Needs attention',
-        meta: `· ${attention.length} critical`,
-        dotClass: 'd',
-        rightLabel: 'Critical',
-        rightCount: attention.length,
-        tasks: attention,
+        label: 'Needs attention', meta: `· ${attention.length} critical`,
+        dotClass: 'd', rightLabel: 'Critical', rightCount: attention.length, tasks: attention,
       }));
     }
 
@@ -757,34 +1070,22 @@
       const todayTasks = rest.filter(t => {
         if (!t.deadline || t.deadline === 'No deadline') return false;
         const d = new Date(t.deadline);
-        return d.getFullYear() === today.getFullYear() &&
-               d.getMonth() === today.getMonth() &&
-               d.getDate() === today.getDate();
+        return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
       });
       const other = rest.filter(t => !todayTasks.includes(t));
-
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const dateLabel = `· ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][today.getMonth()]} ${today.getDate()}`;
+      const dateLabel = `· ${months[today.getMonth()]} ${today.getDate()}`;
 
       if (todayTasks.length > 0) {
         container.appendChild(buildGroup({
-          label: 'Today',
-          meta: dateLabel,
-          dotClass: '',
-          rightLabel: 'Active',
-          rightCount: todayTasks.length,
-          tasks: todayTasks,
+          label: 'Today', meta: dateLabel, dotClass: '',
+          rightLabel: 'Active', rightCount: todayTasks.length, tasks: todayTasks,
         }));
       }
-
       if (other.length > 0) {
         container.appendChild(buildGroup({
-          label: 'Upcoming',
-          meta: `· ${other.length} task${other.length !== 1 ? 's' : ''}`,
-          dotClass: 'w',
-          rightLabel: 'Active',
-          rightCount: other.length,
-          tasks: other,
+          label: 'Upcoming', meta: `· ${other.length} task${other.length !== 1 ? 's' : ''}`,
+          dotClass: 'w', rightLabel: 'Active', rightCount: other.length, tasks: other,
         }));
       }
     }
@@ -793,7 +1094,6 @@
   function buildGroup({ label, meta, dotClass, rightLabel, rightCount, tasks }) {
     const section = document.createElement('section');
     section.className = 'task-group';
-
     section.innerHTML = `
       <div class="group-header">
         <div class="gh-l">
@@ -805,7 +1105,6 @@
       </div>
       <div class="rows-wrap" id="rows-${label.replace(/\s+/g,'-')}"></div>
     `;
-
     const wrap = section.querySelector('.rows-wrap');
     tasks.forEach(t => wrap.appendChild(buildRow(t)));
     return section;
@@ -815,25 +1114,24 @@
     const div = document.createElement('div');
     div.className = 'task-row';
     div.dataset.id = t.id;
-
     const due = fmtDue(t.deadline === 'No deadline' ? null : t.deadline);
     const pct = t.progress_percent || 0;
     const updStr = t.last_update ? fmtUpdated(t.last_update) : (t.created_at ? fmtUpdated(t.created_at) : '');
     const empName = t.employee || 'Unassigned';
-    const empInit = empName[0].toUpperCase();
-
     const statusLabel = {
       pending: 'Pending', in_progress: 'In Progress', overdue: 'Overdue',
       completed: 'Completed', delayed: 'Delayed', needs_help: 'Needs Help',
     }[t.status] || t.status;
+    const pipelineTag = t.pipeline ? `<div class="t-pipeline-tag">${escHtml(t.pipeline)}</div>` : '';
 
     div.innerHTML = `
       <div class="task-cell">
         <div class="t-name">${escHtml(t.task)}</div>
         <div class="t-sub">${t.checkpoint_summary || 'No checkpoints'}</div>
+        ${pipelineTag}
       </div>
       <div class="assignee-cell">
-        <div class="av">${escHtml(empInit)}</div>
+        <div class="av">${escHtml(empName[0].toUpperCase())}</div>
         <span class="av-name">${escHtml(empName)}</span>
       </div>
       <div class="prog-cell">
@@ -848,10 +1146,10 @@
         ${due.soon ? `<div class="due-soon">${due.soon}</div>` : ''}
       </div>
       <div class="row-actions">
-        <button class="icon-btn check" data-action="complete" data-id="${t.id}" aria-label="Mark done" title="Mark complete">
+        <button class="icon-btn check" data-action="complete" data-id="${t.id}" title="Mark complete">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
         </button>
-        <button class="icon-btn del" data-action="delete" data-id="${t.id}" aria-label="Delete" title="Archive">
+        <button class="icon-btn del" data-action="delete" data-id="${t.id}" title="Archive">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
         </button>
       </div>
@@ -859,12 +1157,102 @@
     return div;
   }
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  /* ── Pipelines ── */
+  function renderPipelines() {
+    const container = document.getElementById('pipelinesContainer');
+    container.innerHTML = '';
+
+    const keys = Object.keys(pipelines).sort((a, b) => {
+      if (a === '__unassigned__') return 1;
+      if (b === '__unassigned__') return -1;
+      return a.localeCompare(b);
+    });
+
+    if (keys.length === 0) {
+      container.innerHTML = `<div class="empty-group">No pipelines yet. Create one or assign tasks to a pipeline.</div>`;
+      return;
+    }
+
+    keys.forEach(key => {
+      const tasks = pipelines[key].tasks || [];
+      const label = key === '__unassigned__' ? 'Unassigned' : key;
+      const total = tasks.length;
+      const completed = tasks.filter(t => t.status === 'completed').length;
+      const overdue = tasks.filter(t => t.status === 'overdue').length;
+      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      const card = document.createElement('div');
+      card.className = 'pipeline-card';
+      card.dataset.pipeline = key;
+
+      card.innerHTML = `
+        <div class="pipeline-head">
+          <div class="pipeline-name-wrap">
+            <input class="pipeline-name" value="${escHtml(label)}" ${key === '__unassigned__' ? 'readonly' : ''} spellcheck="false" />
+            <div class="pipeline-meta">${total} task${total!==1?'s':''} · ${completed} done${overdue>0?` · <span style="color:var(--danger)">${overdue} overdue</span>`:''}</div>
+          </div>
+          <div class="pipeline-progress-wrap">
+            <div class="pipeline-pct">${pct}%</div>
+            <div class="pipeline-bar"><i style="width:${pct}%"></i></div>
+          </div>
+          <div class="pipeline-chevron">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+        </div>
+        <div class="pipeline-tasks"></div>
+      `;
+
+      const tasksWrap = card.querySelector('.pipeline-tasks');
+      if (tasks.length === 0) {
+        tasksWrap.innerHTML = `<div class="empty-group">No tasks in this pipeline.</div>`;
+      } else {
+        tasks.forEach(t => tasksWrap.appendChild(buildRow(t)));
+      }
+
+      card.querySelector('.pipeline-head').addEventListener('click', e => {
+        if (e.target.classList.contains('pipeline-name')) return;
+        card.classList.toggle('expanded');
+      });
+
+      const nameInput = card.querySelector('.pipeline-name');
+      if (key !== '__unassigned__') {
+        nameInput.addEventListener('change', () => {
+          const newName = nameInput.value.trim();
+          if (!newName || newName === key) return;
+          renamePipeline(key, newName);
+        });
+      }
+
+      container.appendChild(card);
+    });
   }
 
-  /* ── Actions ── */
-  document.getElementById('taskGroups').addEventListener('click', async e => {
+  function renamePipeline(oldKey, newKey) {
+    if (pipelines[newKey]) {
+      // Merge tasks
+      pipelines[newKey].tasks = [...(pipelines[newKey].tasks||[]), ...(pipelines[oldKey].tasks||[])];
+    } else {
+      pipelines[newKey] = pipelines[oldKey];
+    }
+    delete pipelines[oldKey];
+    // Update task local state
+    allTasks = allTasks.map(t => (t.pipeline || '__unassigned__') === oldKey ? { ...t, pipeline: newKey } : t);
+    renderPipelines();
+    toast(`Pipeline renamed to "${newKey}".`);
+  }
+
+  document.getElementById('btnNewPipeline').addEventListener('click', () => {
+    const name = prompt('Pipeline name:');
+    if (!name || !name.trim()) return;
+    const key = name.trim();
+    if (pipelines[key]) { toast('Pipeline already exists.', 'error'); return; }
+    pipelines[key] = { tasks: [] };
+    renderPipelines();
+    toast(`Pipeline "${key}" created.`);
+  });
+
+  /* ── Task Actions ── */
+  document.addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const id = btn.dataset.id;
@@ -877,12 +1265,11 @@
     btn.innerHTML = '<span class="spinner"></span>';
     try {
       const res = await fetch(`${API}/tasks/${id}`, {
-        method: 'PATCH',
-        headers: headers(),
-        body: JSON.stringify({ status: 'completed' }),
+        method: 'PATCH', headers: headers(), body: JSON.stringify({ status: 'completed' }),
       });
       if (!res.ok) throw new Error();
       allTasks = allTasks.map(t => t.id == id ? { ...t, status: 'completed' } : t);
+      rebuildPipelines();
       render();
       toast('Task marked complete.');
     } catch {
@@ -896,12 +1283,11 @@
     btn.disabled = true;
     try {
       const res = await fetch(`${API}/tasks/${id}`, {
-        method: 'PATCH',
-        headers: headers(),
-        body: JSON.stringify({ status: 'archived' }),
+        method: 'PATCH', headers: headers(), body: JSON.stringify({ status: 'archived' }),
       });
       if (!res.ok) throw new Error();
       allTasks = allTasks.filter(t => t.id != id);
+      rebuildPipelines();
       render();
       toast('Task archived.');
     } catch {
@@ -925,21 +1311,28 @@
     renderGroups(filteredTasks());
   });
 
-  /* ── Nav ── */
+  /* ── Navigation ── */
+  function navigateTo(page) {
+    currentPage = page;
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`[data-nav="${page}"]`);
+    if (btn) btn.classList.add('active');
+    document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+    const section = document.getElementById(`page-${page}`);
+    if (section) section.classList.add('active');
+
+    if (page === 'pipelines') renderPipelines();
+  }
+
   document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
+    btn.addEventListener('click', () => navigateTo(btn.dataset.nav));
   });
 
   /* ── Modal ── */
   const modal = document.getElementById('modalOverlay');
-
   document.getElementById('btnAddTask').addEventListener('click', () => modal.classList.add('open'));
   document.getElementById('btnModalCancel').addEventListener('click', () => modal.classList.remove('open'));
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
-
   document.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); modal.classList.add('open'); }
     if (e.key === 'Escape') modal.classList.remove('open');
@@ -955,6 +1348,7 @@
 
     const empId = document.getElementById('fEmployee').value;
     const dueVal = document.getElementById('fDue').value;
+    const pipelineVal = document.getElementById('fPipeline').value.trim() || null;
     const payload = {
       title,
       description: document.getElementById('fDesc').value.trim() || null,
@@ -971,16 +1365,18 @@
       }
       if (!res.ok) throw new Error('Failed to create task.');
       const newTask = await res.json();
+      const empName = empId ? (employees.find(e => e.id == empId)?.name || 'Unassigned') : 'Unassigned';
       allTasks.unshift({
-        id: newTask.id, task: newTask.title, employee: newTask.assigned_to || 'Unassigned',
+        id: newTask.id, task: newTask.title, employee: empName,
         deadline: newTask.due_at || 'No deadline', status: newTask.status,
         progress_percent: newTask.progress_percent || 0,
         last_update: newTask.last_update, created_at: newTask.created_at,
+        pipeline: pipelineVal,
       });
+      rebuildPipelines();
       render();
       modal.classList.remove('open');
-      document.getElementById('fTitle').value = '';
-      document.getElementById('fDesc').value = '';
+      ['fTitle','fDesc','fPipeline'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('fEmployee').value = '';
       document.getElementById('fDue').value = '';
       toast('Task created and employee notified via WhatsApp.');
