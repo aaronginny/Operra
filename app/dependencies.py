@@ -23,12 +23,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     if user_id is None or company_id is None:
         raise credentials_exception
     
-    # We could fetch user from db here, but returning payload details is faster
-    # Let's just return CurrentUser structure.
     return CurrentUser(
         id=user_id,
         email=payload.get("sub", ""),
-        name="User",
+        name=payload.get("name") or payload.get("sub", "").split("@")[0] or "User",
         company_id=company_id,
         role=payload.get("role", "employee")
     )

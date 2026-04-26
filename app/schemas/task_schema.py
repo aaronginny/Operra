@@ -8,7 +8,7 @@ from pydantic import BaseModel
 class TaskCreate(BaseModel):
     """Payload to create a task manually (outside the webhook flow)."""
 
-    company_id: int
+    company_id: int | None = None  # set by the route from the authenticated user's JWT
     title: str
     description: str | None = None
     assigned_to: str | None = None

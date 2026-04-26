@@ -39,6 +39,19 @@ async def dashboard_tasks(
     result = await db.execute(stmt)
     tasks = result.scalars().all()
 
+    def _checkpoint_summary(raw: str | None) -> str:
+        if not raw:
+            return ""
+        try:
+            import json as _json
+            cps = _json.loads(raw)
+            if not isinstance(cps, list) or not cps:
+                return ""
+            done = sum(1 for c in cps if isinstance(c, dict) and c.get("done"))
+            return f"{done}/{len(cps)} checkpoints"
+        except Exception:
+            return ""
+
     return [
         {
             "id": t.id,
@@ -48,10 +61,14 @@ async def dashboard_tasks(
                 if t.assigned_employee
                 else t.assigned_to or "Unassigned"
             ),
-            "deadline": (
-                t.due_at.strftime("%H:%M") if t.due_at else "No deadline"
-            ),
+            "deadline": t.due_at.isoformat() if t.due_at else "No deadline",
             "status": t.status.value,
+            "progress_percent": t.progress_percent or 0,
+            "last_update": t.last_update.isoformat() if t.last_update else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "checkpoint_summary": _checkpoint_summary(t.checkpoints),
+            "description": t.description,
+            "pipeline": None,  # not yet stored on the model — client-side only for now
         }
         for t in tasks
     ]
