@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <script>
@@ -11,2669 +10,998 @@
       if (p.get('token') || p.get('company_id')) {
         window.history.replaceState({}, '', '/static/dashboard/index.html');
       }
-      if (!localStorage.getItem("company_id")) {
-        window.location.replace("https://phantompilot.xyz/auth.html");
+      if (!localStorage.getItem('company_id')) {
+        window.location.replace('https://phantompilot.xyz/auth.html');
       }
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PhantomPilot — Dashboard</title>
-  <meta name="description" content="Task management dashboard for PhantomPilot, Smart Task Management for Teams" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* ── Reset & Tokens ─────────────────────────────────────── */
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
     :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --surface-2: #232733;
-      --border: #2e3340;
-      --text: #e4e6ec;
-      --text-dim: #8b8fa3;
-      --accent: #ffffff;
-      --accent-gl: rgba(255, 255, 255, .15);
-      --green: #00b894;
-      --green-bg: rgba(0, 184, 148, .12);
-      --red: #ff6b6b;
-      --red-bg: rgba(255, 107, 107, .12);
-      --yellow: #fdcb6e;
-      --yellow-bg: rgba(253, 203, 110, .12);
-      --blue: #74b9ff;
-      --blue-bg: rgba(116, 185, 255, .12);
-      --orange: #e17055;
-      --orange-bg: rgba(225, 112, 85, .12);
-      --radius: 12px;
-      --radius-sm: 8px;
-      --shadow: 0 4px 24px rgba(0, 0, 0, .35);
-      --transition: .2s ease;
+      --bg: #000000;
+      --sidebar: #020202;
+      --canvas: #030303;
+      --row: #080808;
+      --row-hover: #0d0d0d;
+      --hairline: rgba(255,255,255,0.055);
+      --hairline-2: rgba(255,255,255,0.10);
+      --hairline-3: rgba(255,255,255,0.16);
+      --text: #eeeef2;
+      --text-2: #9896a5;
+      --text-3: #555360;
+      --text-4: #32303b;
+      --accent: #a87fff;
+      --accent-2: #6fb8ff;
+      --accent-3: #ff7fc8;
+      --warn: #ffb87a;
+      --danger: #ff7a8a;
+      --ok: #7ee8b6;
+      --font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: "Space Grotesk", ui-monospace, monospace;
     }
 
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg);
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100vh; background: var(--bg); color: var(--text);
+      font-family: var(--font); -webkit-font-smoothing: antialiased;
+    }
+    body { display: flex; background: var(--bg); }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width: 238px; flex: 0 0 238px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--hairline);
+      padding: 24px 12px 20px;
+      min-height: 100vh; position: sticky; top: 0; align-self: flex-start;
+      display: flex; flex-direction: column; gap: 28px;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 4px 10px 4px 6px; }
+    .brand-ghost {
+      width: 40px; height: 40px; flex: 0 0 40px; border-radius: 12px; overflow: hidden;
+      background: #13101f; border: 1px solid rgba(168,127,255,0.25); display: grid; place-items: center;
+    }
+    .brand-ghost svg { width: 26px; height: 26px; }
+    .brand-text { line-height: 1; }
+    .brand-name {
+      font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 30%, #c0a8ff 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .brand-sub { font-size: 10px; font-weight: 600; color: var(--text-3); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 3px; }
+    .nav-group { display: flex; flex-direction: column; gap: 2px; }
+    .nav-label { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-3); padding: 6px 12px 8px; font-weight: 700; }
+    .nav-item {
+      display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+      color: var(--text-3); font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;
+      transition: all 0.16s ease; border: none; background: transparent; width: 100%; text-align: left;
+    }
+    .nav-item .ico { width: 17px; height: 17px; flex: 0 0 17px; opacity: 0.55; transition: opacity 0.16s; }
+    .nav-item:hover { color: var(--text-2); background: rgba(255,255,255,0.025); }
+    .nav-item:hover .ico { opacity: 0.85; }
+    .nav-item.active {
       color: var(--text);
-      min-height: 100vh;
-      line-height: 1.5;
+      background: linear-gradient(100deg, rgba(168,127,255,0.16) 0%, rgba(168,127,255,0.03) 100%);
+      box-shadow: inset 2.5px 0 0 var(--accent);
     }
-
-    /* ── Layout ─────────────────────────────────────────────── */
-    .app {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 32px 24px;
+    .nav-item.active .ico { opacity: 1; }
+    .badge-n {
+      margin-left: auto; font-size: 10px; font-weight: 700; padding: 2px 7px;
+      border-radius: 999px; background: rgba(255,122,138,0.12); color: var(--danger);
+      border: 1px solid rgba(255,122,138,0.18);
     }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 28px;
+    .sidebar-foot {
+      margin-top: auto; padding: 12px 10px;
+      background: linear-gradient(160deg, rgba(168,127,255,0.06), rgba(111,184,255,0.02));
+      border: 1px solid var(--hairline); border-radius: 14px;
+      display: flex; align-items: center; gap: 10px;
     }
-
-    header h1 {
-      font-size: 24px !important;
-      font-family: Georgia, 'Times New Roman', serif !important;
-      font-weight: 400 !important;
-      letter-spacing: -0.02em !important;
-      color: #ffffff !important;
-      background: none !important;
-      -webkit-background-clip: unset !important;
-      -webkit-text-fill-color: #ffffff !important;
+    .me-av {
+      width: 34px; height: 34px; border-radius: 50%; flex: 0 0 34px;
+      background: linear-gradient(135deg, #a87fff, #6fb8ff);
+      display: grid; place-items: center; color: #080813; font-weight: 800; font-size: 13px;
     }
-
-    header .subtitle {
-      font-size: .82rem;
-      color: var(--text-dim);
-      margin-top: 2px;
+    .me-info .name { font-size: 13px; font-weight: 700; color: var(--text); }
+    .me-info .plan { font-size: 10px; color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; margin-top: 2px; }
+    .me-logout {
+      margin-left: auto; width: 28px; height: 28px; border-radius: 8px;
+      border: 1px solid var(--hairline); background: transparent; color: var(--text-3);
+      display: grid; place-items: center; cursor: pointer; transition: all 0.16s;
     }
+    .me-logout:hover { color: var(--danger); border-color: rgba(255,122,138,0.3); }
 
-    /* ── New Task Button ───────────────────────────────────── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      font-size: .85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all var(--transition);
+    /* ─── MAIN ─── */
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+    /* HERO */
+    .hero {
+      padding: 34px 40px 30px; border-bottom: 1px solid var(--hairline);
+      background: var(--canvas); display: grid; grid-template-columns: 1fr auto;
+      gap: 32px; align-items: center; position: relative; overflow: hidden;
     }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #0a0a08;
+    .greeting {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--text-3); display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+      opacity: 0; animation: rise .5s .05s ease-out forwards;
     }
-
-    .btn-primary:hover {
-      background: rgba(255,255,255,.1);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(255,255,255,.2);
+    .greeting::before { content: ""; width: 20px; height: 1.5px; background: linear-gradient(90deg, var(--accent), transparent); border-radius: 2px; }
+    .hero h1 {
+      font-family: var(--mono); font-size: 33px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1;
+      opacity: 0; animation: rise .5s .12s ease-out forwards;
     }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--text-dim);
-      border: 1px solid var(--border);
+    .hero h1 em { font-style: normal; color: var(--text-3); font-weight: 500; }
+    .hero-summary {
+      margin-top: 10px; color: var(--text-2); font-size: 13.5px; font-weight: 500; line-height: 1.6;
+      max-width: 500px; opacity: 0; animation: rise .5s .2s ease-out forwards;
     }
-
-    .btn-ghost:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    .btn-sm {
-      padding: 5px 12px;
-      font-size: .78rem;
-      border-radius: 6px;
-    }
-
-    .btn-complete {
-      background: var(--green-bg);
-      color: var(--green);
-      border: 1px solid rgba(0, 184, 148, .25);
-    }
-
-    .btn-complete:hover {
-      background: var(--green);
+    .hero-summary b { color: var(--text); font-weight: 700; }
+    .hero-summary .alert { color: var(--danger); font-weight: 700; }
+    .hero-cta { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; opacity: 0; animation: rise .5s .28s ease-out forwards; }
+    .btn-add {
+      font-family: var(--font); font-weight: 700; font-size: 13px; letter-spacing: -0.01em;
+      padding: 13px 22px; border-radius: 12px; cursor: pointer; border: none;
+      background: linear-gradient(160deg, #c4a4ff 0%, #8654ef 60%, #6a3dd4 100%);
       color: #fff;
+      box-shadow: 0 8px 32px rgba(168,127,255,0.32), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+      display: inline-flex; align-items: center; gap: 9px; transition: all 0.2s ease;
+    }
+    .btn-add:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(168,127,255,0.48), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3); }
+    .btn-add .plus { font-size: 18px; font-weight: 400; line-height: 1; }
+    .cta-hint { font-size: 11px; color: var(--text-3); font-weight: 600; letter-spacing: 0.03em; display: flex; align-items: center; gap: 6px; }
+    .kbd { font-family: var(--mono); background: rgba(255,255,255,0.07); border: 1px solid var(--hairline-2); border-radius: 5px; padding: 2px 7px; color: var(--text-2); font-size: 10px; font-weight: 600; }
+
+    /* ─── CONTENT ─── */
+    .content { padding: 30px 40px 60px; }
+
+    /* STATS */
+    .stats-grid {
+      display: grid; grid-template-columns: 200px 1fr; gap: 14px; margin-bottom: 28px;
+      opacity: 0; animation: rise .5s .38s ease-out forwards;
+    }
+    .stat-hero {
+      border-radius: 18px; padding: 22px 22px 20px; background: var(--row);
+      border: 1px solid rgba(168,127,255,0.15); position: relative; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
+    }
+    .stat-hero .s-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(168,127,255,0.8); font-weight: 700; }
+    .stat-hero .s-big { font-family: var(--mono); font-size: 68px; font-weight: 700; letter-spacing: -0.05em; line-height: 0.9; font-variant-numeric: tabular-nums; color: #ffffff; }
+    .stat-hero .s-big sup { font-size: 18px; font-weight: 500; vertical-align: super; color: var(--text-2); margin-left: 10px; letter-spacing: 0.04em; }
+    .stat-breakdown { display: flex; flex-direction: column; gap: 8px; }
+    .stat-breakdown .row-b { display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 0 2px; }
+    .stat-breakdown .row-b .k { color: var(--text-3); font-weight: 600; letter-spacing: 0.04em; }
+    .stat-breakdown .row-b .v { font-family: var(--mono); font-weight: 600; font-size: 13px; }
+    .stat-breakdown .row-b .v.warn { color: var(--warn); }
+    .stat-breakdown .row-b .v.danger { color: var(--danger); }
+    .stat-breakdown .row-b .v.ok { color: var(--ok); }
+    .stats-minis { display: grid; grid-template-columns: repeat(3,1fr); grid-template-rows: 1fr 1fr; gap: 10px; }
+    .mini-card {
+      background: var(--row); border: 1px solid var(--hairline); border-radius: 14px; padding: 16px 18px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      transition: all 0.18s ease; cursor: default; position: relative; overflow: hidden;
+    }
+    .mini-card::before { content: ""; position: absolute; inset: 0; border-radius: 14px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .mini-card:hover { transform: translateY(-2px); border-color: var(--hairline-2); }
+    .mini-card:hover::before { opacity: 1; }
+    .mini-card.warn::before { background: radial-gradient(100px 60px at 80% 0%, rgba(255,184,122,0.08), transparent 65%); }
+    .mini-card.danger::before { background: radial-gradient(100px 60px at 80% 0%, rgba(255,122,138,0.08), transparent 65%); }
+    .mini-card.blue::before { background: radial-gradient(100px 60px at 80% 0%, rgba(111,184,255,0.08), transparent 65%); }
+    .mini-card.ok::before { background: radial-gradient(100px 60px at 80% 0%, rgba(126,232,182,0.08), transparent 65%); }
+    .mini-left .m-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-3); font-weight: 700; margin-bottom: 7px; }
+    .mini-left .m-val { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--text); }
+    .mini-card.warn .m-val { color: var(--warn); }
+    .mini-card.danger .m-val { color: var(--danger); }
+    .mini-card.blue .m-val { color: var(--accent-2); }
+    .mini-card.ok .m-val { color: var(--ok); }
+
+    /* FILTER */
+    .filter-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 16px; opacity: 0; animation: rise .5s .48s ease-out forwards;
+    }
+    .pills {
+      display: flex; gap: 3px; padding: 3px; border: 1px solid var(--hairline);
+      border-radius: 999px; background: rgba(255,255,255,0.015);
+    }
+    .pill {
+      font-family: var(--font); font-size: 12px; font-weight: 600; padding: 7px 15px;
+      border-radius: 999px; cursor: pointer; color: var(--text-3); transition: all 0.18s; border: none; background: transparent;
+    }
+    .pill:hover { color: var(--text-2); }
+    .pill.active { color: #0c0c18; background: linear-gradient(135deg, #fff 0%, #ddd0ff 100%); box-shadow: 0 2px 10px rgba(168,127,255,0.22); }
+    .pill .n { opacity: 0.55; margin-left: 4px; font-variant-numeric: tabular-nums; }
+    .emp-select {
+      font-family: var(--font); font-size: 12px; font-weight: 600; padding: 9px 34px 9px 14px;
+      background: var(--row); border: 1px solid var(--hairline); color: var(--text); border-radius: 999px;
+      cursor: pointer; appearance: none; transition: border-color 0.16s;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2355536f' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    .emp-select:hover { border-color: var(--hairline-2); }
+
+    /* TASK GROUPS */
+    .task-group { margin-top: 18px; opacity: 0; animation: rise .5s ease-out forwards; }
+    .task-group:nth-of-type(1) { animation-delay: .56s; }
+    .task-group:nth-of-type(2) { animation-delay: .62s; }
+    .task-group:nth-of-type(3) { animation-delay: .68s; }
+    .group-header {
+      display: flex; justify-content: space-between; align-items: center; padding: 13px 20px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+      border: 1px solid var(--hairline); border-radius: 14px 14px 0 0; border-bottom: none;
+    }
+    .gh-l { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 700; color: var(--text); }
+    .dot-marker { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .dot-marker.d { background: var(--danger); }
+    .dot-marker.w { background: var(--warn); }
+    .gh-meta { font-size: 11px; color: var(--text-3); font-weight: 600; letter-spacing: 0.05em; }
+    .gh-r { font-size: 11px; color: var(--text-3); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+    .gh-r b { font-family: var(--mono); color: var(--text); font-size: 15px; font-weight: 700; margin-left: 8px; text-transform: none; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .rows-wrap { border: 1px solid var(--hairline); border-radius: 0 0 14px 14px; overflow: hidden; }
+
+    /* Task rows */
+    .task-row {
+      display: grid; grid-template-columns: 1fr 148px 148px 120px 128px 82px;
+      align-items: center; gap: 14px; padding: 18px 20px;
+      border-top: 1px solid var(--hairline); background: var(--row); transition: background 0.16s;
+    }
+    .task-row:hover { background: var(--row-hover); }
+    .task-cell { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+    .t-name { font-size: 13.5px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .t-dot { color: var(--text-4); margin: 0 8px; }
+    .t-proj { font-weight: 700; color: var(--accent); }
+    .t-proj.warm { color: var(--warn); }
+    .t-proj.blue { color: var(--accent-2); }
+    .t-sub { font-size: 11.5px; color: var(--text-3); font-weight: 500; }
+    .assignee-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .av {
+      width: 28px; height: 28px; border-radius: 50%; flex: 0 0 28px;
+      background: linear-gradient(135deg, #a87fff, #6fb8ff);
+      display: grid; place-items: center; color: #060609; font-weight: 800; font-size: 11px;
+    }
+    .av-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prog-cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    .prog-top { display: flex; justify-content: space-between; align-items: center; }
+    .prog-pct { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text); }
+    .prog-bar { width: 100%; height: 3px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+    .prog-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 3px; }
+    .prog-upd { font-size: 10px; color: var(--text-3); font-weight: 600; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 7px;
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      border: 1px solid transparent; white-space: nowrap;
+    }
+    .status-badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+    .status-badge.pending { color: var(--warn); border-color: rgba(255,184,122,0.2); background: rgba(255,184,122,0.07); }
+    .status-badge.pending::before { background: var(--warn); }
+    .status-badge.overdue { color: var(--danger); border-color: rgba(255,122,138,0.2); background: rgba(255,122,138,0.07); }
+    .status-badge.overdue::before { background: var(--danger); }
+    .status-badge.in_progress { color: var(--accent-2); border-color: rgba(111,184,255,0.2); background: rgba(111,184,255,0.07); }
+    .status-badge.in_progress::before { background: var(--accent-2); }
+    .status-badge.completed { color: var(--ok); border-color: rgba(126,232,182,0.2); background: rgba(126,232,182,0.07); }
+    .status-badge.completed::before { background: var(--ok); }
+    .status-badge.delayed { color: var(--warn); border-color: rgba(255,184,122,0.2); background: rgba(255,184,122,0.07); }
+    .status-badge.delayed::before { background: var(--warn); }
+    .status-badge.needs_help { color: var(--accent-3); border-color: rgba(255,127,200,0.2); background: rgba(255,127,200,0.07); }
+    .status-badge.needs_help::before { background: var(--accent-3); }
+    .due-cell { display: flex; flex-direction: column; gap: 3px; }
+    .due-when { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+    .due-late { font-size: 10px; color: var(--danger); font-weight: 600; }
+    .due-soon { font-size: 10px; color: var(--text-3); font-weight: 600; }
+    .row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+    .icon-btn {
+      width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--hairline);
+      background: transparent; color: var(--text-3); cursor: pointer;
+      display: grid; place-items: center; transition: all 0.16s;
+    }
+    .icon-btn:hover { border-color: var(--hairline-2); color: var(--text); background: rgba(255,255,255,0.03); }
+    .icon-btn.check:hover { color: var(--ok); border-color: rgba(126,232,182,0.3); background: rgba(126,232,182,0.06); }
+    .icon-btn.del:hover { color: var(--danger); border-color: rgba(255,122,138,0.3); background: rgba(255,122,138,0.06); }
+    .empty-group {
+      padding: 32px 20px; text-align: center; color: var(--text-3);
+      font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
     }
 
-    /* ── Filters Bar ───────────────────────────────────────── */
-    .filters {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
+    /* FOOTER */
+    .footer {
+      margin-top: 36px; padding: 0 4px;
+      display: flex; justify-content: space-between; align-items: center;
+      color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      opacity: 0; animation: rise .5s .78s ease-out forwards;
+    }
+    .live-dot { display: inline-flex; align-items: center; gap: 8px; }
+    .live-dot::before {
+      content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok);
+      animation: pulse 2.2s ease-in-out infinite;
     }
 
-    .status-tabs {
-      display: flex;
-      gap: 4px;
-      background: var(--surface);
-      border-radius: var(--radius-sm);
-      padding: 4px;
-      border: 1px solid var(--border);
-    }
-
-    .status-tab {
-      padding: 7px 16px;
-      border: none;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--text-dim);
-      font-family: inherit;
-      font-size: .8rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all var(--transition);
-    }
-
-    .status-tab:hover {
-      color: var(--text);
-    }
-
-    .status-tab.active {
-      background: var(--accent);
-      color: #0a0a08;
-    }
-
-    .filter-select {
-      padding: 8px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text);
-      font-family: inherit;
-      font-size: .8rem;
-      outline: none;
-      cursor: pointer;
-      transition: border-color var(--transition);
-    }
-
-    .filter-select:hover,
-    .filter-select:focus {
-      border-color: var(--accent);
-    }
-
-    /* ── Stats Row ─────────────────────────────────────────── */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px 20px;
-      transition: border-color var(--transition);
-    }
-
-    .stat-card:hover {
-      border-color: var(--accent);
-    }
-
-    .stat-card .label {
-      font-size: .75rem;
-      color: var(--text-dim);
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 6px;
-    }
-
-    .stat-card .value {
-      font-size: 1.6rem;
-      font-weight: 700;
-    }
-
-    .stat-card.overdue .value {
-      color: var(--red);
-    }
-
-    /* ── Task Table ────────────────────────────────────────── */
-    .table-wrap {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    thead th {
-      text-align: left;
-      padding: 14px 18px;
-      font-size: .73rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .6px;
-      color: var(--text-dim);
-      background: var(--surface-2);
-      border-bottom: 1px solid var(--border);
-    }
-
-    tbody td {
-      padding: 14px 18px;
-      font-size: .85rem;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-    }
-
-    tbody tr {
-      transition: background var(--transition);
-    }
-
-    tbody tr:hover {
-      background: var(--surface-2);
-    }
-
-    tbody tr:last-child td {
-      border-bottom: none;
-    }
-
-    tbody tr.row-overdue {
-      background: var(--red-bg);
-    }
-
-    tbody tr.row-overdue:hover {
-      background: rgba(255, 107, 107, .18);
-    }
-
-    tbody tr.row-needs_help {
-      background: var(--orange-bg);
-    }
-
-    tbody tr.row-needs_help:hover {
-      background: rgba(225, 112, 85, .18);
-    }
-
-    .task-title {
-      font-weight: 600;
-    }
-
-    .task-desc {
-      font-size: .78rem;
-      color: var(--text-dim);
-      margin-top: 2px;
-      max-width: 280px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* ── Status Badge ──────────────────────────────────────── */
-    .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: .72rem;
-      font-weight: 600;
-      text-transform: capitalize;
-    }
-
-    .badge-pending {
-      background: var(--yellow-bg);
-      color: var(--yellow);
-    }
-
-    .badge-in_progress {
-      background: var(--blue-bg);
-      color: var(--blue);
-    }
-
-    .badge-completed {
-      background: var(--green-bg);
-      color: var(--green);
-    }
-
-    .badge-overdue {
-      background: var(--red-bg);
-      color: var(--red);
-    }
-
-    .badge-delayed {
-      background: var(--yellow-bg);
-      color: var(--yellow);
-    }
-
-    .badge-needs_help {
-      background: var(--orange-bg);
-      color: var(--orange);
-    }
-
-    .due-text {
-      font-size: .82rem;
-    }
-
-    .due-overdue {
-      color: var(--red);
-      font-weight: 600;
-    }
-
-    .due-cell {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .btn-edit-due {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-dim);
-      padding: 2px 4px;
-      border-radius: 4px;
-      line-height: 1;
-      opacity: 0.5;
-      transition: opacity var(--transition), color var(--transition);
-    }
-
-    .btn-edit-due:hover {
-      opacity: 1;
-      color: var(--accent);
-    }
-
-    .due-editor {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .due-editor input[type="datetime-local"] {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: var(--radius-sm);
-      padding: 3px 6px;
-      font-size: .78rem;
-    }
-
-    .due-editor .btn-save-due {
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: var(--radius-sm);
-      padding: 3px 8px;
-      font-size: .78rem;
-      cursor: pointer;
-    }
-
-    .due-editor .btn-cancel-due {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-      border-radius: var(--radius-sm);
-      padding: 3px 8px;
-      font-size: .78rem;
-      cursor: pointer;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-dim);
-    }
-
-    .empty-state .icon {
-      font-size: 2rem;
-      margin-bottom: 8px;
-    }
-
-    /* ── Modal / Create Form ──────────────────────────────── */
+    /* MODAL */
     .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .25s;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+      opacity: 0; pointer-events: none; transition: opacity .25s;
     }
-
-    .modal-overlay.open {
-      opacity: 1;
-      pointer-events: all;
-    }
-
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
     .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px 32px;
-      width: 100%;
-      max-width: 480px;
-      box-shadow: 0 12px 48px rgba(0, 0, 0, .5);
-      transform: translateY(16px);
-      transition: transform .25s;
+      background: #0d0d0d; border: 1px solid var(--hairline-2);
+      border-radius: 20px; padding: 32px 36px; width: 100%; max-width: 500px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.7); transform: translateY(16px); transition: transform .25s;
     }
-
-    .modal-overlay.open .modal {
-      transform: translateY(0);
-    }
-
-    .modal h2 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 20px;
-    }
-
-    .form-group {
-      margin-bottom: 16px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: .78rem;
-      font-weight: 600;
-      color: var(--text-dim);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: .4px;
-    }
-
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-title { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 7px; }
     .form-input {
-      width: 100%;
-      padding: 10px 14px;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text);
-      font-family: inherit;
-      font-size: .88rem;
-      outline: none;
-      transition: border-color var(--transition);
+      width: 100%; padding: 11px 14px; background: var(--row); border: 1px solid var(--hairline-2);
+      border-radius: 10px; color: var(--text); font-family: var(--font); font-size: 13.5px; outline: none; transition: border-color 0.16s;
     }
-
-    .form-input:focus {
-      border-color: var(--accent);
+    .form-input:focus { border-color: var(--accent); }
+    .form-input::placeholder { color: var(--text-3); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+    .btn-cancel {
+      font-family: var(--font); font-size: 13px; font-weight: 600; padding: 11px 20px;
+      border-radius: 10px; border: 1px solid var(--hairline-2); background: transparent;
+      color: var(--text-3); cursor: pointer; transition: all 0.16s;
     }
-
-    .form-input::placeholder {
-      color: var(--text-dim);
-      opacity: .6;
+    .btn-cancel:hover { color: var(--text); border-color: var(--hairline-3); }
+    .btn-submit {
+      font-family: var(--font); font-size: 13px; font-weight: 700; padding: 11px 22px;
+      border-radius: 10px; border: none; cursor: pointer;
+      background: linear-gradient(160deg, #c4a4ff 0%, #8654ef 60%, #6a3dd4 100%);
+      color: #fff; box-shadow: 0 4px 20px rgba(168,127,255,0.3); transition: all 0.2s;
     }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(168,127,255,0.45); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 24px;
-    }
-
-    /* ── Loading Spinner ───────────────────────────────────── */
-    .spinner {
-      display: inline-block;
-      width: 18px;
-      height: 18px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin .6s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* ── Toast ─────────────────────────────────────────────── */
-    .toast-container {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      z-index: 200;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
+    /* TOAST */
+    .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
     .toast {
-      padding: 12px 20px;
-      border-radius: var(--radius-sm);
-      font-size: .84rem;
-      font-weight: 500;
-      color: #fff;
-      animation: slideIn .3s ease;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
+      padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      animation: slideIn .3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      border: 1px solid transparent;
     }
+    .toast-success { background: rgba(126,232,182,0.1); border-color: rgba(126,232,182,0.2); color: var(--ok); }
+    .toast-error { background: rgba(255,122,138,0.1); border-color: rgba(255,122,138,0.2); color: var(--danger); }
 
-    .toast-success {
-      background: var(--green);
+    /* ANIMATIONS */
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+
+    @media (max-width: 1200px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .task-row { grid-template-columns: 1fr 120px 110px 110px 118px 70px; gap: 10px; }
     }
-
-    .toast-error {
-      background: var(--red);
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateX(20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
-    }
-
-    /* ── Responsive ────────────────────────────────────────── */
-
-    /* ── Checkpoint Checklist ──────────────────────────────── */
-    .checkpoint-list {
-      list-style: none;
-      margin: 6px 0 0 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .checkpoint-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: .76rem;
-      color: var(--text-dim);
-      cursor: pointer;
-      padding: 2px 0;
-      transition: color .2s;
-    }
-
-    .checkpoint-item:hover {
-      color: var(--text);
-    }
-
-    .checkpoint-item input[type="checkbox"] {
-      appearance: none;
-      width: 14px;
-      height: 14px;
-      border: 1.5px solid var(--border);
-      border-radius: 3px;
-      background: var(--surface-2);
-      cursor: pointer;
-      flex-shrink: 0;
-      position: relative;
-      transition: all .15s;
-    }
-
-    .checkpoint-item input[type="checkbox"]:checked {
-      background: var(--green);
-      border-color: var(--green);
-    }
-
-    .checkpoint-item input[type="checkbox"]:checked::after {
-      content: "✓";
-      position: absolute;
-      top: -1px;
-      left: 2px;
-      font-size: 10px;
-      color: #fff;
-      font-weight: 700;
-    }
-
-    .checkpoint-item.done .cp-text {
-      text-decoration: line-through;
-      opacity: .5;
-    }
-
-    .checkpoint-progress {
-      font-size: .68rem;
-      color: var(--accent);
-      font-weight: 600;
-      margin-top: 4px;
-    }
-
-    /* ── Progress Bar ────────────────────────────────────── */
-    .progress-bar-wrap {
-      width: 100%;
-      height: 6px;
-      background: var(--surface-2);
-      border-radius: 3px;
-      margin: 4px 0;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width .4s ease;
-    }
-
-    /* ── Smart Summary ──────────────────────────────────── */
-    .smart-summary {
-      font-size: .74rem;
-      padding: 4px 8px;
-      background: var(--accent-gl);
-      border-radius: 6px;
-      border-left: 2px solid var(--accent);
-      color: var(--accent);
-      margin-top: 4px;
-      max-width: 180px;
-      line-height: 1.3;
-    }
-
-    .smart-summary.blocker {
-      background: var(--red-bg);
-      border-left-color: var(--red);
-      color: var(--red);
-    }
-
-    /* ── Mobile Responsive ─────────────────────────────────── */
-    @media (max-width: 768px) {
-      .app {
-        padding: 16px 14px;
-      }
-
-      /* Header */
-      header {
-        margin-bottom: 16px;
-      }
-      header h1 {
-        font-size: 18px !important;
-      }
-      header .subtitle {
-        font-size: .72rem;
-      }
-      #btnNewTask {
-        display: none;
-      }
-
-      /* Nav tabs — horizontal scroll */
-      .nav-tabs-bar {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-      }
-      .nav-tabs-bar::-webkit-scrollbar { display: none; }
-      .nav-tabs-bar > div {
-        min-width: max-content;
-      }
-
-      /* Stats — 3 per row */
-      .stats {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-      }
-      .stat-card {
-        padding: 12px 10px;
-      }
-      .stat-card .value {
-        font-size: 1.2rem;
-      }
-      .stat-card .label {
-        font-size: .65rem;
-      }
-
-      /* Filters — horizontal scroll for status tabs, full-width select */
-      .filters {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-      }
-      .status-tabs {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        white-space: nowrap;
-        display: flex;
-        flex-wrap: nowrap;
-      }
-      .status-tabs::-webkit-scrollbar { display: none; }
-      .filter-select {
-        width: 100%;
-      }
-
-      /* Task table — hide on mobile, show cards */
-      .table-wrap table {
-        display: none;
-      }
-      .task-cards-mobile {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      /* Employee Performance table — allow horizontal scroll */
-      .perf-section .table-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      .perf-section .table-wrap table {
-        display: table;
-        min-width: 500px;
-      }
-
-      /* Modal — full screen */
-      .modal-overlay {
-        align-items: flex-end;
-      }
-      .modal {
-        max-width: 100% !important;
-        width: 100%;
-        border-radius: var(--radius) var(--radius) 0 0;
-        padding: 24px 20px;
-        max-height: 90vh;
-        overflow-y: auto;
-      }
-      .modal-actions {
-        flex-direction: column;
-      }
-      .modal-actions .btn {
-        width: 100%;
-        justify-content: center;
-      }
-
-      /* Trial banner */
-      .trial-banner {
-        flex-wrap: wrap;
-        font-size: .78rem;
-        padding: 10px 14px;
-      }
-
-      /* Employees view */
-      #viewEmployees .table-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      #viewEmployees .table-wrap table {
-        display: table;
-        min-width: 400px;
-      }
-
-      /* Enquiries view */
-      #viewEnquiries .table-wrap table {
-        display: none;
-      }
-      .enquiry-cards-mobile {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      /* Settings view */
-      #viewSettings > div {
-        max-width: 100% !important;
-      }
-      #viewSettings input,
-      #viewSettings select {
-        width: 100% !important;
-      }
-      #viewSettings > div > div > div[style*="display: flex"] {
-        flex-direction: column;
-      }
-
-      /* Floating action button */
-      .fab {
-        display: flex;
-      }
-
-      /* Toast — full width on mobile */
-      .toast-container {
-        bottom: 80px;
-        right: 14px;
-        left: 14px;
-      }
-      .toast {
-        width: 100%;
-      }
-
-      /* Settings WhatsApp row — stack on mobile */
-      .settings-whatsapp-row {
-        flex-direction: column;
-        align-items: stretch !important;
-      }
-      .settings-whatsapp-row .btn {
-        width: 100%;
-        justify-content: center;
-      }
-
-      /* Upgrade modal pricing grid — single column on mobile */
-      .pricing-grid {
-        grid-template-columns: 1fr !important;
-      }
-    }
-
-    @media (min-width: 769px) {
-      .fab { display: none !important; }
-      .task-cards-mobile { display: none !important; }
-      .enquiry-cards-mobile { display: none !important; }
-    }
-
-    /* Task card (mobile view) */
-    .task-card-mobile {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-    }
-    .task-card-mobile.row-overdue { background: var(--red-bg); border-color: rgba(255,107,107,.3); }
-    .task-card-mobile.row-needs_help { background: var(--orange-bg); border-color: rgba(225,112,85,.3); }
-    .task-card-mobile .tc-title { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
-    .task-card-mobile .tc-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-    .task-card-mobile .tc-assignee { font-size: .78rem; color: var(--text-dim); }
-    .task-card-mobile .tc-due { font-size: .78rem; }
-    .task-card-mobile .tc-progress { margin-bottom: 8px; }
-    .task-card-mobile .tc-pct { font-size: .78rem; color: var(--text-dim); margin-bottom: 4px; }
-    .task-card-mobile .tc-actions { display: flex; gap: 8px; margin-top: 10px; }
-    .task-card-mobile .tc-actions .btn { flex: 1; justify-content: center; }
-    .task-card-mobile .tc-checkpoints { margin-top: 8px; }
-
-    /* Enquiry card (mobile view) */
-    .enquiry-card-mobile {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-    }
-    .enquiry-card-mobile .ec-client { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
-    .enquiry-card-mobile .ec-meta { font-size: .78rem; color: var(--text-dim); margin-bottom: 6px; }
-    .enquiry-card-mobile .ec-actions { display: flex; gap: 8px; margin-top: 10px; }
-    .enquiry-card-mobile .ec-actions .btn { flex: 1; justify-content: center; }
-
-    /* Floating Action Button */
-    .fab {
-      position: fixed;
-      bottom: 24px;
-      right: 20px;
-      z-index: 50;
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: #ffffff;
-      color: #0a0a08;
-      border: none;
-      font-size: 1.6rem;
-      font-weight: 300;
-      cursor: pointer;
-      box-shadow: 0 4px 20px rgba(0,0,0,.4);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-    }
-    .fab:active { transform: scale(.93); }
-
-    /* ── Performance Table ─────────────────────────────────── */
-    .perf-section {
-      margin-top: 36px;
-    }
-
-    .perf-section h2 {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-      color: #fff;
-    }
-
-    .perf-row-star td {
-      border-left: 3px solid var(--green) !important;
-    }
-
-    .perf-row-delays td {
-      border-left: 3px solid var(--orange) !important;
-    }
-
-    .perf-row-help td {
-      border-left: 3px solid var(--red) !important;
-    }
-
-    .perf-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: .7rem;
-      font-weight: 600;
-      margin-left: 6px;
-    }
-
-    .perf-badge-star {
-      background: var(--green-bg);
-      color: var(--green);
-    }
-
-    .perf-badge-delays {
-      background: var(--orange-bg);
-      color: var(--orange);
-    }
-
-    .perf-badge-help {
-      background: var(--red-bg);
-      color: var(--red);
-    }
-
-    /* ── Employee UI Updates ──────────────────────────────── */
-    .nav-tab {
-      background: transparent;
-      border: none;
-      color: var(--text-dim);
-      font-size: 1.05rem;
-      font-weight: 600;
-      padding: 10px 0;
-      cursor: pointer;
-      position: relative;
-    }
-    .nav-tab.active {
-      color: var(--accent);
-    }
-    .nav-tab.active::after {
-      content: "";
-      position: absolute;
-      bottom: -1px;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--accent);
-    }
-    
-    .employee-link {
-        color: var(--blue);
-        cursor: pointer;
-        text-decoration: underline;
-        text-decoration-color: transparent;
-        transition: text-decoration-color .2s;
-    }
-    .employee-link:hover {
-        text-decoration-color: var(--blue);
-    }
-
-    .employee-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 12px;
-      margin-bottom: 24px;
-      max-height: 240px;
-      overflow-y: auto;
-    }
-    
-    .emp-card {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px;
-      text-align: center;
-      cursor: pointer;
-      transition: all .2s;
-    }
-    .emp-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-    .emp-card.selected { border-color: var(--accent); background: var(--accent-gl); }
-    .emp-card .name { font-weight: 600; font-size: .85rem; margin-bottom: 4px; }
-    .emp-card .phone { font-size: .7rem; color: var(--text-dim); }
-
-    /* ── Trial Banner ───────────────────────────────────────── */
-    .trial-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      background: #ffffff;
-      color: #0a0f1a;
-      padding: 12px 20px;
-      border-radius: var(--radius-sm);
-      margin-bottom: 20px;
-      font-size: .85rem;
-      font-weight: 500;
-    }
-    .trial-banner strong { font-weight: 700; }
-    .trial-banner .trial-upgrade-btn {
-      background: #0a0f1a;
-      color: #fff;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: .78rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      font-family: inherit;
-    }
-    .trial-banner .trial-upgrade-btn:hover { opacity: .85; }
-    .trial-banner .trial-dismiss {
-      background: none;
-      border: none;
-      color: #666;
-      font-size: 1rem;
-      cursor: pointer;
-      flex-shrink: 0;
-      line-height: 1;
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .hero { padding: 24px 20px; }
+      .content { padding: 20px 20px 40px; }
+      .task-row { grid-template-columns: 1fr 100px 90px 80px; }
+      .task-row > .prog-cell,
+      .task-row > .row-actions { display: none; }
+      .task-row > .row-actions { display: flex; }
     }
   </style>
 </head>
-
 <body>
 
-  <div class="app">
-    <!-- Trial Banner -->
-    <div id="trialBanner" class="trial-banner" style="display:none;"></div>
-
-    <!-- Header -->
-    <header>
-      <div>
-        <h1>PhantomPilot</h1>
-        <p class="subtitle">Smart Task Management for Teams</p>
-      </div>
-      <div style="display: flex; gap: 12px;">
-        <button class="btn btn-primary" id="btnNewTask" onclick="openModal()">+ Add Task</button>
-        <button class="btn btn-ghost" id="btnLogout" onclick="logout()" title="Sign out">🚪 Logout</button>
-      </div>
-    </header>
-
-    <!-- Navigation Tabs -->
-    <div class="nav-tabs-bar" style="border-bottom: 1px solid var(--border); margin-bottom: 24px;">
-      <div style="display: flex; gap: 20px;">
-        <button class="nav-tab active" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
-        <button class="nav-tab" id="tabEmployees" onclick="switchTab('employees')">Employees</button>
-        <button class="nav-tab" id="tabEnquiries" onclick="switchTab('enquiries')">Enquiries</button>
-        <button class="nav-tab" id="tabSettings" onclick="switchTab('settings')">⚙ Settings</button>
-      </div>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-ghost">
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 6C13.373 6 8 11.373 8 18v14l4-3 4 3 4-3 4 3 4-3v-14C28 11.373 22.627 6 20 6z" fill="url(#ghost-g)" opacity="0.9"/>
+        <circle cx="15.5" cy="18" r="2" fill="#0a0a14"/>
+        <circle cx="24.5" cy="18" r="2" fill="#0a0a14"/>
+        <defs>
+          <linearGradient id="ghost-g" x1="8" y1="6" x2="32" y2="34" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#d4b8ff"/>
+            <stop offset="1" stop-color="#8a5cf7"/>
+          </linearGradient>
+        </defs>
+      </svg>
     </div>
+    <div class="brand-text">
+      <div class="brand-name">PhantomPilot</div>
+      <div class="brand-sub">v 0.4 · beta</div>
+    </div>
+  </div>
 
-    <!-- Dashboard View -->
-    <div id="viewDashboard">
-      <!-- Stats -->
-      <div class="stats" id="stats">
-        <div class="stat-card">
-          <div class="label">Total (Active)</div>
-          <div class="value" id="statTotal">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Pending</div>
-          <div class="value" id="statPending">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">In Progress</div>
-          <div class="value" id="statProgress">—</div>
-        </div>
-        <div class="stat-card overdue">
-          <div class="label">Overdue</div>
-          <div class="value" id="statOverdue">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Delayed</div>
-          <div class="value" id="statDelayed">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Needs Help</div>
-          <div class="value" id="statHelp" style="color:var(--orange)">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Completed</div>
-          <div class="value" id="statDone">—</div>
+  <div class="nav-group">
+    <button class="nav-item active" data-nav="dashboard">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" data-nav="tasks">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16 4h4a1 1 0 011 1v15a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1h4"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 11h8M9 15h6"/></svg>
+      Tasks
+      <span class="badge-n" id="sidebarTaskBadge">—</span>
+    </button>
+    <button class="nav-item" data-nav="employees">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0112 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 016-4.5"/></svg>
+      Employees
+    </button>
+    <button class="nav-item" data-nav="enquiries">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a4 4 0 01-4 4H8l-5 4V6a4 4 0 014-4h10a4 4 0 014 4z"/></svg>
+      Enquiries
+    </button>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Manage</div>
+    <button class="nav-item" data-nav="projects">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 16V8a2 2 0 00-1-1.7l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.7l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></svg>
+      Projects
+    </button>
+    <button class="nav-item" data-nav="schedule">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+      Schedule
+    </button>
+    <button class="nav-item" data-nav="team">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16.5 7.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/><path d="M22 22a10 10 0 00-20 0"/></svg>
+      Team
+    </button>
+    <button class="nav-item" data-nav="settings">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1-.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+      Settings
+    </button>
+  </div>
+
+  <div class="sidebar-foot">
+    <div class="me-av" id="meAvatar">A</div>
+    <div class="me-info">
+      <div class="name" id="meName">—</div>
+      <div class="plan" id="mePlan">Owner · Beta</div>
+    </div>
+    <button class="me-logout" id="btnLogout" aria-label="Logout">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <div class="greeting" id="heroDate">Today</div>
+      <h1 id="heroGreeting">Good evening, Aaron.<br><em>Here's where your team stands.</em></h1>
+      <p class="hero-summary" id="heroSummary">Loading your tasks…</p>
+    </div>
+    <div class="hero-cta">
+      <button class="btn-add" id="btnAddTask"><span class="plus">+</span> Add new task</button>
+      <div class="cta-hint">or press <span class="kbd">⌘</span> <span class="kbd">N</span></div>
+    </div>
+  </section>
+
+  <div class="content">
+
+    <!-- STATS -->
+    <section class="stats-grid">
+      <div class="stat-hero">
+        <div class="s-label">Total active</div>
+        <div class="s-big" id="statTotal">—<sup>tasks</sup></div>
+        <div class="stat-breakdown">
+          <div class="row-b"><span class="k">Pending</span><span class="v warn" id="statPending">—</span></div>
+          <div class="row-b"><span class="k">In Progress</span><span class="v" id="statInProgress">—</span></div>
+          <div class="row-b"><span class="k">Overdue</span><span class="v danger" id="statOverdue">—</span></div>
+          <div class="row-b"><span class="k">Completed</span><span class="v ok" id="statCompleted">—</span></div>
         </div>
       </div>
-
-    <!-- Filters -->
-    <div class="filters">
-      <div class="status-tabs" id="statusTabs">
-        <button class="status-tab active" data-status="">Active (All)</button>
-        <button class="status-tab" data-status="pending">Pending</button>
-        <button class="status-tab" data-status="in_progress">In Progress</button>
-        <button class="status-tab" data-status="overdue">Overdue</button>
-        <button class="status-tab" data-status="delayed">Delayed</button>
-        <button class="status-tab" data-status="needs_help">Needs Help</button>
-        <button class="status-tab" data-status="completed">Completed</button>
-        <!-- Note: Archived tasks are excluded by the API by default, they require a specific endpoint or flag to fetch if we wanted a full Archived view. Since the API currently excludes them, 'archived' tab just shows empty. Let's fix that next. -->
+      <div class="stats-minis">
+        <div class="mini-card warn"><div class="mini-left"><div class="m-label">Pending</div><div class="m-val" id="miniPending">—</div></div></div>
+        <div class="mini-card blue"><div class="mini-left"><div class="m-label">In Progress</div><div class="m-val" id="miniInProgress">—</div></div></div>
+        <div class="mini-card danger"><div class="mini-left"><div class="m-label">Overdue</div><div class="m-val" id="miniOverdue">—</div></div></div>
+        <div class="mini-card"><div class="mini-left"><div class="m-label">Delayed</div><div class="m-val" id="miniDelayed">—</div></div></div>
+        <div class="mini-card"><div class="mini-left"><div class="m-label">Needs Help</div><div class="m-val" id="miniNeedsHelp">—</div></div></div>
+        <div class="mini-card ok"><div class="mini-left"><div class="m-label">Completed</div><div class="m-val" id="miniCompleted">—</div></div></div>
       </div>
-      <select class="filter-select" id="employeeFilter">
+    </section>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <div class="pills" id="pillsBar">
+        <button class="pill active" data-filter="all">Active <span class="n" id="pillAll">—</span></button>
+        <button class="pill" data-filter="pending">Pending <span class="n" id="pillPending">—</span></button>
+        <button class="pill" data-filter="in_progress">In Progress <span class="n" id="pillInProgress">—</span></button>
+        <button class="pill" data-filter="overdue">Overdue <span class="n" id="pillOverdue">—</span></button>
+        <button class="pill" data-filter="delayed">Delayed <span class="n" id="pillDelayed">—</span></button>
+        <button class="pill" data-filter="needs_help">Needs Help <span class="n" id="pillNeedsHelp">—</span></button>
+        <button class="pill" data-filter="completed">Completed <span class="n" id="pillCompleted">—</span></button>
+      </div>
+      <select class="emp-select" id="empFilter">
         <option value="">All Employees</option>
       </select>
     </div>
 
-    <!-- Table -->
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th>Assigned To</th>
-            <th>Progress</th>
-            <th>Status</th>
-            <th>Due</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="taskBody">
-          <tr>
-            <td colspan="5" class="empty-state">
-              <div class="spinner"></div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <!-- Mobile task cards (shown only on mobile) -->
-    <div class="task-cards-mobile" id="taskCardsMobile"></div>
+    <!-- TASK GROUPS -->
+    <div id="taskGroups"></div>
 
-      <!-- Employee Performance -->
-      <div class="perf-section">
-        <h2>📊 Employee Performance</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Completed</th>
-                <th>Delays</th>
-                <th>Help Requests</th>
-                <th>Completion Rate</th>
-              </tr>
-            </thead>
-            <tbody id="perfBody">
-              <tr>
-                <td colspan="5" class="empty-state">
-                  <div class="spinner"></div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div> <!-- /Dashboard View -->
-
-    <!-- Employees View -->
-    <div id="viewEmployees" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2>Team Directory</h2>
-        <button class="btn btn-primary btn-sm" onclick="openAddEmployeeModal()">+ Add Employee</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Phone Number</th>
-              <th>Active Tasks</th>
-            </tr>
-          </thead>
-          <tbody id="employeeBody">
-            <tr><td colspan="3" class="empty-state"><div class="spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div> <!-- /Employees View -->
-
-    <!-- Enquiries View -->
-    <div id="viewEnquiries" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2>Client Enquiries</h2>
-        <button class="btn btn-primary btn-sm" onclick="openEnquiryModal()">+ Add Enquiry</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Client</th>
-              <th>Service</th>
-              <th>Assigned To</th>
-              <th>Stage</th>
-              <th>Notes</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="enquiryBody">
-            <tr><td colspan="7" class="empty-state"><div class="spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- Mobile enquiry cards -->
-      <div class="enquiry-cards-mobile" id="enquiryCardsMobile"></div>
-    </div> <!-- /Enquiries View -->
-
-    <!-- Settings View -->
-    <div id="viewSettings" style="display: none;">
-      <h2 style="margin-bottom: 24px;">Settings</h2>
-
-      <div style="max-width: 520px;">
-
-        <!-- ── Plan & Billing ─────────────────────────────────── -->
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-            <div>
-              <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 4px;">Plan & Billing</h3>
-              <p style="font-size: .82rem; color: var(--text-dim);">Manage your PhantomPilot subscription.</p>
-            </div>
-            <span id="planBadge" style="display:inline-flex; align-items:center; gap:5px; padding: 4px 12px; border-radius: 20px; font-size:.75rem; font-weight:700; background: var(--surface-2); color: var(--text-dim);">
-              FREE
-            </span>
-          </div>
-
-          <!-- Usage Bar -->
-          <div style="margin-bottom: 16px;">
-            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-              <span style="font-size:.8rem; font-weight:600; color:var(--text)">Tasks Used</span>
-              <span id="usageText" style="font-size:.8rem; color:var(--text-dim);">0 / 3</span>
-            </div>
-            <div style="height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden; border:1px solid var(--border);">
-              <div id="usageBar" style="height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--blue)); border-radius:4px; transition: width .5s ease;"></div>
-            </div>
-            <p id="usageHint" style="font-size:.74rem; color:var(--text-dim); margin-top:6px;">Loading plan details…</p>
-          </div>
-
-          <!-- Upgrade Button -->
-          <button class="btn btn-primary" id="btnUpgrade" onclick="openUpgradeModal()" style="width:100%; justify-content:center; background: #ffffff; color: #0a0a08;">
-            🚀 Upgrade to Premium
-          </button>
-        </div>
-
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px;">
-          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px;">CEO WhatsApp Number</h3>
-          <p style="font-size: .82rem; color: var(--text-dim); margin-bottom: 16px;">
-            Messages from this number are treated as CEO commands in PhantomPilot.
-            Include country code, e.g. <strong>+919150016161</strong>
-          </p>
-          <div class="settings-whatsapp-row" style="display: flex; gap: 10px; align-items: center;">
-            <input
-              type="tel"
-              id="settingsWhatsapp"
-              placeholder="+919150016161"
-              style="flex: 1; padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); font-size: .9rem; font-family: inherit;"
-            />
-            <button class="btn btn-primary btn-sm" onclick="saveWhatsappNumber()">Save</button>
-          </div>
-          <div id="settingsWhatsappMsg" style="font-size:.82rem; margin-top: 8px; min-height: 18px;"></div>
-        </div>
-
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px;">
-          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px;">Account</h3>
-          <p style="font-size: .82rem; color: var(--text-dim); margin-bottom: 12px;">Signed in as <span id="settingsEmail" style="color: var(--text);">—</span></p>
-          <button class="btn btn-ghost btn-sm" onclick="logout()">Sign out</button>
-        </div>
-      </div>
-    </div> <!-- /Settings View -->
-
-  </div>
-
-  <!-- Employee Profile Modal -->
-  <div class="modal-overlay" id="modalEmployeeProfile">
-    <div class="modal" style="max-width: 600px;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-        <div>
-          <h2 id="profName" style="margin-bottom: 4px;">Employee Name</h2>
-          <p id="profPhone" style="color: var(--text-dim); font-size: .85rem; margin-bottom: 16px;">+0000000000</p>
-        </div>
-        <button class="btn btn-primary btn-sm" id="btnAssignFromProfile">Assign Task</button>
-      </div>
-
-      <h3 style="font-size: .95rem; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">Active Tasks</h3>
-      <div style="max-height: 300px; overflow-y: auto; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);">
-        <table style="width: 100%;">
-          <tbody id="profTasks">
-            <!-- Rendered tasks -->
-          </tbody>
-        </table>
-      </div>
-
-      <div class="modal-actions" style="margin-top: 20px;">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('modalEmployeeProfile')">Close</button>
-      </div>
+    <div class="footer">
+      <div class="live-dot">Phantom is watching &nbsp;·&nbsp; live sync</div>
+      <div>v 0.4.1 · beta</div>
     </div>
   </div>
+</main>
 
-  <!-- Unified Create Task Modal -->
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal">
-      <h2 id="taskModalTitle">Add Task</h2>
-      <form id="createForm" onsubmit="handleCreate(event)">
-        <input type="hidden" id="fSourceEnquiryId" />
-        
-        <!-- Employee Selection (Step 1) -->
-        <div id="stepSelectEmployee">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
-             <label for="fAssignee" style="margin-bottom: 0;">Select Employee *</label>
-             <button type="button" class="btn btn-sm btn-ghost" onclick="toggleAddEmployeeForm()">+ Add New Employee</button>
-          </div>
-          
-          <div class="employee-grid" id="fAssigneeGrid">
-             <div class="spinner"></div>
-          </div>
-          
-          <input type="hidden" id="fAssignee" required />
-          <div class="modal-actions">
-            <button type="button" class="btn btn-ghost" onclick="closeModal('modalOverlay')">Cancel</button>
-          </div>
-        </div>
-
-        <!-- Inline Add Employee Form (Hidden by default) -->
-        <div id="addEmployeeForm" style="display: none; background: var(--surface-2); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 16px; border: 1px dashed var(--border);">
-          <div class="form-group">
-            <label for="fNewEmpName">New Employee Name *</label>
-            <input class="form-input" id="fNewEmpName" placeholder="e.g. John Doe" />
-          </div>
-          <div class="form-group">
-            <label for="fNewEmpPhone">Phone Number *</label>
-            <input class="form-input" id="fNewEmpPhone" placeholder="e.g. +919999999999" />
-          </div>
-          <div style="display: flex; gap: 8px; justify-content: flex-end;">
-            <button type="button" class="btn btn-sm btn-ghost" onclick="toggleAddEmployeeForm()">Cancel</button>
-            <button type="button" class="btn btn-sm btn-primary" id="btnSaveEmployee" onclick="saveNewEmployee()">Save Employee</button>
-          </div>
-        </div>
-
-        <!-- Task Details (Hidden until employee chosen) -->
-        <div id="taskFields" style="display: none;">
-          <div style="margin-bottom: 16px; padding: 10px; background: var(--accent-gl); border-radius: var(--radius-sm); font-size: .85rem; font-weight: 500; color: var(--accent); display: flex; justify-content: space-between; align-items: center;">
-            <span>Assigning to: <strong id="lblSelectedEmployee"></strong></span>
-            <button type="button" class="btn btn-sm btn-ghost" style="padding: 2px 8px; border-color: transparent;" onclick="resetToEmployeeSelection()">Change</button>
-          </div>
-
-          <div class="form-group">
-            <label for="fTitle">Task Title *</label>
-            <input class="form-input" id="fTitle" placeholder="e.g. Pack 40 boxes" />
-          </div>
-          <div class="form-group">
-            <label for="fDesc">Description</label>
-            <input class="form-input" id="fDesc" placeholder="Optional details…" />
-          </div>
-          <div class="form-group">
-            <label for="fDue">Due Date & Time</label>
-            <input class="form-input" id="fDue" type="datetime-local" />
-          </div>
-          <div class="form-group">
-            <label for="fFrequency">Reminder Frequency</label>
-            <select class="form-input" id="fFrequency">
-              <option value="">No extra reminders</option>
-              <option value="1">Daily</option>
-              <option value="2">Every 2 days</option>
-              <option value="3">Every 3 days</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="fCheckpoints">Checkpoints (comma separated)</label>
-            <input class="form-input" id="fCheckpoints" placeholder="e.g. Check logo, Buy fabric, Call supplier" />
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="btn btn-ghost" onclick="closeModal('modalOverlay')">Cancel</button>
-            <button type="submit" class="btn btn-primary" id="btnSubmit">Create Task & Assign</button>
-          </div>
-        </div>
-      </form>
+<!-- CREATE TASK MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title">New task</div>
+    <div class="form-group">
+      <label>Task title</label>
+      <input class="form-input" id="fTitle" type="text" placeholder="What needs to be done?" />
+    </div>
+    <div class="form-group">
+      <label>Description (optional)</label>
+      <input class="form-input" id="fDesc" type="text" placeholder="Add context…" />
+    </div>
+    <div class="form-group">
+      <label>Assign to</label>
+      <select class="form-input" id="fEmployee">
+        <option value="">Unassigned</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Due date &amp; time</label>
+      <input class="form-input" id="fDue" type="datetime-local" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btnModalCancel">Cancel</button>
+      <button class="btn-submit" id="btnModalSubmit">Create task</button>
     </div>
   </div>
+</div>
 
-  <!-- Add Enquiry Modal -->
-  <div class="modal-overlay" id="modalEnquiry">
-    <div class="modal" style="max-width: 500px;">
-      <h2 id="enquiryModalTitle">Add Enquiry</h2>
-      <form id="enquiryForm" onsubmit="handleEnquirySubmit(event)">
-        <input type="hidden" id="eqId" />
-        <div class="form-group">
-          <label for="eqClient">Client Name *</label>
-          <input class="form-input" id="eqClient" placeholder="e.g. Raj Kumar" required />
-        </div>
-        <div class="form-group">
-          <label for="eqService">Service Requested</label>
-          <input class="form-input" id="eqService" placeholder="e.g. Painting, Plumbing" />
-        </div>
-        <div class="form-group">
-          <label for="eqNotes">Notes</label>
-          <textarea class="form-input" id="eqNotes" rows="3" placeholder="Any extra details..." style="resize: vertical;"></textarea>
-        </div>
-        <div class="form-group">
-          <label for="eqEmployee">Assign Employee</label>
-          <select class="form-input" id="eqEmployee">
-            <option value="">— None —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="eqStatus">Status</label>
-          <select class="form-input" id="eqStatus">
-            <option value="new">New</option>
-            <option value="assigned">Assigned</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-ghost" onclick="closeModal('modalEnquiry')">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btnEnquirySubmit">Save Enquiry</button>
-        </div>
-      </form>
-    </div>
-  </div>
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
 
-  <!-- Upgrade Modal — Cashfree Payment -->
-  <div class="modal-overlay" id="modalUpgrade">
-    <div class="modal" style="max-width:600px;">
+<script>
+  /* ── Helpers ── */
+  const API = '';
+  const token = () => localStorage.getItem('token') || '';
+  const headers = () => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` });
 
-      <!-- Header -->
-      <div style="text-align:center; margin-bottom:22px;">
-        <div style="font-size:2rem; margin-bottom:8px;">🚀</div>
-        <h2 style="color:#fff; font-family:Georgia,serif; font-weight:400; letter-spacing:-0.02em; margin-bottom:6px;">Upgrade PhantomPilot</h2>
-        <p style="font-size:.85rem; color:var(--text-dim);">Secure payment &nbsp;·&nbsp; Instant activation</p>
-      </div>
+  function pad(n) { return String(n).padStart(2, '0'); }
 
-      <!-- Pricing cards -->
-      <div class="pricing-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;">
+  function toast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    document.getElementById('toastContainer').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
 
-        <!-- Basic card -->
-        <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:12px;">
-          <div>
-            <div style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--yellow); margin-bottom:5px;">Basic Plan</div>
-            <div style="font-size:1.7rem; font-weight:700; color:var(--text); line-height:1;">₹2,000</div>
-            <div style="font-size:.75rem; color:var(--text-dim); margin-top:3px;">per project &nbsp;·&nbsp; one-time</div>
-          </div>
-          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:6px; color:var(--text-dim); margin:0; padding:0;">
-            <li>✅ Unlimited tasks for this project</li>
-            <li>✅ Smart Checkpoints AI</li>
-            <li>✅ WhatsApp Control Tower</li>
-            <li>✅ AI morning pulse reminders</li>
-          </ul>
-          <button id="payBtnBasic" onclick="startPayment('basic')"
-            style="margin-top:auto; width:100%; padding:11px 0; border-radius:6px; border:none; background:var(--accent); color:#0a0a0f; font-size:.88rem; font-weight:700; cursor:pointer; transition:opacity .2s; letter-spacing:.2px;">
-            Pay ₹2,000 →
-          </button>
-        </div>
+  /* ── Date helpers ── */
+  function heroDate() {
+    const d = new Date();
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `Today · ${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  }
 
-        <!-- Premium card — highlighted with Most Popular badge -->
-        <div style="background:var(--surface-2); border:2px solid var(--accent); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:12px; position:relative;">
-          <!-- Most Popular badge -->
-          <div style="position:absolute; top:-11px; left:50%; transform:translateX(-50%); background:#ffffff; color:#0a0a08; font-size:.68rem; font-weight:700; padding:3px 12px; border-radius:20px; white-space:nowrap; letter-spacing:.4px;">
-            MOST POPULAR
-          </div>
-          <div>
-            <div style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--green); margin-bottom:5px;">Premium</div>
-            <div style="font-size:1.7rem; font-weight:700; color:var(--text); line-height:1;">₹5,000</div>
-            <div style="font-size:.75rem; color:var(--text-dim); margin-top:3px;">per month &nbsp;·&nbsp; all features</div>
-          </div>
-          <ul style="list-style:none; font-size:.82rem; display:flex; flex-direction:column; gap:6px; color:var(--text-dim); margin:0; padding:0;">
-            <li>✅ Everything in Basic</li>
-            <li>✅ Unlimited projects</li>
-            <li>✅ Priority support</li>
-            <li>✅ White-glove onboarding</li>
-          </ul>
-          <button id="payBtnPremium" onclick="startPayment('premium')"
-            style="margin-top:auto; width:100%; padding:11px 0; border-radius:6px; border:none; background:#fff; color:#0a0a0f; font-size:.88rem; font-weight:700; cursor:pointer; transition:opacity .2s; letter-spacing:.2px;">
-            Pay ₹5,000 →
-          </button>
-        </div>
+  function greeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  }
 
-      </div>
+  function fmtDue(iso) {
+    if (!iso) return { when: 'No deadline', late: null, soon: null };
+    const d = new Date(iso);
+    const now = new Date();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const diffMs = d - now;
+    const diffDays = Math.round(diffMs / 86400000);
+    const diffHours = Math.round(diffMs / 3600000);
+    const whenStr = `${months[d.getMonth()]} ${d.getDate()} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    let late = null, soon = null;
+    if (diffMs < 0) {
+      const absDays = Math.abs(diffDays);
+      late = absDays === 0 ? 'Due today' : `${absDays} day${absDays !== 1 ? 's' : ''} late`;
+    } else if (diffHours < 24) {
+      soon = `In ${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
+    } else {
+      soon = `In ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    }
+    return { when: whenStr, late, soon };
+  }
 
-      <!-- Payment status message (shown after redirect back) -->
-      <div id="paymentStatusMsg" style="display:none; text-align:center; padding:12px; border-radius:6px; font-size:.85rem; margin-bottom:16px;"></div>
+  function fmtUpdated(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `Updated · ${months[d.getMonth()]} ${d.getDate()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
 
-      <!-- Footer -->
-      <div class="modal-actions" style="justify-content:center;">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('modalUpgrade')">Maybe Later</button>
-      </div>
-    </div>
-  </div>
+  /* ── State ── */
+  let allTasks = [];
+  let employees = [];
+  let activeFilter = 'all';
+  let empFilter = '';
 
-  <!-- Floating Action Button (mobile only) -->
-  <button class="fab" onclick="openModal()" aria-label="Add Task">+</button>
+  /* ── Init ── */
+  document.getElementById('heroDate').textContent = heroDate();
 
-  <!-- Toast Container -->
-  <div class="toast-container" id="toasts"></div>
-
-  <script>
-    /* ── Config ──────────────────────────────────────────────── */
-    const API = window.location.origin;
-      if (!localStorage.getItem("token")) window.location.replace("/static/login.html");    // same server
-
-    /* ── State ───────────────────────────────────────────────── */
-    let allTasks = [];
-    let allEmployees = [];
-    let activeStatus = "";
-    let activeEmployee = "";
-    let billingStatus = null;  // cached billing info
-
-    /* ── Billing ─────────────────────────────────────────────── */
-    async function loadBillingStatus() {
-      try {
-        billingStatus = await api("/tasks/billing-status");
-        _renderBillingUI(billingStatus);
-      } catch (e) {
-        // Non-fatal — don't crash the dashboard
-        console.warn("Could not load billing status:", e.message);
+  /* ── Fetch data ── */
+  async function loadData() {
+    try {
+      const [tRes, eRes] = await Promise.all([
+        fetch(`${API}/api/dashboard/tasks`, { headers: headers() }),
+        fetch(`${API}/api/dashboard/employees`, { headers: headers() }),
+      ]);
+      if (tRes.status === 401 || eRes.status === 401) {
+        window.location.replace('https://phantompilot.xyz/auth.html');
+        return;
       }
+      allTasks = await tRes.json();
+      employees = await eRes.json();
+      render();
+      populateEmployeeFilters();
+    } catch (e) {
+      toast('Failed to load tasks. Check connection.', 'error');
+    }
+  }
+
+  function populateEmployeeFilters() {
+    const sel = document.getElementById('empFilter');
+    const fSel = document.getElementById('fEmployee');
+    sel.innerHTML = '<option value="">All Employees</option>';
+    fSel.innerHTML = '<option value="">Unassigned</option>';
+    employees.forEach(e => {
+      sel.innerHTML += `<option value="${e.name}">${e.name}</option>`;
+      fSel.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+    });
+
+    // Try to get user name from token
+    try {
+      const payload = JSON.parse(atob(token().split('.')[1]));
+      const name = payload.name || payload.sub || 'Aaron';
+      document.getElementById('meName').textContent = name;
+      document.getElementById('meAvatar').textContent = name[0].toUpperCase();
+      document.getElementById('heroGreeting').innerHTML =
+        `${greeting()}, ${name}.<br><em>Here's where your team stands.</em>`;
+    } catch(_) {}
+  }
+
+  /* ── Render ── */
+  function filteredTasks() {
+    let tasks = allTasks;
+    if (empFilter) tasks = tasks.filter(t => (t.employee || '').toLowerCase() === empFilter.toLowerCase());
+    if (activeFilter === 'all') return tasks.filter(t => t.status !== 'completed' && t.status !== 'archived');
+    return tasks.filter(t => t.status === activeFilter);
+  }
+
+  function counts() {
+    const c = { pending: 0, in_progress: 0, overdue: 0, delayed: 0, needs_help: 0, completed: 0 };
+    allTasks.forEach(t => { if (c[t.status] !== undefined) c[t.status]++; });
+    return c;
+  }
+
+  function render() {
+    const c = counts();
+    const active = allTasks.filter(t => t.status !== 'completed' && t.status !== 'archived').length;
+
+    // Stats
+    document.getElementById('statTotal').innerHTML = `${active}<sup>tasks</sup>`;
+    document.getElementById('statPending').textContent = pad(c.pending);
+    document.getElementById('statInProgress').textContent = pad(c.in_progress);
+    document.getElementById('statOverdue').textContent = pad(c.overdue);
+    document.getElementById('statCompleted').textContent = pad(c.completed);
+    document.getElementById('miniPending').textContent = pad(c.pending);
+    document.getElementById('miniInProgress').textContent = pad(c.in_progress);
+    document.getElementById('miniOverdue').textContent = pad(c.overdue);
+    document.getElementById('miniDelayed').textContent = pad(c.delayed);
+    document.getElementById('miniNeedsHelp').textContent = pad(c.needs_help);
+    document.getElementById('miniCompleted').textContent = pad(c.completed);
+
+    // Pills
+    document.getElementById('pillAll').textContent = active;
+    document.getElementById('pillPending').textContent = c.pending;
+    document.getElementById('pillInProgress').textContent = c.in_progress;
+    document.getElementById('pillOverdue').textContent = c.overdue;
+    document.getElementById('pillDelayed').textContent = c.delayed;
+    document.getElementById('pillNeedsHelp').textContent = c.needs_help;
+    document.getElementById('pillCompleted').textContent = c.completed;
+
+    // Sidebar badge
+    const badge = document.getElementById('sidebarTaskBadge');
+    badge.textContent = active;
+
+    // Hero summary
+    const overdueCount = c.overdue;
+    const pendingCount = c.pending;
+    document.getElementById('heroSummary').innerHTML =
+      `You have <b>${active} active task${active !== 1 ? 's' : ''}</b> across the team` +
+      (overdueCount > 0 ? ` — <span class="alert">${overdueCount} overdue</span>` : '') +
+      (pendingCount > 0 ? ` and <b>${pendingCount} pending</b>` : '') +
+      `. Phantom is following up on WhatsApp; no action needed right now.`;
+
+    // Task groups
+    renderGroups(filteredTasks());
+  }
+
+  function renderGroups(tasks) {
+    const container = document.getElementById('taskGroups');
+    container.innerHTML = '';
+
+    if (tasks.length === 0) {
+      container.innerHTML = `<div class="empty-group">No tasks match the current filter.</div>`;
+      return;
     }
 
-    function _renderBillingUI(b) {
-      if (!b) return;
-      const tier = (b.tier || b.subscription_level || "free").toLowerCase();
+    // Group: overdue / needs_help first, then the rest
+    const attention = tasks.filter(t => t.status === 'overdue' || t.status === 'needs_help');
+    const rest = tasks.filter(t => t.status !== 'overdue' && t.status !== 'needs_help');
 
-      // Plan Badge
-      const badge = document.getElementById("planBadge");
-      if (badge) {
-        if (b.is_trial_active) {
-          badge.textContent = "🎁 TRIAL";
-          badge.style.background = "var(--blue-bg)";
-          badge.style.color = "var(--blue)";
-        } else if (tier === "premium") {
-          badge.textContent = "✨ PREMIUM";
-          badge.style.background = "var(--green-bg)";
-          badge.style.color = "var(--green)";
-        } else if (tier === "basic") {
-          badge.textContent = "⚡ BASIC";
-          badge.style.background = "var(--yellow-bg)";
-          badge.style.color = "var(--yellow)";
-        } else {
-          badge.textContent = "FREE";
-          badge.style.background = "var(--surface-2)";
-          badge.style.color = "var(--text-dim)";
-        }
-      }
-
-      // Usage Bar
-      const usageText = document.getElementById("usageText");
-      const usageBar  = document.getElementById("usageBar");
-      const usageHint = document.getElementById("usageHint");
-      const unlimited = b.is_trial_active || tier === "premium" || tier === "basic";
-
-      if (usageText) {
-        usageText.textContent = b.is_trial_active
-          ? `∞ Trial (${b.trial_days_remaining}d left)`
-          : (unlimited ? "∞ Unlimited" : `${b.tasks_created_count} / ${b.free_task_limit}`);
-      }
-      if (usageBar) {
-        const pct = unlimited ? 0 : Math.min((b.tasks_created_count / b.free_task_limit) * 100, 100);
-        usageBar.style.width = pct + "%";
-        usageBar.style.background = b.limit_reached
-          ? "var(--red)"
-          : "linear-gradient(90deg, var(--accent), var(--blue))";
-      }
-      if (usageHint) {
-        if (b.is_trial_active) {
-          const d = b.trial_days_remaining;
-          usageHint.textContent = `Trial active — ${d} day${d !== 1 ? "s" : ""} left. All features unlocked.`;
-          usageHint.style.color = "var(--blue)";
-        } else if (tier === "premium") {
-          usageHint.textContent = "Premium active — unlimited projects & tasks.";
-          usageHint.style.color = "var(--green)";
-        } else if (tier === "basic") {
-          const paid = (b.projects_paid || []).length;
-          usageHint.textContent = `Basic plan — ${paid} project${paid !== 1 ? "s" : ""} unlocked.`;
-          usageHint.style.color = "var(--yellow)";
-        } else if (b.limit_reached) {
-          usageHint.textContent = "Free limit reached. Upgrade to create more tasks.";
-          usageHint.style.color = "var(--red)";
-        } else {
-          const remaining = b.free_task_limit - b.tasks_created_count;
-          usageHint.textContent = `${remaining} free task${remaining !== 1 ? "s" : ""} remaining.`;
-          usageHint.style.color = "var(--text-dim)";
-        }
-      }
-
-      // Upgrade button
-      const btnUpgrade = document.getElementById("btnUpgrade");
-      if (btnUpgrade) {
-        if (tier === "premium") {
-          btnUpgrade.style.display = "none";
-        } else if (tier === "basic") {
-          btnUpgrade.style.display = "flex";
-          btnUpgrade.textContent = "➕ Add More Projects";
-        } else {
-          btnUpgrade.style.display = "flex";
-          btnUpgrade.textContent = "🚀 Upgrade Plan";
-        }
-      }
-
-      // Trial banner
-      const banner = document.getElementById("trialBanner");
-      if (banner) {
-        if (b.is_trial_active) {
-          const d = b.trial_days_remaining;
-          banner.style.display = "flex";
-          banner.innerHTML = `<span>🎉 Free trial — <strong>${d} day${d !== 1 ? "s" : ""} remaining</strong>. Upgrade to keep full access.</span><div style="display:flex;gap:8px;align-items:center;flex-shrink:0;"><button class="trial-upgrade-btn" onclick="openUpgradeModal()">Upgrade</button><button class="trial-dismiss" onclick="document.getElementById('trialBanner').style.display='none'">✕</button></div>`;
-        } else if (!b.is_trial_active && b.trial_ends_at && tier === "free") {
-          banner.style.display = "flex";
-          banner.innerHTML = `<span>Your trial has ended. Upgrade to restore full access.</span><div style="display:flex;gap:8px;align-items:center;flex-shrink:0;"><button class="trial-upgrade-btn" onclick="openUpgradeModal()">Upgrade Now</button><button class="trial-dismiss" onclick="document.getElementById('trialBanner').style.display='none'">✕</button></div>`;
-        } else {
-          banner.style.display = "none";
-        }
-      }
+    if (attention.length > 0) {
+      container.appendChild(buildGroup({
+        label: 'Needs attention',
+        meta: `· ${attention.length} critical`,
+        dotClass: 'd',
+        rightLabel: 'Critical',
+        rightCount: attention.length,
+        tasks: attention,
+      }));
     }
 
-    function openUpgradeModal() {
-      document.getElementById("modalUpgrade").classList.add("open");
-    }
-
-    /* ── Cashfree payment flow ───────────────────────────────── */
-    async function startPayment(plan) {
-      const btnId = plan === "basic" ? "payBtnBasic" : "payBtnPremium";
-      const btn = document.getElementById(btnId);
-      if (btn) { btn.disabled = true; btn.textContent = "Creating order…"; }
-
-      try {
-        const data = await api("/billing/create-order", {
-          method: "POST",
-          body: JSON.stringify({ plan }),
-        });
-        if (data.payment_url) {
-          window.location.href = data.payment_url;
-        } else {
-          showToast("Could not get payment URL. Please try again.", "error");
-          if (btn) { btn.disabled = false; btn.textContent = plan === "basic" ? "Pay ₹2,000 →" : "Pay ₹5,000 →"; }
-        }
-      } catch (e) {
-        showToast("Payment error: " + e.message, "error");
-        if (btn) { btn.disabled = false; btn.textContent = plan === "basic" ? "Pay ₹2,000 →" : "Pay ₹5,000 →"; }
-      }
-    }
-
-    /* ── Handle return from Cashfree checkout ────────────────── */
-    (function checkPaymentReturn() {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("payment") === "success") {
-        // Clean URL
-        history.replaceState({}, "", window.location.pathname);
-        // Show upgrade modal with success message
-        document.getElementById("modalUpgrade").classList.add("open");
-        const msg = document.getElementById("paymentStatusMsg");
-        if (msg) {
-          msg.style.display = "block";
-          msg.style.background = "rgba(0,200,100,.1)";
-          msg.style.border = "1px solid rgba(0,200,100,.3)";
-          msg.style.color = "#00c864";
-          msg.textContent = "Payment received! Your plan is being activated. Refresh in a moment.";
-        }
-      }
-    })();
-
-    /* ── API helpers ─────────────────────────────────────────── */
-    async function api(path, opts = {}) {
-      const res = await fetch(`${API}${path}`, {
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + localStorage.getItem("token") },
-        ...opts,
+    if (rest.length > 0) {
+      const today = new Date();
+      const todayTasks = rest.filter(t => {
+        if (!t.deadline || t.deadline === 'No deadline') return false;
+        const d = new Date(t.deadline);
+        return d.getFullYear() === today.getFullYear() &&
+               d.getMonth() === today.getMonth() &&
+               d.getDate() === today.getDate();
       });
-      if (!res.ok) {
-        let detail = `API ${res.status}`;
-        try { const body = await res.json(); detail = body.detail || body.error || detail; } catch {}
-        throw new Error(detail);
-      }
-      return res.json();
-    }
+      const other = rest.filter(t => !todayTasks.includes(t));
 
-    /* ── Fetch & render ──────────────────────────────────────── */
-    async function loadTasks() {
-      try {
-        allTasks = await api("/tasks");
-        updateStats();
-        populateEmployeeFilter();
-        renderTable();
-      } catch (e) {
-        document.getElementById("taskBody").innerHTML =
-          `<tr><td colspan="5" class="empty-state"><div class="icon">⚠️</div>Could not load tasks.<br><small>${e.message}</small></td></tr>`;
-      }
-    }
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const dateLabel = `· ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][today.getMonth()]} ${today.getDate()}`;
 
-    function updateStats() {
-      const count = (s) => allTasks.filter(t => t.status === s).length;
-      document.getElementById("statTotal").textContent = allTasks.length;
-      document.getElementById("statPending").textContent = count("pending");
-      document.getElementById("statProgress").textContent = count("in_progress");
-      document.getElementById("statOverdue").textContent = count("overdue");
-      document.getElementById("statDelayed").textContent = count("delayed");
-      document.getElementById("statHelp").textContent = count("needs_help");
-      document.getElementById("statDone").textContent = count("completed");
-    }
-
-    function populateEmployeeFilter() {
-      const sel = document.getElementById("employeeFilter");
-      const prev = sel.value;
-      const names = [...new Set(allTasks.map(t => t.assigned_to).filter(Boolean))].sort();
-      sel.innerHTML = '<option value="">All Employees</option>' +
-        names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
-      sel.value = prev;
-    }
-
-    function filteredTasks() {
-      return allTasks.filter(t => {
-        if (activeStatus && t.status !== activeStatus) return false;
-        if (!activeStatus && t.status === 'archived') return false;
-        if (activeEmployee && t.assigned_to !== activeEmployee) return false;
-        return true;
-      });
-    }
-
-    function buildCheckpointsHtml(t) {
-      let checkpointsHtml = '';
-      if (t.checkpoints) {
-        try {
-          const cps = JSON.parse(t.checkpoints);
-          if (cps.length) {
-            const doneCount = cps.filter(c => c.done).length;
-            checkpointsHtml = `<ul class="checkpoint-list">`;
-            cps.forEach((cp, idx) => {
-              const checked = cp.done ? 'checked' : '';
-              const doneClass = cp.done ? 'done' : '';
-              checkpointsHtml += `
-                <li class="checkpoint-item ${doneClass}" onclick="toggleCheckpoint(${t.id}, ${idx}, event)">
-                  <input type="checkbox" ${checked} tabindex="-1" />
-                  <span class="cp-text">${esc(cp.text)}</span>
-                </li>`;
-            });
-            checkpointsHtml += `</ul>`;
-            checkpointsHtml += `<div class="checkpoint-progress">${doneCount}/${cps.length} checkpoints done</div>`;
-          }
-        } catch(e) {}
-      }
-      return checkpointsHtml;
-    }
-
-    function renderTable() {
-      const tasks = filteredTasks();
-      const tbody = document.getElementById("taskBody");
-      const mobileContainer = document.getElementById("taskCardsMobile");
-
-      if (!tasks.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icon">📋</div>No tasks found</td></tr>`;
-        if (mobileContainer) mobileContainer.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No tasks found</div>`;
-        return;
+      if (todayTasks.length > 0) {
+        container.appendChild(buildGroup({
+          label: 'Today',
+          meta: dateLabel,
+          dotClass: '',
+          rightLabel: 'Active',
+          rightCount: todayTasks.length,
+          tasks: todayTasks,
+        }));
       }
 
-      tbody.innerHTML = tasks.map(t => {
-        const isOverdue = t.status === "overdue";
-        const isHelp = t.status === "needs_help";
-        const canComplete = t.status !== "completed";
-        const due = t.due_at ? formatDate(t.due_at) : "—";
-        const dueClass = isOverdue ? "due-overdue" : "";
-        const rowClass = isOverdue ? 'row-overdue' : isHelp ? 'row-needs_help' : '';
-        const pct = t.progress_percent || 0;
-        const lastUp = t.last_update ? formatDate(t.last_update) : formatDate(t.created_at);
-        const checkpointsHtml = buildCheckpointsHtml(t);
-
-        return `
-      <tr class="${rowClass}">
-        <td>
-          <div class="task-title">${esc(t.title)}</div>
-          ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ""}
-          ${checkpointsHtml}
-        </td>
-        <td>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span class="employee-link" onclick="openEmployeeProfileByName('${esc(t.assigned_to)}')">${esc(t.assigned_to || "—")}</span>
-            ${t.notification_sent === true
-              ? `<span title="WhatsApp message sent" style="color: var(--green); font-size: .9rem;">✓</span>`
-              : t.notification_sent === false
-              ? `<span title="WhatsApp message failed to send" style="color: var(--red); font-size: .9rem;">✕</span>`
-              : ''}
-          </div>
-        </td>
-        <td>
-          <div style="font-weight:600; font-size:.85rem; color:var(--text)">${pct}%</div>
-          <div class="progress-bar-wrap">
-            <div class="progress-bar-fill" style="width:${pct}%; background: ${pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--accent)' : 'var(--yellow)'};"></div>
-          </div>
-          ${t.last_update_summary
-            ? `<div class="smart-summary ${t.last_update_summary.toLowerCase().includes('block') || t.last_update_summary.toLowerCase().includes('stuck') ? 'blocker' : ''}">💬 ${esc(t.last_update_summary)}</div>`
-            : ""}
-          <div style="font-size:.7rem; color:var(--text-dim); margin-top:2px">Updated: ${lastUp}</div>
-        </td>
-        <td><span class="badge badge-${t.status}">${statusLabel(t.status)}</span></td>
-        <td class="due-text ${dueClass}" id="due-cell-${t.id}">
-          <div class="due-cell">
-            <span class="due-label">${due}</span>
-            <button class="btn-edit-due" onclick="openDueEditor(${t.id}, '${t.due_at || ''}')" title="Change due date">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </td>
-        <td>
-          <div style="display:flex; gap: 8px;">
-              ${canComplete
-                ? `<button class="btn btn-sm btn-complete" onclick="markComplete(${t.id})">✓ Done</button>`
-                : `<span style="color:var(--green)">✓ Done</span>`}
-              <button class="btn btn-sm btn-ghost" onclick="archiveTask(${t.id})" title="Delete Task" style="padding: 5px 8px; color: var(--red); border-color: rgba(255, 107, 107, .2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
-          </div>
-        </td>
-      </tr>`;
-      }).join("");
-
-      // Mobile card view
-      if (mobileContainer) {
-        mobileContainer.innerHTML = tasks.map(t => {
-          const isOverdue = t.status === "overdue";
-          const isHelp = t.status === "needs_help";
-          const canComplete = t.status !== "completed";
-          const due = t.due_at ? formatDate(t.due_at) : "—";
-          const dueClass = isOverdue ? "due-overdue" : "";
-          const rowClass = isOverdue ? 'row-overdue' : isHelp ? 'row-needs_help' : '';
-          const pct = t.progress_percent || 0;
-          const checkpointsHtml = buildCheckpointsHtml(t);
-          const barColor = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--accent)' : 'var(--yellow)';
-
-          return `
-          <div class="task-card-mobile ${rowClass}">
-            <div class="tc-title">${esc(t.title)}</div>
-            <div class="tc-meta">
-              <span class="badge badge-${t.status}">${statusLabel(t.status)}</span>
-              <span class="tc-assignee">${esc(t.assigned_to || "—")}</span>
-              <span class="tc-due ${dueClass}">${due}</span>
-            </div>
-            <div class="tc-progress">
-              <div class="tc-pct">${pct}% complete</div>
-              <div class="progress-bar-wrap">
-                <div class="progress-bar-fill" style="width:${pct}%; background:${barColor};"></div>
-              </div>
-            </div>
-            ${checkpointsHtml ? `<div class="tc-checkpoints">${checkpointsHtml}</div>` : ""}
-            <div class="tc-actions">
-              ${canComplete
-                ? `<button class="btn btn-sm btn-complete" onclick="markComplete(${t.id})">✓ Done</button>`
-                : `<button class="btn btn-sm btn-ghost" disabled style="color:var(--green);">✓ Done</button>`}
-              <button class="btn btn-sm btn-ghost" onclick="archiveTask(${t.id})" title="Delete" style="color:var(--red); border-color:rgba(255,107,107,.2);">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
-            </div>
-          </div>`;
-        }).join("");
+      if (other.length > 0) {
+        container.appendChild(buildGroup({
+          label: 'Upcoming',
+          meta: `· ${other.length} task${other.length !== 1 ? 's' : ''}`,
+          dotClass: 'w',
+          rightLabel: 'Active',
+          rightCount: other.length,
+          tasks: other,
+        }));
       }
     }
+  }
 
-    /* ── Helpers ─────────────────────────────────────────────── */
-    function esc(s) {
-      const d = document.createElement("div");
-      d.textContent = s;
-      return d.innerHTML;
-    }
+  function buildGroup({ label, meta, dotClass, rightLabel, rightCount, tasks }) {
+    const section = document.createElement('section');
+    section.className = 'task-group';
 
-    function statusLabel(s) {
-      return s.replace(/_/g, " ");
-    }
-
-    function formatDate(iso) {
-      const d = new Date(iso);
-      const now = new Date();
-      const opts = { month: "short", day: "numeric" };
-      const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-      if (d.toDateString() === now.toDateString()) return `Today ${time}`;
-      const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
-      if (d.toDateString() === tomorrow.toDateString()) return `Tomorrow ${time}`;
-      return `${d.toLocaleDateString([], opts)} ${time}`;
-    }
-
-    /* ── Mark complete / Archive ───────────────────────────────────────── */
-    async function markComplete(id) {
-      if (!confirm("Mark this task as completed?")) return;
-      try {
-        await api(`/tasks/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: "completed" }),
-        });
-        toast("Task marked as completed!", "success");
-        await loadTasks();
-      } catch (e) {
-        toast("Failed to update task", "error");
-      }
-    }
-
-    async function archiveTask(id) {
-        if (!confirm("Delete Task?\n\nThis will remove it from your active views.")) return;
-        try {
-          await api(`/tasks/${id}`, {
-              method: "PATCH",
-              body: JSON.stringify({ status: "archived" }),
-          });
-          toast("Task deleted.", "success");
-          await loadTasks();
-        } catch (e) {
-          toast("Failed to delete task.", "error");
-        }
-    }
-
-    /* ── Toggle checkpoint (CEO clicks checkbox on dashboard) ── */
-    async function toggleCheckpoint(taskId, cpIndex, event) {
-      event.stopPropagation();
-      try {
-        await api(`/tasks/${taskId}/checkpoints/${cpIndex}/toggle`, { method: "PATCH" });
-        await loadTasks();
-      } catch (e) {
-        toast("Failed to update checkpoint.", "error");
-      }
-    }
-
-    /* ── Change due date ─────────────────────────────────────── */
-    function openDueEditor(taskId, currentDueIso) {
-      const cell = document.getElementById(`due-cell-${taskId}`);
-      if (!cell) return;
-
-      // Format current date for the datetime-local input (YYYY-MM-DDTHH:MM)
-      let defaultValue = "";
-      if (currentDueIso) {
-        const d = new Date(currentDueIso);
-        const pad = n => String(n).padStart(2, "0");
-        defaultValue = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      }
-
-      cell.innerHTML = `
-        <div class="due-editor">
-          <input type="datetime-local" id="due-input-${taskId}" value="${defaultValue}" />
-          <button class="btn-save-due" onclick="saveDueDate(${taskId})">Save</button>
-          <button class="btn-cancel-due" onclick="renderTable()">✕</button>
-        </div>`;
-    }
-
-    async function saveDueDate(taskId) {
-      const input = document.getElementById(`due-input-${taskId}`);
-      if (!input || !input.value) {
-        toast("Please pick a date and time.", "error");
-        return;
-      }
-      try {
-        await api(`/tasks/${taskId}/due-date`, {
-          method: "PATCH",
-          body: JSON.stringify({ due_at: new Date(input.value).toISOString() }),
-        });
-        toast("Due date updated — employee notified.", "success");
-        await loadTasks();
-      } catch (e) {
-        toast("Failed to update due date.", "error");
-      }
-    }
-
-    /* ── Create task ─────────────────────────────────────────── */
-    async function handleCreate(e) {
-      e.preventDefault();
-      const btn = document.getElementById("btnSubmit");
-      btn.disabled = true;
-      btn.textContent = "Creating & Assigning…";
-
-      const empId = document.getElementById("fAssignee").value;
-      const empName = document.getElementById("lblSelectedEmployee").textContent;
-      
-      const titleInput = document.getElementById("fTitle").value.trim();
-      const descInput = document.getElementById("fDesc").value.trim();
-      const dueInput = document.getElementById("fDue").value;
-      const freqInput = document.getElementById("fFrequency").value;
-      
-      if (!titleInput) {
-          toast("Task Title is required.", "error");
-          btn.disabled = false;
-          btn.textContent = "Create Task & Assign";
-          return;
-      }
-
-        const parsedEmpId = Number.parseInt(empId, 10);
-        if (!Number.isInteger(parsedEmpId) || parsedEmpId <= 0 || !empName.trim()) {
-          toast("Please select an employee before creating a task.", "error");
-          btn.disabled = false;
-          btn.textContent = "Create Task & Assign";
-          return;
-        }
-
-      // We use the onboard-assign endpoint if they selected by name but don't know the exact endpoint logic.
-      // Wait, let's just use POST /tasks directly now since we have the DB ID from the employees endpoint!
-      const body = {
-          company_id: 1,
-          title: titleInput,
-          assigned_to: empName,
-          assigned_employee_id: parsedEmpId,
-          source_type: "dashboard"
-      };
-      if (descInput) body.description = descInput;
-      if (dueInput) body.due_at = new Date(dueInput).toISOString();
-      if (freqInput) body.reminder_interval_days = parseInt(freqInput);
-
-      // Checkpoints: split by comma, trim, filter empty
-      const cpInput = document.getElementById("fCheckpoints").value.trim();
-      if (cpInput) {
-        body.checkpoints = cpInput.split(",").map(s => s.trim()).filter(Boolean);
-      }
-
-      try {
-        await api("/tasks", { method: "POST", body: JSON.stringify(body) });
-
-        // If this was converted from an enquiry, mark it as assigned
-        const sourceEqId = document.getElementById("fSourceEnquiryId").value;
-        if (sourceEqId) {
-          try {
-            await api(`/enquiries/${sourceEqId}`, {
-              method: "PATCH",
-              body: JSON.stringify({ status: "assigned" }),
-            });
-          } catch (_) { /* non-fatal */ }
-        }
-
-        toast("Task created and assigned!", "success");
-        closeModal('modalOverlay');
-        await loadTasks();
-        await loadBillingStatus();  // refresh usage after task creation
-        if (sourceEqId) await loadEnquiries();
-      } catch (e) {
-        // If free limit hit, show upgrade modal instead of generic error
-        const msg = e.message || "";
-        if (msg.includes("Free limit reached") || msg.includes("Upgrade to Premium") || msg.includes("403")) {
-          closeModal('modalOverlay');
-          openUpgradeModal();
-          await loadBillingStatus();
-        } else {
-          toast("Failed to create task: " + msg, "error");
-        }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Create Task & Assign";
-      }
-    }
-
-    /* ── Employee Management Logic ───────────────────────────── */
-    async function loadEmployees() {
-      try {
-        allEmployees = await api("/employees"); // New endpoint
-        renderEmployeeGrid();
-        renderEmployeeTable();
-      } catch (e) {
-        console.error("Could not load employees:", e);
-      }
-    }
-
-    function renderEmployeeTable() {
-        const tbody = document.getElementById("employeeBody");
-        if (!allEmployees.length) {
-            tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No employees found.</td></tr>`;
-            return;
-        }
-        tbody.innerHTML = allEmployees.map(e => `
-            <tr>
-                <td><span class="employee-link" onclick="openEmployeeProfile(${e.id})">${esc(e.name)}</span></td>
-                <td>${e.phone_number ? `<a href="tel:${esc(e.phone_number)}" style="color:var(--blue); text-decoration:none;">${esc(e.phone_number)}</a>` : "No phone"}</td>
-                <td><span class="badge ${e.active_task_count > 0 ? 'badge-in_progress' : 'badge-completed'}">${e.active_task_count} tasks</span></td>
-            </tr>
-        `).join("");
-    }
-
-    function renderEmployeeGrid() {
-      const grid = document.getElementById("fAssigneeGrid");
-      grid.innerHTML = allEmployees.map(e => `
-        <div class="emp-card" onclick="selectEmployeeForTask(${e.id}, '${esc(e.name).replace(/'/g, "\\'")}')">
-           <div class="name">${esc(e.name)}</div>
-           <div class="phone">${esc(e.phone_number || "No phone")}</div>
+    section.innerHTML = `
+      <div class="group-header">
+        <div class="gh-l">
+          <span class="dot-marker ${dotClass}"></span>
+          ${label}
+          <span class="gh-meta">${meta}</span>
         </div>
-      `).join("");
-    }
+        <div class="gh-r">${rightLabel}<b>${rightCount}</b></div>
+      </div>
+      <div class="rows-wrap" id="rows-${label.replace(/\s+/g,'-')}"></div>
+    `;
 
-    function selectEmployeeForTask(id, name) {
-        document.getElementById("fAssignee").value = id;
-        document.getElementById("lblSelectedEmployee").textContent = name;
-        
-        document.getElementById("stepSelectEmployee").style.display = "none";
-        document.getElementById("taskFields").style.display = "block";
-    }
+    const wrap = section.querySelector('.rows-wrap');
+    tasks.forEach(t => wrap.appendChild(buildRow(t)));
+    return section;
+  }
 
-    function resetToEmployeeSelection() {
-        document.getElementById("fAssignee").value = "";
-      document.getElementById("lblSelectedEmployee").textContent = "";
-        document.getElementById("stepSelectEmployee").style.display = "block";
-        document.getElementById("taskFields").style.display = "none";
-    }
+  function buildRow(t) {
+    const div = document.createElement('div');
+    div.className = 'task-row';
+    div.dataset.id = t.id;
 
-    function toggleAddEmployeeForm() {
-      const form = document.getElementById("addEmployeeForm");
-      if (form.style.display === "none") {
-        form.style.display = "block";
-      } else {
-        form.style.display = "none";
-        document.getElementById("fNewEmpName").value = "";
-        document.getElementById("fNewEmpPhone").value = "";
-      }
-    }
+    const due = fmtDue(t.deadline === 'No deadline' ? null : t.deadline);
+    const pct = t.progress_percent || 0;
+    const updStr = t.last_update ? fmtUpdated(t.last_update) : (t.created_at ? fmtUpdated(t.created_at) : '');
+    const empName = t.employee || 'Unassigned';
+    const empInit = empName[0].toUpperCase();
 
-    function toggleTaskFields() {
-      const sel = document.getElementById("fAssignee");
-      const fields = document.getElementById("taskFields");
-      if (sel.value) {
-        fields.style.display = "block";
-        // Also hide add-employee form if opened
-        document.getElementById("addEmployeeForm").style.display = "none";
-      } else {
-        fields.style.display = "none";
-      }
-    }
+    const statusLabel = {
+      pending: 'Pending', in_progress: 'In Progress', overdue: 'Overdue',
+      completed: 'Completed', delayed: 'Delayed', needs_help: 'Needs Help',
+    }[t.status] || t.status;
 
-    async function saveNewEmployee() {
-      const name = document.getElementById("fNewEmpName").value.trim();
-      const phone = document.getElementById("fNewEmpPhone").value.trim();
-      const btn = document.getElementById("btnSaveEmployee");
+    div.innerHTML = `
+      <div class="task-cell">
+        <div class="t-name">${escHtml(t.task)}</div>
+        <div class="t-sub">${t.checkpoint_summary || 'No checkpoints'}</div>
+      </div>
+      <div class="assignee-cell">
+        <div class="av">${escHtml(empInit)}</div>
+        <span class="av-name">${escHtml(empName)}</span>
+      </div>
+      <div class="prog-cell">
+        <div class="prog-top"><span class="prog-pct">${pct}%</span></div>
+        <div class="prog-bar"><i style="width:${pct}%"></i></div>
+        <div class="prog-upd">${updStr}</div>
+      </div>
+      <span class="status-badge ${t.status}">${statusLabel}</span>
+      <div class="due-cell">
+        <div class="due-when">${due.when}</div>
+        ${due.late ? `<div class="due-late">${due.late}</div>` : ''}
+        ${due.soon ? `<div class="due-soon">${due.soon}</div>` : ''}
+      </div>
+      <div class="row-actions">
+        <button class="icon-btn check" data-action="complete" data-id="${t.id}" aria-label="Mark done" title="Mark complete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+        </button>
+        <button class="icon-btn del" data-action="delete" data-id="${t.id}" aria-label="Delete" title="Archive">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        </button>
+      </div>
+    `;
+    return div;
+  }
 
-      if (!name || !phone) {
-        toast("Name and Phone are required", "error");
-        return;
-      }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
-      btn.disabled = true;
-      btn.textContent = "Saving...";
+  /* ── Actions ── */
+  document.getElementById('taskGroups').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.dataset.action === 'complete') await markDone(id, btn);
+    if (btn.dataset.action === 'delete') await archiveTask(id, btn);
+  });
 
-      try {
-        // Technically this creates/finds via onboard-assign but without a task, we need a standard employee POST route
-        // Wait, we don't have a direct `POST /employees` route handy in our new demo backend.
-        // Let me just send a dummy task that is completed immediately? No, wait. 
-        // We do have /api/dashboard/onboard-assign but it requires a task title.
-        // Hmm, let me call api('/employees') - Wait, I have `employee_routes.py`? Let me check if it exists:
-        // Let's assume `POST /employees` exists and takes name + phone_number.
-        const body = { name, phone_number: phone, company_id: 1 };
-        const res = await api("/employees", { method: "POST", body: JSON.stringify(body) });
-        
-        toast("Employee added!", "success");
-        await loadEmployees(); // refresh dropdown
-        
-        // Auto-select them
-        const sel = document.getElementById("fAssignee");
-        sel.value = res.id;
-        
-        toggleAddEmployeeForm(); // Collapse
-        toggleTaskFields(); // Show task fields
-
-      } catch (e) {
-        toast("Failed to add employee: " + e.message, "error");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Save Employee";
-      }
-    }
-
-    /* ── Tabs & Profile Modals ───────────────────────────────── */
-    function switchTab(tabId) {
-        document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-        document.getElementById('viewDashboard').style.display = 'none';
-        document.getElementById('viewEmployees').style.display = 'none';
-        document.getElementById('viewEnquiries').style.display = 'none';
-        document.getElementById('viewSettings').style.display = 'none';
-
-        if (tabId === 'dashboard') {
-            document.getElementById('tabDashboard').classList.add('active');
-            document.getElementById('viewDashboard').style.display = 'block';
-        } else if (tabId === 'employees') {
-            document.getElementById('tabEmployees').classList.add('active');
-            document.getElementById('viewEmployees').style.display = 'block';
-        } else if (tabId === 'enquiries') {
-            document.getElementById('tabEnquiries').classList.add('active');
-            document.getElementById('viewEnquiries').style.display = 'block';
-            loadEnquiries();
-        } else if (tabId === 'settings') {
-            document.getElementById('tabSettings').classList.add('active');
-            document.getElementById('viewSettings').style.display = 'block';
-            loadProfile();
-            loadBillingStatus();  // refresh billing panel each time settings opens
-        }
-    }
-
-    /* ── Settings / Profile ──────────────────────────────────── */
-    async function loadProfile() {
-        try {
-            const data = await api("/auth/me");
-            document.getElementById("settingsWhatsapp").value = data.whatsapp_number || "";
-            document.getElementById("settingsEmail").textContent = data.email || "—";
-        } catch (e) {
-            // silently ignore — user stays logged in
-        }
-    }
-
-    async function saveWhatsappNumber() {
-        const num = document.getElementById("settingsWhatsapp").value.trim();
-        const msg = document.getElementById("settingsWhatsappMsg");
-        msg.style.color = "var(--text-dim)";
-        msg.textContent = "Saving…";
-        try {
-            const data = await api("/auth/profile", {
-                method: "PATCH",
-                body: JSON.stringify({ whatsapp_number: num || null })
-            });
-            if (data.success) {
-                msg.style.color = "var(--green)";
-                msg.textContent = "Saved! CEO commands from this number are now active.";
-            } else {
-                msg.style.color = "var(--red)";
-                msg.textContent = data.error || "Save failed.";
-            }
-        } catch (e) {
-            msg.style.color = "var(--red)";
-            msg.textContent = "Error: " + e.message;
-        }
-    }
-
-    function openEmployeeProfileByName(name) {
-        const emp = allEmployees.find(e => e.name === name);
-        if (emp) openEmployeeProfile(emp.id);
-    }
-
-    async function openEmployeeProfile(id) {
-        try {
-            const data = await api(`/employees/${id}`);
-            document.getElementById("profName").textContent = data.employee.name;
-            document.getElementById("profPhone").textContent = data.employee.phone_number || "No phone";
-            
-            const tbody = document.getElementById("profTasks");
-            if (!data.tasks || !data.tasks.length) {
-                tbody.innerHTML = `<tr><td class="empty-state" style="padding: 20px;">No tasks assigned.</td></tr>`;
-            } else {
-                tbody.innerHTML = data.tasks.filter(t => t.status !== 'archived').map(t => `
-                  <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid var(--border);">
-                      <div class="task-title" style="font-size:.85rem">${esc(t.title)}</div>
-                    </td>
-                    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align:right;">
-                      <span class="badge badge-${t.status}">${statusLabel(t.status)}</span>
-                    </td>
-                  </tr>
-                `).join("");
-            }
-            
-            document.getElementById("btnAssignFromProfile").onclick = () => {
-                closeModal('modalEmployeeProfile');
-                openModal();
-                selectEmployeeForTask(data.employee.id, data.employee.name);
-            };
-            
-            document.getElementById("modalEmployeeProfile").classList.add("open");
-        } catch (e) {
-            toast("Failed to load profile", "error");
-        }
-    }
-
-    /* ── Modal ───────────────────────────────────────────────── */
-    function openModal() {
-      // Billing gatekeeper: block if free limit reached
-      if (billingStatus && billingStatus.limit_reached) {
-        openUpgradeModal();
-        return;
-      }
-
-      document.getElementById("createForm").reset();
-      document.getElementById("fSourceEnquiryId").value = "";
-      document.getElementById("taskModalTitle").textContent = "Add Task";
-      toggleAddEmployeeForm(); // ensure closed
-      document.getElementById("addEmployeeForm").style.display = "none";
-      resetToEmployeeSelection();
-      document.getElementById("modalOverlay").classList.add("open");
-    }
-
-    function convertToTask(eqId) {
-      const eq = allEnquiries.find(e => e.id === eqId);
-      if (!eq) return;
-
-      // Open the modal fresh first
-      openModal();
-
-      // Pre-fill title and description, then jump straight to task fields
-      const title = [eq.client_name, eq.service_requested].filter(Boolean).join(" — ");
-      document.getElementById("fTitle").value = title;
-      document.getElementById("fDesc").value = eq.notes || "";
-
-      // Store source enquiry so we can mark it assigned after save
-      document.getElementById("fSourceEnquiryId").value = eqId;
-      document.getElementById("taskModalTitle").textContent = "Convert Enquiry to Task";
-
-      // Skip the employee-selection step only if an employee is already assigned
-      if (eq.assigned_employee_id && eq.assigned_employee_name) {
-        selectEmployeeForTask(eq.assigned_employee_id, eq.assigned_employee_name);
-      }
-    }
-    
-    function openAddEmployeeModal() {
-        openModal();
-        toggleAddEmployeeForm();
-    }
-    
-    function closeModal(id) { document.getElementById(id).classList.remove("open"); }
-
-    document.querySelectorAll(".modal-overlay").forEach(overlay => {
-      overlay.addEventListener("click", (e) => {
-        if (e.target === e.currentTarget) closeModal(e.target.id);
+  async function markDone(id, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+      const res = await fetch(`${API}/tasks/${id}`, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ status: 'completed' }),
       });
-    });
-
-    /* ── Toast ───────────────────────────────────────────────── */
-    function toast(msg, type = "success") {
-      const c = document.getElementById("toasts");
-      const el = document.createElement("div");
-      el.className = `toast toast-${type}`;
-      el.textContent = msg;
-      c.appendChild(el);
-      setTimeout(() => { el.remove(); }, 3000);
+      if (!res.ok) throw new Error();
+      allTasks = allTasks.map(t => t.id == id ? { ...t, status: 'completed' } : t);
+      render();
+      toast('Task marked complete.');
+    } catch {
+      toast('Could not update task.', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>';
     }
+  }
 
-    /* ── Tab & filter wiring ─────────────────────────────────── */
-    document.getElementById("statusTabs").addEventListener("click", (e) => {
-      if (!e.target.classList.contains("status-tab")) return;
-      document.querySelectorAll(".status-tab").forEach(t => t.classList.remove("active"));
-      e.target.classList.add("active");
-      activeStatus = e.target.dataset.status;
-      renderTable();
-    });
-
-    document.getElementById("employeeFilter").addEventListener("change", (e) => {
-      activeEmployee = e.target.value;
-      renderTable();
-    });
-
-    /* ── Keyboard shortcut ───────────────────────────────────── */
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
-      }
-    });
-
-    /* ── Logout ──────────────────────────────────────────────── */
-    function logout() {
-      if (confirm("Are you sure you want to sign out?")) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("company_id");
-        window.location.replace("/static/login.html");
-      }
+  async function archiveTask(id, btn) {
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/tasks/${id}`, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ status: 'archived' }),
+      });
+      if (!res.ok) throw new Error();
+      allTasks = allTasks.filter(t => t.id != id);
+      render();
+      toast('Task archived.');
+    } catch {
+      toast('Could not archive task.', 'error');
+      btn.disabled = false;
     }
+  }
 
-    /* ── Init ────────────────────────────────────────────────── */
-    loadTasks();
-    loadEmployees();
-    loadPerformance();
-    setInterval(loadTasks, 30000);  // auto-refresh every 30s
-    setInterval(loadPerformance, 30000);
+  /* ── Filters ── */
+  document.getElementById('pillsBar').addEventListener('click', e => {
+    const pill = e.target.closest('.pill');
+    if (!pill) return;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    activeFilter = pill.dataset.filter;
+    renderGroups(filteredTasks());
+  });
 
-    /* ── Employee Performance ────────────────────────────────── */
-    async function loadPerformance() {
-      try {
-        const data = await api("/analytics/employees");
-        renderPerformance(data);
-      } catch (e) {
-        document.getElementById("perfBody").innerHTML =
-          `<tr><td colspan="5" class="empty-state">Could not load performance data.</td></tr>`;
-      }
-    }
+  document.getElementById('empFilter').addEventListener('change', e => {
+    empFilter = e.target.value;
+    renderGroups(filteredTasks());
+  });
 
-    /* ── Enquiries ───────────────────────────────────────────── */
-    let allEnquiries = [];
+  /* ── Nav ── */
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
 
-    const STAGE_LABELS = {
-      follow_up: "Follow Up",
-      send_options: "Send Options",
-      close_deal: "Close Deal",
-      payment_received: "Payment Received",
-      done: "Done",
+  /* ── Modal ── */
+  const modal = document.getElementById('modalOverlay');
+
+  document.getElementById('btnAddTask').addEventListener('click', () => modal.classList.add('open'));
+  document.getElementById('btnModalCancel').addEventListener('click', () => modal.classList.remove('open'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); modal.classList.add('open'); }
+    if (e.key === 'Escape') modal.classList.remove('open');
+  });
+
+  document.getElementById('btnModalSubmit').addEventListener('click', async () => {
+    const title = document.getElementById('fTitle').value.trim();
+    if (!title) { toast('Please enter a task title.', 'error'); return; }
+
+    const btn = document.getElementById('btnModalSubmit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Creating…';
+
+    const empId = document.getElementById('fEmployee').value;
+    const dueVal = document.getElementById('fDue').value;
+    const payload = {
+      title,
+      description: document.getElementById('fDesc').value.trim() || null,
+      assigned_employee_id: empId ? parseInt(empId) : null,
+      due_at: dueVal ? new Date(dueVal).toISOString() : null,
+      source_type: 'dashboard',
     };
 
-    const STAGE_COLORS = {
-      follow_up: "var(--blue)",
-      send_options: "var(--yellow)",
-      close_deal: "var(--orange)",
-      payment_received: "var(--green)",
-      done: "var(--text-dim)",
-    };
-
-    const STAGE_BG = {
-      follow_up: "var(--blue-bg)",
-      send_options: "var(--yellow-bg)",
-      close_deal: "var(--orange-bg)",
-      payment_received: "var(--green-bg)",
-      done: "rgba(139,143,163,.12)",
-    };
-
-    const STAGE_ORDER = ["follow_up", "send_options", "close_deal", "payment_received", "done"];
-
-    function nextStageLabel(currentStage) {
-      if (!currentStage) return STAGE_LABELS.follow_up;
-      const idx = STAGE_ORDER.indexOf(currentStage);
-      if (idx < 0 || idx >= STAGE_ORDER.length - 1) return null;
-      return STAGE_LABELS[STAGE_ORDER[idx + 1]];
-    }
-
-    async function loadEnquiries() {
-      try {
-        allEnquiries = await api("/enquiries");
-        renderEnquiryTable();
-      } catch (e) {
-        document.getElementById("enquiryBody").innerHTML =
-          `<tr><td colspan="7" class="empty-state"><div class="icon">⚠️</div>Could not load enquiries.<br><small>${e.message}</small></td></tr>`;
+    try {
+      const res = await fetch(`${API}/tasks`, { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+      if (res.status === 403) {
+        const data = await res.json();
+        throw new Error(data.detail || 'Plan limit reached.');
       }
-    }
-
-    function renderEnquiryTable() {
-      const tbody = document.getElementById("enquiryBody");
-      const mobileContainer = document.getElementById("enquiryCardsMobile");
-
-      if (!allEnquiries.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icon">📋</div>No enquiries yet</td></tr>`;
-        if (mobileContainer) mobileContainer.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No enquiries yet</div>`;
-        return;
-      }
-
-      const rows = allEnquiries.map(eq => {
-        const date = formatDate(eq.created_at);
-        const stage = eq.stage;
-        const stageLabel = stage ? STAGE_LABELS[stage] || stage : "Not started";
-        const stageColor = stage ? (STAGE_COLORS[stage] || "var(--text-dim)") : "var(--text-dim)";
-        const stageBg = stage ? (STAGE_BG[stage] || "transparent") : "transparent";
-        const nextLabel = nextStageLabel(stage);
-
-        const empOptions = allEmployees.map(e =>
-          `<option value="${e.id}" ${e.id === eq.assigned_employee_id ? "selected" : ""}>${esc(e.name)}</option>`
-        ).join("");
-
-        return { eq, date, stageLabel, stageColor, stageBg, nextLabel, empOptions };
+      if (!res.ok) throw new Error('Failed to create task.');
+      const newTask = await res.json();
+      allTasks.unshift({
+        id: newTask.id, task: newTask.title, employee: newTask.assigned_to || 'Unassigned',
+        deadline: newTask.due_at || 'No deadline', status: newTask.status,
+        progress_percent: newTask.progress_percent || 0,
+        last_update: newTask.last_update, created_at: newTask.created_at,
       });
-
-      tbody.innerHTML = rows.map(({ eq, date, stageLabel, stageColor, stageBg, nextLabel, empOptions }) => `
-        <tr id="eq-row-${eq.id}">
-          <td style="white-space:nowrap; font-size:.82rem">${date}</td>
-          <td style="font-weight:600">${esc(eq.client_name)}</td>
-          <td>${esc(eq.service_requested || "—")}</td>
-          <td>
-            <select class="form-input" style="padding:4px 8px; font-size:.78rem; min-width:120px;" onchange="assignEnquiryEmployee(${eq.id}, this.value)">
-              <option value="">— Assign —</option>
-              ${empOptions}
-            </select>
-          </td>
-          <td>
-            <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
-              <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:.75rem; font-weight:600; background:${stageBg}; color:${stageColor};">${stageLabel}</span>
-              ${nextLabel && eq.stage !== "done"
-                ? `<button class="btn btn-sm btn-primary" style="padding:3px 10px; font-size:.72rem;" onclick="advanceStage(${eq.id})" ${!eq.assigned_employee_id ? 'disabled title="Assign an employee first"' : ''}>${nextLabel} &rarr;</button>`
-                : ""}
-            </div>
-          </td>
-          <td style="max-width:160px; white-space:normal; font-size:.8rem; color:var(--text-dim)">${esc(eq.notes || "—")}</td>
-          <td>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn btn-sm btn-ghost" onclick="convertToTask(${eq.id})" title="Convert to Task" style="color:var(--accent); border-color:rgba(255,255,255,.3);">→ Task</button>
-              <button class="btn btn-sm btn-ghost" onclick="editEnquiry(${eq.id})" title="Edit">✏️</button>
-              <button class="btn btn-sm btn-ghost" onclick="deleteEnquiry(${eq.id})" title="Delete" style="color:var(--red);">🗑️</button>
-            </div>
-          </td>
-        </tr>`).join("");
-
-      // Mobile card view
-      if (mobileContainer) {
-        mobileContainer.innerHTML = rows.map(({ eq, date, stageLabel, stageColor, stageBg, nextLabel, empOptions }) => `
-          <div class="enquiry-card-mobile">
-            <div class="ec-client">${esc(eq.client_name)}</div>
-            <div class="ec-meta">${esc(eq.service_requested || "No service specified")} &middot; ${date}</div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
-              <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:.75rem; font-weight:600; background:${stageBg}; color:${stageColor};">${stageLabel}</span>
-              ${eq.assigned_employee_name ? `<span style="font-size:.78rem; color:var(--text-dim);">${esc(eq.assigned_employee_name)}</span>` : ""}
-            </div>
-            ${eq.notes ? `<div style="font-size:.78rem; color:var(--text-dim); margin-bottom:8px;">${esc(eq.notes)}</div>` : ""}
-            <div style="margin-bottom:10px;">
-              <select class="form-input" style="padding:6px 10px; font-size:.82rem; width:100%;" onchange="assignEnquiryEmployee(${eq.id}, this.value)">
-                <option value="">— Assign Employee —</option>
-                ${empOptions}
-              </select>
-            </div>
-            <div class="ec-actions">
-              ${nextLabel && eq.stage !== "done"
-                ? `<button class="btn btn-sm btn-primary" onclick="advanceStage(${eq.id})" ${!eq.assigned_employee_id ? 'disabled' : ''}>${nextLabel} →</button>`
-                : ""}
-              <button class="btn btn-sm btn-ghost" onclick="convertToTask(${eq.id})" style="color:var(--accent);">→ Task</button>
-              <button class="btn btn-sm btn-ghost" onclick="editEnquiry(${eq.id})">✏️</button>
-              <button class="btn btn-sm btn-ghost" onclick="deleteEnquiry(${eq.id})" style="color:var(--red);">🗑️</button>
-            </div>
-          </div>`).join("");
-      }
+      render();
+      modal.classList.remove('open');
+      document.getElementById('fTitle').value = '';
+      document.getElementById('fDesc').value = '';
+      document.getElementById('fEmployee').value = '';
+      document.getElementById('fDue').value = '';
+      toast('Task created and employee notified via WhatsApp.');
+    } catch(err) {
+      toast(err.message || 'Failed to create task.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Create task';
     }
+  });
 
-    async function assignEnquiryEmployee(eqId, empId) {
-      if (!empId) return;
-      try {
-        await api(`/enquiries/${eqId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ assigned_employee_id: parseInt(empId) }),
-        });
-        toast("Employee assigned to enquiry.", "success");
-        await loadEnquiries();
-      } catch (e) {
-        toast("Failed to assign employee: " + e.message, "error");
-      }
-    }
+  /* ── Logout ── */
+  document.getElementById('btnLogout').addEventListener('click', () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('company_id');
+    window.location.replace('https://phantompilot.xyz/auth.html');
+  });
 
-    async function advanceStage(eqId) {
-      const eq = allEnquiries.find(e => e.id === eqId);
-      const next = nextStageLabel(eq?.stage);
-      if (!confirm(`Advance to "${next}" and notify employee via WhatsApp?`)) return;
-      try {
-        const res = await api(`/enquiries/${eqId}/advance-stage`, { method: "POST" });
-        const sentMsg = res.whatsapp_sent ? " — WhatsApp sent!" : " (no WhatsApp sent)";
-        toast(`Stage advanced to ${STAGE_LABELS[res.stage] || res.stage}${sentMsg}`, "success");
-        await loadEnquiries();
-      } catch (e) {
-        toast("Failed to advance stage: " + e.message, "error");
-      }
-    }
-
-    function openEnquiryModal(eq = null) {
-      document.getElementById("enquiryForm").reset();
-      document.getElementById("eqId").value = "";
-
-      // Populate employee dropdown
-      const empSel = document.getElementById("eqEmployee");
-      empSel.innerHTML = '<option value="">— None —</option>' +
-        allEmployees.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
-
-      if (eq) {
-        document.getElementById("enquiryModalTitle").textContent = "Edit Enquiry";
-        document.getElementById("eqId").value = eq.id;
-        document.getElementById("eqClient").value = eq.client_name || "";
-        document.getElementById("eqService").value = eq.service_requested || "";
-        document.getElementById("eqNotes").value = eq.notes || "";
-        document.getElementById("eqStatus").value = eq.status || "new";
-        empSel.value = eq.assigned_employee_id || "";
-        document.getElementById("btnEnquirySubmit").textContent = "Update Enquiry";
-      } else {
-        document.getElementById("enquiryModalTitle").textContent = "Add Enquiry";
-        document.getElementById("btnEnquirySubmit").textContent = "Save Enquiry";
-      }
-
-      document.getElementById("modalEnquiry").classList.add("open");
-    }
-
-    function editEnquiry(id) {
-      const eq = allEnquiries.find(e => e.id === id);
-      if (eq) openEnquiryModal(eq);
-    }
-
-    async function handleEnquirySubmit(e) {
-      e.preventDefault();
-      const btn = document.getElementById("btnEnquirySubmit");
-      btn.disabled = true;
-
-      const eqId = document.getElementById("eqId").value;
-      const empVal = document.getElementById("eqEmployee").value;
-      const body = {
-        client_name: document.getElementById("eqClient").value.trim(),
-        service_requested: document.getElementById("eqService").value.trim() || null,
-        notes: document.getElementById("eqNotes").value.trim() || null,
-        status: document.getElementById("eqStatus").value,
-      };
-      if (empVal) body.assigned_employee_id = parseInt(empVal);
-
-      if (!body.client_name) {
-        toast("Client name is required.", "error");
-        btn.disabled = false;
-        return;
-      }
-
-      try {
-        if (eqId) {
-          await api(`/enquiries/${eqId}`, { method: "PATCH", body: JSON.stringify(body) });
-          toast("Enquiry updated!", "success");
-        } else {
-          await api("/enquiries", { method: "POST", body: JSON.stringify(body) });
-          toast("Enquiry added!", "success");
-        }
-        closeModal("modalEnquiry");
-        await loadEnquiries();
-      } catch (err) {
-        toast("Failed to save enquiry: " + err.message, "error");
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function deleteEnquiry(id) {
-      if (!confirm("Delete this enquiry?")) return;
-      try {
-        await api(`/enquiries/${id}`, { method: "DELETE" });
-        toast("Enquiry deleted.", "success");
-        await loadEnquiries();
-      } catch (e) {
-        toast("Failed to delete enquiry.", "error");
-      }
-    }
-
-    function renderPerformance(employees) {
-      const tbody = document.getElementById("perfBody");
-      if (!employees.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No employee data yet.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = employees.map(e => {
-        // Highlighting logic
-        const isStar = e.completion_rate >= 80 && e.tasks_completed >= 2;
-        const isDelays = e.tasks_delayed >= 2;
-        const isHelp = e.help_requests >= 2;
-
-        let rowClass = "";
-        let badges = "";
-
-        if (isStar) {
-          rowClass = "perf-row-star";
-          badges += `<span class="perf-badge perf-badge-star">⭐ Top Performer</span>`;
-        }
-        if (isDelays) {
-          rowClass = rowClass || "perf-row-delays";
-          badges += `<span class="perf-badge perf-badge-delays">⚠ Frequent Delays</span>`;
-        }
-        if (isHelp) {
-          rowClass = rowClass || "perf-row-help";
-          badges += `<span class="perf-badge perf-badge-help">🆘 Needs Support</span>`;
-        }
-
-        const rateColor = e.completion_rate >= 80 ? "var(--green)"
-          : e.completion_rate >= 50 ? "var(--yellow)" : "var(--red)";
-
-        return `
-        <tr class="${rowClass}">
-          <td>${esc(e.employee_name)}${badges}</td>
-          <td>${e.tasks_completed} / ${e.tasks_total}</td>
-          <td>${e.tasks_delayed}</td>
-          <td>${e.help_requests}</td>
-          <td style="color:${rateColor};font-weight:600">${e.completion_rate}%</td>
-        </tr>`;
-      }).join("");
-    }
-  </script>
+  /* ── Boot ── */
+  loadData();
+  setInterval(loadData, 30000);
+</script>
 </body>
-
 </html>
