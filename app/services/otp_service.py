@@ -2,9 +2,11 @@
 
 import logging
 import os
-import random
+import secrets
 import string
+import time
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 
 import resend
 from sqlalchemy import select
@@ -14,8 +16,51 @@ logger = logging.getLogger(__name__)
 
 
 def generate_otp() -> str:
-    """Return a random 6-digit OTP string."""
-    return "".join(random.choices(string.digits, k=6))
+    """Return a cryptographically-random 6-digit OTP string."""
+    return "".join(secrets.choice(string.digits) for _ in range(6))
+
+
+# ── In-memory OTP rate limiter ──────────────────────────────────────────────
+# Per-process: lost on restart, not shared across instances. Adequate for
+# single-instance deployments. For multi-instance, swap for Redis.
+_OTP_RATE_LOCK = Lock()
+_OTP_SEND_HITS: dict[str, list[float]] = {}     # email -> [timestamps]
+_OTP_VERIFY_HITS: dict[str, list[float]] = {}   # email -> [timestamps]
+
+_SEND_WINDOW_SEC = 15 * 60   # 15 minutes
+_SEND_MAX_HITS = 3
+_VERIFY_WINDOW_SEC = 15 * 60
+_VERIFY_MAX_HITS = 5
+
+
+def _check_and_record(bucket: dict[str, list[float]], key: str, window: int, limit: int) -> bool:
+    """Return True if under the limit (and record the hit), False if rate-limited."""
+    now = time.monotonic()
+    cutoff = now - window
+    with _OTP_RATE_LOCK:
+        hits = [t for t in bucket.get(key, []) if t > cutoff]
+        if len(hits) >= limit:
+            bucket[key] = hits
+            return False
+        hits.append(now)
+        bucket[key] = hits
+        return True
+
+
+def can_send_otp(email: str) -> bool:
+    """Check + record send rate limit. Returns False if the caller is rate-limited."""
+    return _check_and_record(_OTP_SEND_HITS, email.lower(), _SEND_WINDOW_SEC, _SEND_MAX_HITS)
+
+
+def can_verify_otp(email: str) -> bool:
+    """Check + record verify rate limit. Returns False if the caller is rate-limited."""
+    return _check_and_record(_OTP_VERIFY_HITS, email.lower(), _VERIFY_WINDOW_SEC, _VERIFY_MAX_HITS)
+
+
+def reset_otp_attempts(email: str) -> None:
+    """Clear the verify-attempt bucket for an email (call after successful verification)."""
+    with _OTP_RATE_LOCK:
+        _OTP_VERIFY_HITS.pop(email.lower(), None)
 
 
 def send_otp_email(email: str, otp: str) -> bool:
@@ -98,7 +143,9 @@ async def verify_otp(db: AsyncSession, email: str, otp: str):
         logger.warning("[OTP] verify_otp: OTP expired for %s", email)
         return None
 
-    if user.otp_code != otp:
+    # Timing-safe comparison so an attacker can't infer correct prefixes
+    # from tiny response-time differences.
+    if not secrets.compare_digest(user.otp_code, otp):
         logger.warning("[OTP] verify_otp: wrong code for %s", email)
         return None
 
@@ -108,5 +155,6 @@ async def verify_otp(db: AsyncSession, email: str, otp: str):
     user.otp_expires_at = None
     await db.flush()
 
+    reset_otp_attempts(email)
     logger.info("[OTP] Email verified for %s", email)
     return user

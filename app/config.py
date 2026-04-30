@@ -18,10 +18,32 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    
+
     # ── Security ──────────────────────────────────────────────
-    secret_key: str = "super_secret_dev_key_operra_123!"
+    # No fallback: if SECRET_KEY isn't set, the app refuses to start in
+    # production. The dev-only default is gated by the validator below so
+    # a missing prod env var can never silently use a known-public secret.
+    secret_key: str = ""
     cors_origins: list[str] = ["*"]
+    # Set to "production" on Render / live deploys to enforce strict checks
+    # (currently: refuse to start with empty SECRET_KEY).
+    app_env: str = "development"
+
+    @field_validator("secret_key", mode="after")
+    @classmethod
+    def _require_secret_in_prod(cls, v: str, info) -> str:
+        env = (info.data.get("app_env") or "development").lower()
+        if env == "production" and not v:
+            raise ValueError(
+                "SECRET_KEY env var is required in production. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(48))'"
+            )
+        if not v:
+            # Dev-only ephemeral default — different per process, so leaked
+            # tokens from one local run don't carry to another.
+            import secrets as _secrets
+            return _secrets.token_urlsafe(48)
+        return v
     
     # ── Database ──────────────────────────────────────────────
     # Render sets DATABASE_URL as postgresql:// or postgres://

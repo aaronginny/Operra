@@ -1,5 +1,6 @@
 """Authentication API routes."""
 
+import hmac
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -15,7 +16,13 @@ from app.models.user import User, UserRole
 from app.models.company import Company
 from app.schemas.auth_schema import UserCreate, UserLogin, Token
 from app.services.auth_service import get_password_hash, verify_password, create_access_token, get_current_user
-from app.services.otp_service import generate_otp, send_otp_email, verify_otp as _verify_otp
+from app.services.otp_service import (
+    can_send_otp,
+    can_verify_otp,
+    generate_otp,
+    send_otp_email,
+    verify_otp as _verify_otp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +162,12 @@ class SendOtpRequest(BaseModel):
 @router.post("/send-otp")
 async def send_otp(payload: SendOtpRequest, db: AsyncSession = Depends(get_db)):
     """Generate a fresh OTP and email it to the user."""
+    if not can_send_otp(payload.email):
+        # Same response shape as success: don't reveal that we hit the limiter,
+        # so attackers can't probe the bucket.
+        logger.warning("[OTP] send-otp rate-limited for %s", payload.email)
+        return {"message": "OTP sent"}
+
     stmt = select(User).where(User.email == payload.email)
     result = await db.execute(stmt)
     user = result.scalars().first()
@@ -186,6 +199,11 @@ class VerifyOtpRequest(BaseModel):
 @router.post("/verify-otp")
 async def verify_otp(payload: VerifyOtpRequest, db: AsyncSession = Depends(get_db)):
     """Verify the OTP, mark the user as verified, and return an access token."""
+    if not can_verify_otp(payload.email):
+        logger.warning("[OTP] verify-otp rate-limited for %s", payload.email)
+        # Generic error to avoid leaking that the bucket is full.
+        return {"success": False, "error": "Too many attempts. Try again later."}
+
     user = await _verify_otp(db, payload.email, payload.otp)
     if not user:
         return {"success": False, "error": "Invalid or expired code"}
@@ -268,13 +286,32 @@ async def update_profile(
     }
 
 
-@router.post("/reset")
-async def reset_users(db: AsyncSession = Depends(get_db)):
-    """Clear all users and companies so a fresh signup can be done.
+class ResetRequest(BaseModel):
+    confirm: str
 
-    WARNING: destructive — only for dev / early-stage use.
+
+@router.post("/reset")
+async def reset_users(
+    payload: ResetRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Clear all users and companies. Founder-only; requires env-configured token.
+
+    Returns 404 unless ADMIN_RESET_TOKEN is set, so the route is invisible
+    in production. Requires the caller to be the configured founder *and*
+    pass the matching token in the request body.
     """
+    import os
+    expected = os.getenv("ADMIN_RESET_TOKEN")
+    if not expected:
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not _is_founder(current_user.email or ""):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not hmac.compare_digest(payload.confirm, expected):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     await db.execute(delete(User))
     await db.execute(delete(Company))
-    logger.warning("[PhantomPilot] All users and companies have been deleted via /auth/reset")
-    return {"success": True, "message": "All users and companies cleared. You can now sign up again."}
+    logger.warning("[PhantomPilot] /auth/reset invoked by founder %s — all users/companies deleted", current_user.email)
+    return {"success": True, "message": "All users and companies cleared."}

@@ -118,7 +118,15 @@ async def cashfree_webhook(request: Request, db: AsyncSession = Depends(get_db))
     received_sig = request.headers.get("x-webhook-signature", "")
     timestamp = request.headers.get("x-webhook-timestamp", "")
 
-    if secret and received_sig:
+    # Production must have CASHFREE_SECRET_KEY set; signature verification is
+    # mandatory there. Without it, an attacker can forge a "PAID" webhook.
+    is_prod = (settings.app_env or "development").lower() == "production"
+    if not secret or not received_sig:
+        if is_prod:
+            logger.error("Cashfree webhook: rejected — signature/secret missing in production")
+            raise HTTPException(status_code=400, detail="Webhook signature required")
+        logger.warning("Cashfree webhook: signature verification skipped (dev/sandbox)")
+    else:
         message = timestamp + body_text
         expected = hmac.new(
             secret.encode("utf-8"),
@@ -128,9 +136,6 @@ async def cashfree_webhook(request: Request, db: AsyncSession = Depends(get_db))
         if not hmac.compare_digest(expected, received_sig):
             logger.warning("Cashfree webhook: invalid signature")
             raise HTTPException(status_code=400, detail="Invalid webhook signature")
-    else:
-        # No secret configured — log a warning but don't block (sandbox testing)
-        logger.warning("Cashfree webhook: signature verification skipped (no secret configured)")
 
     # ── Parse payload ─────────────────────────────────────────
     try:
@@ -167,6 +172,18 @@ async def cashfree_webhook(request: Request, db: AsyncSession = Depends(get_db))
         except Exception as exc:
             logger.error("Cashfree verification failed: %s", exc)
         return {"status": "ignored", "reason": "company not found"}
+
+    # ── Idempotency guard ─────────────────────────────────────
+    # If the same order_id is replayed (Cashfree retries on timeout, attacker
+    # replays, etc.) and we've already marked it paid, exit cleanly without
+    # re-running the upgrade. The (cashfree_order_id, payment_status) pair is
+    # the natural dedup key — same order can't move from "paid" back to unpaid.
+    if company.payment_status == "paid":
+        logger.info(
+            "Cashfree webhook: order_id=%s already processed for company #%s, skipping",
+            order_id, company.id,
+        )
+        return {"status": "ok", "reason": "already_processed", "company_id": company.id}
 
     # Infer plan from order_id (PP-BAS-... or PP-PRE-...)
     plan = "premium"

@@ -5,15 +5,41 @@ POST /whatsapp/webhook  — Twilio sends incoming messages here
 
 import logging
 
-from fastapi import APIRouter, Depends, Form, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+from twilio.request_validator import RequestValidator
 
+from app.config import settings
 from app.database import get_db
 from app.services.webhook_service import process_incoming_message
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/whatsapp", tags=["Twilio WhatsApp"])
+
+
+async def _verify_twilio_signature(request: Request) -> None:
+    """Reject the request unless X-Twilio-Signature is valid for our auth_token.
+
+    Skipped only if TWILIO_AUTH_TOKEN isn't configured (dev/sandbox).
+    """
+    auth_token = settings.twilio_auth_token
+    if not auth_token:
+        # Dev fallback — log loudly so this isn't silently disabled in prod.
+        logger.warning("Twilio webhook: signature check skipped (TWILIO_AUTH_TOKEN unset)")
+        return
+
+    signature = request.headers.get("X-Twilio-Signature", "")
+    # Twilio signs against the full public URL; behind Render's proxy the
+    # request scheme/host appear as the proxied values, which is what we want.
+    url = str(request.url)
+    form = await request.form()
+    params = {k: v for k, v in form.items()}
+
+    validator = RequestValidator(auth_token)
+    if not validator.validate(url, params, signature):
+        logger.warning("Twilio webhook: invalid signature for url=%s", url)
+        raise HTTPException(status_code=403, detail="Invalid Twilio signature")
 
 
 def _twiml_response(text: str) -> Response:
@@ -29,10 +55,7 @@ def _twiml_response(text: str) -> Response:
 
 @router.post("/webhook")
 async def twilio_webhook(
-    Body: str = Form(""),
-    From: str = Form(""),
-    To: str = Form(""),
-    MessageSid: str = Form(""),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Receive an incoming WhatsApp message from Twilio.
@@ -40,6 +63,14 @@ async def twilio_webhook(
     Twilio sends form-encoded data with fields like Body, From, To, etc.
     This endpoint processes the message and returns a TwiML XML reply.
     """
+    await _verify_twilio_signature(request)
+
+    form = await request.form()
+    Body = (form.get("Body") or "")
+    From = (form.get("From") or "")
+    To = (form.get("To") or "")
+    MessageSid = (form.get("MessageSid") or "")
+
     # Strip the "whatsapp:" prefix Twilio adds to numbers
     sender = From.replace("whatsapp:", "").strip()
     message = Body.strip()
