@@ -194,12 +194,48 @@
     .cmd-card.ok .c-val { color: var(--ok); }
 
     /* Activity Feed */
+    .dash-grid {
+      display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 18px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 1080px) { .dash-grid { grid-template-columns: 1fr; } }
     .activity-section {
-      opacity: 0; animation: rise .5s .5s ease-out forwards;
+      opacity: 0; animation: rise .5s .5s ease-out forwards; min-width: 0;
+    }
+    .section-head {
+      display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;
     }
     .section-title {
       font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--text-3); margin-bottom: 14px;
+      color: var(--text-3);
+    }
+    .section-link {
+      font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+      color: var(--text-3); background: transparent; border: none; cursor: pointer;
+      padding: 4px 6px; border-radius: 6px; transition: color 0.16s;
+    }
+    .section-link:hover { color: var(--accent); }
+    .status-panel {
+      background: var(--row); border: 1px solid var(--hairline); border-radius: 16px;
+      padding: 28px 22px; min-height: 168px;
+      display: grid; place-items: center;
+    }
+    .status-empty { text-align: center; max-width: 240px; }
+    .status-empty svg { width: 28px; height: 28px; color: var(--ok); opacity: 0.85; margin-bottom: 12px; }
+    .status-empty-text { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+    .status-empty-sub { font-size: 11.5px; font-weight: 500; color: var(--text-3); margin-top: 6px; line-height: 1.5; }
+    .status-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 18px; margin-bottom: 22px;
+      background: rgba(126,232,182,0.04);
+      border: 1px solid rgba(126,232,182,0.14);
+      border-radius: 12px;
+      font-size: 12.5px; font-weight: 600; color: var(--text-2); letter-spacing: -0.005em;
+      opacity: 0; animation: rise .5s .58s ease-out forwards;
+    }
+    .status-bar-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(126,232,182,0.12);
     }
     .activity-list {
       background: var(--row); border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden;
@@ -545,6 +581,7 @@
   </div>
 
   <div class="nav-group">
+    <div class="nav-label">Main</div>
     <button class="nav-item active" data-nav="dashboard">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
       Dashboard
@@ -554,6 +591,10 @@
       Tasks
       <span class="badge-n" id="sidebarTaskBadge">—</span>
     </button>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Workspace</div>
     <button class="nav-item" data-nav="employees">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0112 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 016-4.5"/></svg>
       Employees
@@ -618,9 +659,33 @@
         </div>
       </div>
 
-      <div class="activity-section">
-        <div class="section-title">Recent Activity</div>
-        <div class="activity-list" id="activityFeed"></div>
+      <div class="dash-grid">
+        <div class="activity-section">
+          <div class="section-head">
+            <div class="section-title">Recent Activity</div>
+            <button class="section-link" data-nav="tasks">View all →</button>
+          </div>
+          <div class="activity-list" id="activityFeed"></div>
+        </div>
+
+        <div class="activity-section">
+          <div class="section-head">
+            <div class="section-title">Team status</div>
+            <button class="section-link" data-nav="employees">Manage →</button>
+          </div>
+          <div class="status-panel" id="teamStatusPanel">
+            <div class="status-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+              <div class="status-empty-text">No issues across the team.</div>
+              <div class="status-empty-sub">Phantom will surface anyone falling behind here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <span class="status-bar-dot"></span>
+        <span>No conflicts detected this week.</span>
       </div>
 
       <div class="footer">
@@ -1355,6 +1420,9 @@
   }
 
   document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => navigateTo(btn.dataset.nav));
+  });
+  document.querySelectorAll('.section-link[data-nav]').forEach(btn => {
     btn.addEventListener('click', () => navigateTo(btn.dataset.nav));
   });
 
