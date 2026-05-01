@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhantomPilot — Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#000;color:#fff;font-family:'DM Sans',sans-serif;overflow:hidden;cursor:none}
+#cursor{position:fixed;width:8px;height:8px;background:#fff;border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:width 0.2s,height 0.2s,background 0.2s}
+#cursor.hover{width:26px;height:26px;background:transparent;border:1px solid rgba(255,255,255,0.4)}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1;opacity:0.5}
+#ghost-bg{position:fixed;top:50%;right:-60px;transform:translateY(-50%);z-index:2;pointer-events:none;opacity:0.12;filter:drop-shadow(0 0 120px rgba(192,132,252,0.25));animation:ghostFloat 4.5s ease-in-out infinite}
+@keyframes ghostFloat{0%,100%{transform:translateY(-50%) translateY(0)}50%{transform:translateY(-50%) translateY(-20px)}}
+.page{position:fixed;inset:0;z-index:10;display:flex;align-items:stretch}
+.left{width:45%;display:flex;flex-direction:column;justify-content:center;padding:60px 64px;border-right:0.5px solid #111;position:relative}
+.left-logo{position:absolute;top:32px;left:48px;font-family:'Playfair Display',serif;font-size:16px;color:#fff;letter-spacing:0.02em;text-decoration:none}
+.left-tagline{font-family:'Playfair Display',serif;font-size:clamp(32px,3.5vw,52px);font-weight:400;line-height:1.05;letter-spacing:-0.02em}
+.left-tagline .glow{display:block;text-shadow:0 0 40px rgba(255,255,255,0.8),0 0 80px rgba(255,255,255,0.25)}
+.left-tagline .dim{display:block;color:#555;font-style:italic}
+.left-sub{font-size:14px;color:#555;line-height:1.75;max-width:340px;margin-top:20px;font-weight:300}
+.left-features{margin-top:36px;display:flex;flex-direction:column;gap:12px}
+.left-feat{display:flex;align-items:center;gap:12px;font-size:12px;color:#444}
+.left-feat::before{content:'✓';color:#666;font-size:11px;flex-shrink:0}
+.beta-badge{margin-top:40px;display:inline-flex;align-items:center;gap:8px;font-size:10px;color:#555;border:0.5px solid #222;padding:6px 14px;border-radius:20px;letter-spacing:0.08em;text-transform:uppercase;width:fit-content}
+.beta-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#4ade80;display:block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.right{width:55%;display:flex;align-items:center;justify-content:center;padding:40px 48px;overflow-y:auto}
+.form-box{width:100%;max-width:400px}
+.tabs{display:flex;gap:0;margin-bottom:36px;border-bottom:0.5px solid #111}
+.tab{flex:1;padding:12px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;text-align:center;cursor:pointer;color:#333;background:none;border:none;font-family:'DM Sans',sans-serif;border-bottom:1px solid transparent;margin-bottom:-0.5px;transition:color 0.2s,border-color 0.2s}
+.tab.active{color:#fff;border-bottom-color:#fff}
+.tab:hover{color:#888}
+.form-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:400;margin-bottom:6px;text-shadow:0 0 30px rgba(255,255,255,0.3)}
+.form-sub{font-size:13px;color:#555;margin-bottom:28px;line-height:1.6}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;color:#555;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px}
+.field input{width:100%;background:#080808;border:0.5px solid #1e1e1e;border-radius:3px;padding:12px 14px;font-size:13px;color:#fff;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s}
+.field input::placeholder{color:#2a2a2a}
+.field input:focus{border-color:#444}
+.field input.error{border-color:#7f1d1d}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.err-msg{font-size:11px;color:#f87171;margin-top:4px;display:none}
+.err-msg.show{display:block}
+.btn-submit{width:100%;background:#fff;color:#000;font-size:12px;font-weight:500;padding:13px;border-radius:3px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:0.08em;text-transform:uppercase;margin-top:8px;transition:all 0.2s;position:relative;overflow:hidden}
+.btn-submit:hover{background:#e8e8e8;transform:translateY(-1px)}
+.btn-submit:disabled{background:#1a1a1a;color:#333;cursor:not-allowed;transform:none}
+.btn-submit .spinner{display:none;width:14px;height:14px;border:1.5px solid #333;border-top-color:#000;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto}
+.btn-submit.loading .spinner{display:block}
+.btn-submit.loading .btn-text{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.form-switch{font-size:12px;color:#444;text-align:center;margin-top:20px}
+.form-switch a{color:#888;cursor:pointer;text-decoration:underline;text-underline-offset:3px;transition:color 0.2s}
+.form-switch a:hover{color:#fff}
+.view{display:none}
+.view.active{display:block}
+.otp-wrap{text-align:center}
+.otp-icon{font-size:40px;margin-bottom:16px}
+.otp-boxes{display:flex;gap:10px;justify-content:center;margin:24px 0}
+.otp-box{width:44px;height:52px;background:#080808;border:0.5px solid #222;border-radius:4px;font-size:20px;font-weight:500;color:#fff;text-align:center;outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.2s;caret-color:transparent}
+.otp-box:focus{border-color:#777}
+.otp-box.filled{border-color:#333}
+.otp-resend{font-size:12px;color:#444;margin-top:12px}
+.otp-resend a{color:#777;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.otp-resend a:hover{color:#fff}
+.otp-email-display{font-size:13px;color:#666;margin-top:8px;word-break:break-all}
+.status-msg{padding:10px 14px;border-radius:3px;font-size:12px;margin-bottom:16px;display:none;line-height:1.5}
+.status-msg.show{display:block}
+.status-msg.success{background:#0a1a0a;border:0.5px solid #1a3a1a;color:#4ade80}
+.status-msg.error{background:#1a0a0a;border:0.5px solid #3a1a1a;color:#f87171}
+.status-msg.info{background:#0a0a1a;border:0.5px solid #1a1a3a;color:#818cf8}
+#resend-countdown{color:#555}
+</style>
+</head>
+<body>
+<div id="cursor"></div>
+<div id="ghost-bg">
+  <svg xmlns="http://www.w3.org/2000/svg" width="420" height="525" viewBox="0 0 231 289">
+    <defs>
+      <radialGradient id="gg1" cx="38%" cy="28%" r="72%" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="231" y2="289">
+        <stop offset="0%" stop-color="#f9a8d4"/><stop offset="25%" stop-color="#e879f9"/>
+        <stop offset="55%" stop-color="#818cf8"/><stop offset="80%" stop-color="#60a5fa"/>
+        <stop offset="100%" stop-color="#1e3a5f"/>
+      </radialGradient>
+      <radialGradient id="gg2" cx="65%" cy="60%" r="50%" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="231" y2="289">
+        <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+      </radialGradient>
+      <clipPath id="gc">
+        <path d="M230.809 115.385V249.411C230.809 269.923 214.985 287.282 194.495 288.411C184.544 288.949 175.364 285.718 168.26 280C159.746 273.154 147.769 273.461 139.178 280.23C132.638 285.384 124.381 288.462 115.379 288.462C106.377 288.462 98.1451 285.384 91.6055 280.23C82.912 273.385 70.9353 273.385 62.2415 280.23C55.7532 285.334 47.598 288.411 38.7246 288.462C17.4132 288.615 0 270.667 0 249.359V115.385C0 51.6667 51.6756 0 115.404 0C179.134 0 230.809 51.6667 230.809 115.385Z"/>
+      </clipPath>
+    </defs>
+    <rect width="231" height="289" clip-path="url(#gc)" fill="url(#gg1)"/>
+    <rect width="231" height="289" clip-path="url(#gc)" fill="url(#gg2)"/>
+    <ellipse id="ge1" cx="80" cy="118" rx="20" ry="27" fill="white" opacity="0.9"/>
+    <ellipse id="ge2" cx="150" cy="118" rx="20" ry="27" fill="white" opacity="0.9"/>
+  </svg>
+</div>
+<div class="page">
+  <div class="left">
+    <a href="/" class="left-logo">PhantomPilot</a>
+    <div class="left-tagline">
+      <span class="glow">Your team.</span>
+      <span class="dim">Managed.</span>
+    </div>
+    <p class="left-sub">Assign tasks from a dashboard. Your team replies on WhatsApp. No app downloads, no training.</p>
+    <div class="left-features">
+      <div class="left-feat">Assign tasks in plain English</div>
+      <div class="left-feat">Team replies DONE on WhatsApp</div>
+      <div class="left-feat">Auto reminders every 4 hours</div>
+      <div class="left-feat">AI summaries from updates</div>
+      <div class="left-feat">Live dashboard, zero effort</div>
+    </div>
+    <div class="beta-badge">Free during beta</div>
+  </div>
+  <div class="right">
+    <div class="form-box">
+      <div class="tabs">
+        <button class="tab active" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+        <button class="tab" id="tab-login" onclick="switchTab('login')">Login</button>
+      </div>
+      <div class="view active" id="view-signup">
+        <div class="form-title">Create your account</div>
+        <div class="form-sub">Free during beta. No credit card needed.</div>
+        <div class="status-msg" id="signup-status"></div>
+        <div class="field-row">
+          <div class="field">
+            <label>Full Name</label>
+            <input type="text" id="su-name" placeholder="Your name" autocomplete="name"/>
+            <div class="err-msg" id="err-name">Enter your full name</div>
+          </div>
+          <div class="field">
+            <label>Company Name</label>
+            <input type="text" id="su-company" placeholder="Your company" autocomplete="organization"/>
+            <div class="err-msg" id="err-company">Enter your company name</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="su-email" placeholder="you@company.com" autocomplete="email"/>
+          <div class="err-msg" id="err-email">Enter a valid email</div>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="su-password" placeholder="Min 8 characters" autocomplete="new-password"/>
+          <div class="err-msg" id="err-password">Password must be at least 8 characters</div>
+        </div>
+        <div class="field">
+          <label>WhatsApp Number <span style="color:#333;font-size:10px;text-transform:none">(for Control Tower)</span></label>
+          <input type="tel" id="su-whatsapp" placeholder="+91XXXXXXXXXX" autocomplete="tel"/>
+          <div class="err-msg" id="err-whatsapp">Enter your WhatsApp number with country code</div>
+        </div>
+        <button class="btn-submit" id="btn-signup" onclick="doSignup()">
+          <span class="btn-text">Create Account →</span>
+          <div class="spinner"></div>
+        </button>
+        <div class="form-switch">Already have an account? <a onclick="switchTab('login')">Log in</a></div>
+      </div>
+      <div class="view" id="view-otp">
+        <div class="otp-wrap">
+          <div class="otp-icon">👻</div>
+          <div class="form-title">Check your email</div>
+          <div class="form-sub">We sent a 6-digit code to</div>
+          <div class="otp-email-display" id="otp-email-shown">—</div>
+          <div class="status-msg" id="otp-status"></div>
+          <div class="otp-boxes">
+            <input class="otp-box" id="otp0" maxlength="1" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="otp1" maxlength="1" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="otp2" maxlength="1" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="otp3" maxlength="1" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="otp4" maxlength="1" type="text" inputmode="numeric"/>
+            <input class="otp-box" id="otp5" maxlength="1" type="text" inputmode="numeric"/>
+          </div>
+          <button class="btn-submit" id="btn-otp" onclick="doVerifyOTP()">
+            <span class="btn-text">Verify & Continue →</span>
+            <div class="spinner"></div>
+          </button>
+          <div class="otp-resend" style="margin-top:16px">
+            Didn't get it? <a onclick="doResendOTP()" id="resend-link">Resend code</a>
+            <span id="resend-countdown"></span>
+          </div>
+        </div>
+      </div>
+      <div class="view" id="view-login">
+        <div class="form-title">Welcome back</div>
+        <div class="form-sub">Sign in to manage your team.</div>
+        <div class="status-msg" id="login-status"></div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="li-email" placeholder="you@company.com" autocomplete="email"/>
+          <div class="err-msg" id="err-li-email">Enter your email</div>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="li-password" placeholder="Your password" autocomplete="current-password"/>
+          <div class="err-msg" id="err-li-password">Enter your password</div>
+        </div>
+        <button class="btn-submit" id="btn-login" onclick="doLogin()">
+          <span class="btn-text">Sign In →</span>
+          <div class="spinner"></div>
+        </button>
+        <div class="form-switch">No account yet? <a onclick="switchTab('signup')">Sign up free</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const API='https://operra-bo0x.onrender.com';
+let signupEmail='';
+let resendTimer=null;
+const cursor=document.getElementById('cursor');
+document.addEventListener('mousemove',e=>{cursor.style.left=e.clientX+'px';cursor.style.top=e.clientY+'px'});
+document.querySelectorAll('input,button,a').forEach(el=>{el.addEventListener('mouseenter',()=>cursor.classList.add('hover'));el.addEventListener('mouseleave',()=>cursor.classList.remove('hover'))});
+let mx=window.innerWidth/2,my=window.innerHeight/2;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
+function trackEyes(){const ghost=document.getElementById('ghost-bg');const rect=ghost.getBoundingClientRect();const cx=rect.left+rect.width/2;const cy=rect.top+rect.height/2;const dx=mx-cx,dy=my-cy;const dist=Math.sqrt(dx*dx+dy*dy)||1;const max=7,factor=Math.min(dist/400,1);const ox=(dx/dist)*max*factor,oy=(dy/dist)*max*factor;['ge1','ge2'].forEach((id,i)=>{const el=document.getElementById(id);if(el){el.setAttribute('cx',(i===0?80:150)+ox);el.setAttribute('cy',118+oy)}});requestAnimationFrame(trackEyes)}
+trackEyes();
+function doBlink(){['ge1','ge2'].forEach((id,i)=>{const el=document.getElementById(id);if(!el)return;setTimeout(()=>{el.setAttribute('ry','3');setTimeout(()=>el.setAttribute('ry','27'),120)},i*70)});setTimeout(doBlink,3000+Math.random()*2000)}
+doBlink();
+function switchTab(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));if(tab==='signup'){document.getElementById('tab-signup').classList.add('active');document.getElementById('view-signup').classList.add('active')}else{document.getElementById('tab-login').classList.add('active');document.getElementById('view-login').classList.add('active')}}
+const _tab=new URLSearchParams(window.location.search).get('tab');if(_tab==='login'||_tab==='signup')switchTab(_tab);
+function showView(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function setStatus(id,msg,type){const el=document.getElementById(id);el.textContent=msg;el.className='status-msg show '+type}
+function clearStatus(id){const el=document.getElementById(id);el.className='status-msg'}
+function setLoading(btnId,loading){const btn=document.getElementById(btnId);btn.classList.toggle('loading',loading);btn.disabled=loading}
+async function doSignup(){clearStatus('signup-status');const name=document.getElementById('su-name').value.trim();const company=document.getElementById('su-company').value.trim();const email=document.getElementById('su-email').value.trim();const password=document.getElementById('su-password').value;const whatsapp=document.getElementById('su-whatsapp').value.trim();let valid=true;if(!name){document.getElementById('su-name').classList.add('error');document.getElementById('err-name').classList.add('show');valid=false}else{document.getElementById('su-name').classList.remove('error');document.getElementById('err-name').classList.remove('show')}if(!company){document.getElementById('su-company').classList.add('error');document.getElementById('err-company').classList.add('show');valid=false}else{document.getElementById('su-company').classList.remove('error');document.getElementById('err-company').classList.remove('show')}if(!email||!email.includes('@')){document.getElementById('su-email').classList.add('error');document.getElementById('err-email').classList.add('show');valid=false}else{document.getElementById('su-email').classList.remove('error');document.getElementById('err-email').classList.remove('show')}if(password.length<8){document.getElementById('su-password').classList.add('error');document.getElementById('err-password').classList.add('show');valid=false}else{document.getElementById('su-password').classList.remove('error');document.getElementById('err-password').classList.remove('show')}if(!whatsapp){document.getElementById('su-whatsapp').classList.add('error');document.getElementById('err-whatsapp').classList.add('show');valid=false}else{document.getElementById('su-whatsapp').classList.remove('error');document.getElementById('err-whatsapp').classList.remove('show')}if(!valid)return;setLoading('btn-signup',true);try{const res=await fetch(`${API}/auth/signup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,company_name:company,email:email,password:password,whatsapp_number:whatsapp})});const data=await res.json();if(data.success!==false&&(res.ok||data.needs_otp)){signupEmail=email;document.getElementById('otp-email-shown').textContent=email;showView('view-otp');document.getElementById('otp0').focus();startResendCountdown(60)}else{setStatus('signup-status',data.error||data.detail||'Something went wrong. Please try again.','error')}}catch(e){setStatus('signup-status','Unable to connect. Please check your internet connection.','error')}setLoading('btn-signup',false)}
+document.querySelectorAll('.otp-box').forEach((box,i)=>{box.addEventListener('input',e=>{const val=e.target.value.replace(/\D/g,'');e.target.value=val;if(val&&i<5)document.getElementById('otp'+(i+1)).focus();e.target.classList.toggle('filled',!!val);const code=getOTPCode();if(code.length===6)doVerifyOTP()});box.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!box.value&&i>0)document.getElementById('otp'+(i-1)).focus()});box.addEventListener('paste',e=>{e.preventDefault();const paste=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);paste.split('').forEach((c,j)=>{const el=document.getElementById('otp'+j);if(el){el.value=c;el.classList.add('filled')}});if(paste.length===6)doVerifyOTP();else if(paste.length>0)document.getElementById('otp'+(Math.min(paste.length,5))).focus()})});
+function getOTPCode(){return[0,1,2,3,4,5].map(i=>document.getElementById('otp'+i).value).join('')}
+async function doVerifyOTP(){clearStatus('otp-status');const code=getOTPCode();if(code.length!==6){setStatus('otp-status','Please enter the full 6-digit code.','error');return}setLoading('btn-otp',true);try{const res=await fetch(`${API}/auth/verify-otp`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:signupEmail,otp_code:code})});const data=await res.json();if(data.success!==false&&data.access_token){if(data.access_token)localStorage.setItem('token',data.access_token);if(data.company_id)localStorage.setItem('company_id',data.company_id);setStatus('otp-status','✓ Verified! Taking you to your dashboard...','success');setTimeout(()=>{window.location.href=`${API}/static/dashboard/index.html?token=${data.access_token}&company_id=${data.company_id}`},1200)}else{setStatus('otp-status',data.error||data.detail||'Incorrect code. Please try again.','error');[0,1,2,3,4,5].forEach(i=>{const el=document.getElementById('otp'+i);el.value='';el.classList.remove('filled')});document.getElementById('otp0').focus()}}catch(e){setStatus('otp-status','Connection error. Please try again.','error')}setLoading('btn-otp',false)}
+async function doResendOTP(){if(document.getElementById('resend-link').style.pointerEvents==='none')return;clearStatus('otp-status');try{const res=await fetch(`${API}/auth/send-otp`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:signupEmail})});const data=await res.json();if(res.ok){setStatus('otp-status','New code sent! Check your email.','info');startResendCountdown(60)}else{setStatus('otp-status',data.detail||'Failed to resend. Try again.','error')}}catch(e){setStatus('otp-status','Connection error.','error')}}
+function startResendCountdown(seconds){const link=document.getElementById('resend-link');const countdown=document.getElementById('resend-countdown');link.style.pointerEvents='none';link.style.color='#333';let s=seconds;if(resendTimer)clearInterval(resendTimer);countdown.textContent=` (${s}s)`;resendTimer=setInterval(()=>{s--;if(s<=0){clearInterval(resendTimer);countdown.textContent='';link.style.pointerEvents='auto';link.style.color=''}else{countdown.textContent=` (${s}s)`}},1000)}
+async function doLogin(){clearStatus('login-status');const email=document.getElementById('li-email').value.trim();const password=document.getElementById('li-password').value;let valid=true;if(!email||!email.includes('@')){document.getElementById('li-email').classList.add('error');document.getElementById('err-li-email').classList.add('show');valid=false}else{document.getElementById('li-email').classList.remove('error');document.getElementById('err-li-email').classList.remove('show')}if(!password){document.getElementById('li-password').classList.add('error');document.getElementById('err-li-password').classList.add('show');valid=false}else{document.getElementById('li-password').classList.remove('error');document.getElementById('err-li-password').classList.remove('show')}if(!valid)return;setLoading('btn-login',true);try{const res=await fetch(`${API}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const data=await res.json();if(res.ok){if(data.access_token)localStorage.setItem('token',data.access_token);if(data.company_id)localStorage.setItem('company_id',data.company_id);if(data.requires_otp){signupEmail=email;document.getElementById('otp-email-shown').textContent=email;setStatus('otp-status','Your account needs verification. Enter the code we sent.','info');showView('view-otp');startResendCountdown(60)}else{setStatus('login-status','✓ Signed in! Taking you to your dashboard...','success');setTimeout(()=>{window.location.href=`${API}/static/dashboard/index.html?token=${data.access_token}&company_id=${data.company_id}`},1000)}}else{setStatus('login-status',data.detail||'Invalid email or password.','error')}}catch(e){setStatus('login-status','Unable to connect. Please try again.','error')}setLoading('btn-login',false)}
+document.getElementById('li-password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+document.getElementById('su-whatsapp').addEventListener('keydown',e=>{if(e.key==='Enter')doSignup()});
+</script>
+</body>
+</html>

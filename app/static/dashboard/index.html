@@ -11,7 +11,7 @@
         window.history.replaceState({}, '', '/static/dashboard/index.html');
       }
       if (!localStorage.getItem('company_id')) {
-        window.location.replace('https://phantompilot.xyz/auth.html');
+        window.location.replace('/static/auth.html');
       }
     })();
   </script>
@@ -947,7 +947,7 @@
         fetch(`${API}/enquiries`, { headers: headers() }),
       ]);
       if (tRes.status === 401 || eRes.status === 401) {
-        window.location.replace('https://phantompilot.xyz/auth.html');
+        window.location.replace('/static/auth.html');
         return;
       }
       allTasks = await tRes.json();
@@ -1522,7 +1522,7 @@
   document.getElementById('btnLogout').addEventListener('click', () => {
     localStorage.removeItem('token');
     localStorage.removeItem('company_id');
-    window.location.replace('https://phantompilot.xyz/auth.html');
+    window.location.replace('/static/auth.html');
   });
 
   /* ── Boot ── */
