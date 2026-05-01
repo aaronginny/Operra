@@ -99,7 +99,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="https://phantompilot.xyz")
+    return RedirectResponse(url="/static/login.html")
 
 @app.get("/signup", include_in_schema=False)
 def signup_page():
