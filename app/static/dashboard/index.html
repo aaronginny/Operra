@@ -1462,7 +1462,7 @@
     const grid = document.getElementById('employeeGrid');
     grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><div class="spinner"></div></div>';
     try {
-      const res = await fetch(`${API}/employees`, { headers: authHeaders() });
+      const res = await fetch(`${API}/employees`, { headers: headers() });
       const emps = await res.json();
       if (!emps.length) {
         grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><p>No employees yet.</p></div>';
