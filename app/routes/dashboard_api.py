@@ -95,7 +95,6 @@ async def dashboard_employees(
             "phone_number": e.phone_number,
         }
         for e in employees
-        if not e.name.startswith("Employee_") and not e.name.startswith("+") and not e.name.isdigit()
     ]
 
 
