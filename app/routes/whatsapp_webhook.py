@@ -134,6 +134,28 @@ async def meta_receive_message(
         logger.warning("Meta webhook: could not parse JSON body")
         return {"status": "ok"}
 
+    # Surface Meta delivery status updates so silent drops are visible
+    try:
+        statuses = body["entry"][0]["changes"][0]["value"].get("statuses") or []
+    except (KeyError, IndexError, TypeError):
+        statuses = []
+    for s in statuses:
+        status = s.get("status")
+        recipient = s.get("recipient_id")
+        msg_id = s.get("id")
+        errors = s.get("errors") or []
+        if status == "failed" or errors:
+            err_summary = "; ".join(
+                f"code={e.get('code')} title={e.get('title')!r} detail={(e.get('error_data') or {}).get('details') or e.get('message')!r}"
+                for e in errors
+            )
+            logger.error(
+                "=== META DELIVERY FAILED === to=%s msg_id=%s status=%s errors=[%s]",
+                recipient, msg_id, status, err_summary,
+            )
+        else:
+            logger.info("=== META DELIVERY === to=%s msg_id=%s status=%s", recipient, msg_id, status)
+
     try:
         message = body["entry"][0]["changes"][0]["value"]["messages"][0]
         sender = message["from"]
