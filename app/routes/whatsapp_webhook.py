@@ -128,11 +128,19 @@ async def meta_receive_message(
     Non-message events (status updates, read receipts, etc.) are silently
     ignored so Meta doesn't retry them.
     """
+    import json as _json
+    raw_bytes = await request.body()
+    logger.info("=== META WEBHOOK HIT === method=POST path=/webhook/whatsapp")
+    logger.info("=== HEADERS === %s", dict(request.headers))
+    logger.info("=== RAW BODY === %s", raw_bytes.decode("utf-8", errors="replace"))
+
     try:
-        body = await request.json()
+        body = _json.loads(raw_bytes)
     except Exception:
         logger.warning("Meta webhook: could not parse JSON body")
         return {"status": "ok"}
+
+    logger.info("=== PARSED BODY === %s", body)
 
     # Surface Meta delivery status updates so silent drops are visible
     try:
