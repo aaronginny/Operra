@@ -66,18 +66,21 @@ def _normalize_whatsapp_phone(phone_number: str) -> str:
     return cleaned
 
 
-def _send_via_meta(to_clean: str, body: str) -> bool:
-    """Synchronous Meta Cloud API call (run inside asyncio.to_thread)."""
+def _send_via_meta(to_clean: str, body: str) -> tuple[bool, str | None]:
+    """Synchronous Meta Cloud API call (run inside asyncio.to_thread).
+
+    Returns (success, error_reason). error_reason is None on success or a
+    short human-readable string explaining why delivery was rejected.
+    """
     phone_number_id = settings.meta_phone_number_id
     access_token = settings.meta_access_token
 
-    logger.info("=== META PHONE_NUMBER_ID === %s", phone_number_id)
     if not phone_number_id or not access_token:
         logger.error("=== META NOT CONFIGURED === META_PHONE_NUMBER_ID or META_ACCESS_TOKEN missing")
-        return False
+        return False, "Meta API credentials missing on server."
 
     url = f"https://graph.facebook.com/v25.0/{phone_number_id}/messages"
-    headers = {
+    req_headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
@@ -88,13 +91,49 @@ def _send_via_meta(to_clean: str, body: str) -> bool:
         "text": {"body": body},
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=10)
+    try:
+        response = requests.post(url, headers=req_headers, json=payload, timeout=10)
+    except requests.RequestException as exc:
+        logger.error("=== META REQUEST FAILED === %s", exc)
+        return False, f"Network error talking to Meta: {exc}"
+
+    # Meta API quirks:
+    # • 200 with messages[0].id → accepted by Meta (still may not deliver if outside 24h window)
+    # • 200 with errors[] → rare, but check
+    # • 4xx with error.code 131047 → "Re-engagement message" (24h window expired) → must use template
+    # • 4xx with error.code 131051 → "Unsupported message type"
+    # • 4xx with error.code 100 → "Invalid parameter" (often a malformed phone number)
+    try:
+        body_json = response.json()
+    except ValueError:
+        body_json = {}
+
     if response.status_code == 200:
-        logger.info("=== META SENT OK === to %s", to_clean)
-        return True
-    else:
-        logger.error("=== META SEND FAILED === %s: %s", response.status_code, response.text)
-        return False
+        msg_id = (body_json.get("messages") or [{}])[0].get("id")
+        if msg_id:
+            logger.info("=== META SENT OK === to=%s msg_id=%s", to_clean, msg_id)
+            return True, None
+        # Unexpected 200 with no message id
+        logger.warning("=== META 200 WITHOUT MSG_ID === to=%s body=%s", to_clean, body_json)
+        return False, "Meta accepted the request but returned no message id."
+
+    err = (body_json.get("error") or {})
+    code = err.get("code")
+    sub = (err.get("error_data") or {}).get("details") or err.get("message") or response.text
+    logger.error("=== META SEND FAILED === status=%s code=%s detail=%s", response.status_code, code, sub)
+
+    if code == 131047:
+        return False, (
+            "WhatsApp 24-hour window expired. The recipient must message your "
+            "Phantom number first, or the notification must be sent as an approved template."
+        )
+    if code == 131051:
+        return False, "WhatsApp rejected the message type."
+    if code == 100:
+        return False, f"Invalid phone number or payload: {sub}"
+    if code == 190:
+        return False, "Meta access token is invalid or expired — refresh META_ACCESS_TOKEN."
+    return False, f"Meta error {code}: {sub}"
 
 
 async def send_whatsapp_message(phone_number: str, message: str) -> bool:
@@ -102,6 +141,16 @@ async def send_whatsapp_message(phone_number: str, message: str) -> bool:
 
     requests.post is synchronous; it runs inside asyncio.to_thread so the
     event loop stays unblocked.  Falls back gracefully when env vars are absent.
+    Returns True on confirmed acceptance by Meta, False otherwise.
+    """
+    ok, _ = await send_whatsapp_message_detailed(phone_number, message)
+    return ok
+
+
+async def send_whatsapp_message_detailed(phone_number: str, message: str) -> tuple[bool, str | None]:
+    """Same as send_whatsapp_message but returns (success, error_reason).
+
+    Use this when callers need to surface delivery failures to the UI.
     """
     to_clean = _normalize_whatsapp_phone(phone_number)
     logger.info("=== META SEND ATTEMPT === raw_to=%r  normalized_to=%s", phone_number, to_clean)

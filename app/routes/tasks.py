@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.employee import Employee
 from app.models.task import Task
 from app.schemas.task_schema import TaskCreate, TaskResponse, TaskUpdate
-from app.services.messaging_service import send_whatsapp_message
+from app.services.messaging_service import send_whatsapp_message, send_whatsapp_message_detailed
 from app.services.task_service import create_task, get_task, get_tasks, update_task
 from app.services.billing_service import (
     check_can_create_task,
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
-@router.post("", response_model=TaskResponse, status_code=201)
+@router.post("", status_code=201)
 async def create_task_endpoint(
     payload: TaskCreate,
     db: AsyncSession = Depends(get_db),
@@ -59,14 +59,26 @@ async def create_task_endpoint(
     # ── Increment usage counter ───────────────────────────────
     await increment_task_count(db, current_user.company_id)
 
+    notify_status = "skipped"
+    notify_reason: str | None = None
+
     if not task.assigned_employee_id:
         logger.info(
-            "=== TASK NOTIFY SKIP === task_id=%s title=%r — no employee assigned, skipping WhatsApp notification",
+            "=== TASK NOTIFY SKIP === task_id=%s title=%r — no employee assigned",
             task.id, task.title,
         )
-    if task.assigned_employee_id:
+        notify_reason = "No employee assigned."
+    else:
         employee = await db.get(Employee, task.assigned_employee_id)
-        if employee and employee.phone_number:
+        if not employee:
+            notify_status = "failed"
+            notify_reason = "Employee not found."
+            logger.warning("Cannot notify: employee id=%s not found", task.assigned_employee_id)
+        elif not employee.phone_number:
+            notify_status = "failed"
+            notify_reason = f"{employee.name} has no phone number on file."
+            logger.warning("Cannot notify employee id=%s — no phone number", task.assigned_employee_id)
+        else:
             due_str = (
                 task.due_at.strftime("%b %d %I:%M %p").lstrip("0") if task.due_at else "No deadline"
             )
@@ -85,25 +97,25 @@ async def create_task_endpoint(
                 "=== TASK NOTIFY === employee=%r phone_raw=%r task_id=%s title=%r",
                 employee.name, employee.phone_number, task.id, task.title,
             )
-            sent = await send_whatsapp_message(employee.phone_number, task_notification)
+            sent, err = await send_whatsapp_message_detailed(employee.phone_number, task_notification)
             task.notification_sent = sent
             await db.flush()
 
             if sent:
+                notify_status = "sent"
                 logger.info("Notification sent to %s at %s", employee.name, employee.phone_number)
             else:
+                notify_status = "failed"
+                notify_reason = err or "WhatsApp delivery failed (see server logs)."
                 logger.error(
-                    "NOTIFICATION FAILED for %s at %s — check Render logs for Twilio errors",
-                    employee.name, employee.phone_number,
+                    "NOTIFICATION FAILED for %s at %s — %s",
+                    employee.name, employee.phone_number, err,
                 )
-        else:
-            logger.warning(
-                "Cannot notify employee id=%s — %s",
-                task.assigned_employee_id,
-                "no phone number" if employee else "employee not found in DB",
-            )
 
-    return task
+    response = TaskResponse.model_validate(task).model_dump(mode="json")
+    response["notify_status"] = notify_status
+    response["notify_reason"] = notify_reason
+    return response
 
 
 @router.get("/billing-status")

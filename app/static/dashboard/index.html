@@ -1554,7 +1554,14 @@
       ['fTitle','fDesc','fPipeline'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('fEmployee').value = '';
       document.getElementById('fDue').value = '';
-      toast('Task created and employee notified via WhatsApp.');
+
+      if (newTask.notify_status === 'sent') {
+        toast(`Task created. WhatsApp sent to ${empName}.`);
+      } else if (newTask.notify_status === 'skipped') {
+        toast('Task created (no employee assigned, no WhatsApp sent).');
+      } else {
+        toast(`Task created, but WhatsApp failed: ${newTask.notify_reason || 'unknown error'}`, 'error');
+      }
     } catch(err) {
       toast(err.message || 'Failed to create task.', 'error');
     } finally {
