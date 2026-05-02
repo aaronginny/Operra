@@ -114,6 +114,14 @@ def dashboard_page():
     """Convenience redirect — /dashboard → dashboard SPA."""
     return RedirectResponse(url="/static/dashboard/index.html")
 
+@app.get("/privacy", include_in_schema=False)
+def privacy_page():
+    return RedirectResponse(url="/static/privacy.html")
+
+@app.get("/terms", include_in_schema=False)
+def terms_page():
+    return RedirectResponse(url="/static/terms.html")
+
 
 @app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
 async def health_check():
