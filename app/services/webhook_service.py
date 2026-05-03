@@ -16,7 +16,7 @@ from app.models.employee import Employee
 from app.models.message_log import MessageLog
 from app.models.enquiry import Enquiry
 from app.models.task import Task, TaskStatus, SourceType
-from app.services.ai_service import extract_enquiry_from_message, extract_task_from_message
+from app.services.ai_service import ask_employee_assistant, extract_enquiry_from_message, extract_task_from_message
 from app.services.employee_service import (
     find_employee_by_name,
     get_all_employee_names,
@@ -122,18 +122,20 @@ async def handle_add_employee(
 async def handle_reply(
     db: AsyncSession, sender: str, command: str
 ) -> dict | None:
-    """Check if the message is a reply command (DONE / STARTED / HELP).
+    """Check if the message is a reply command (DONE / STARTED / HELP / HELP <question>).
 
     Returns a response dict if handled, None otherwise.
     """
-    text = command.strip().upper()
+    stripped = command.strip()
+    upper = stripped.upper()
+    upper_words = upper.split()
 
     # Determine action
-    if text == "DONE":
+    if upper == "DONE":
         new_status = TaskStatus.completed
-    elif text == "STARTED":
+    elif upper == "STARTED":
         new_status = TaskStatus.in_progress
-    elif text == "HELP":
+    elif upper == "HELP" or upper_words[0] == "HELP":
         new_status = TaskStatus.needs_help
     else:
         return None  # Not a command
@@ -202,25 +204,41 @@ async def handle_reply(
             'Employee %s requested help on task "%s".',
             employee.name, task.title,
         )
-        # Acknowledge the employee immediately
-        await send_whatsapp_message(
-            sender,
-            f"Got it! Your request for assistance on \"{task.title}\" has been flagged. Your manager will reach out shortly.",
-        )
-        deadline_str = (
-            task.due_at.strftime("%I:%M %p").lstrip("0") if task.due_at else "No deadline"
-        )
-        help_alert = (
-            f"⚠️ Employee Needs Help\n\n"
-            f"Employee: {employee.name}\n"
-            f"Task: {task.title}\n"
-            f"Deadline: {deadline_str}\n\n"
-            f"The employee requested assistance."
-        )
-        if settings.founder_phone:
-            await send_whatsapp_message(settings.founder_phone, help_alert)
+        # Check if HELP was followed by a question (e.g. "HELP how do I measure the pipe?")
+        question = stripped[4:].strip() if len(stripped) > 4 else ""
+        if question:
+            # Route question to AI assistant with task context
+            tasks_for_context = [
+                {
+                    "title": task.title,
+                    "description": task.description,
+                    "due_at": task.due_at.strftime("%b %d, %I:%M %p") if task.due_at else None,
+                    "status": task.status.value,
+                }
+            ]
+            ai_reply = await ask_employee_assistant(question, tasks_for_context)
+            await send_whatsapp_message(sender, ai_reply)
+            logger.info("AI assistant replied to %s question: %r", employee.name, question[:80])
         else:
-            logger.warning("FOUNDER_PHONE not set — help alert logged only.")
+            # Bare HELP — acknowledge employee and alert manager
+            await send_whatsapp_message(
+                sender,
+                f"Got it! Your team lead has been notified that you need help with \"{task.title}\". They'll reach out shortly.",
+            )
+            deadline_str = (
+                task.due_at.strftime("%b %d, %I:%M %p").lstrip("0") if task.due_at else "No deadline"
+            )
+            help_alert = (
+                f"⚠️ Employee Needs Help\n\n"
+                f"Employee: {employee.name}\n"
+                f"Task: {task.title}\n"
+                f"Deadline: {deadline_str}\n\n"
+                f"The employee requested assistance."
+            )
+            if settings.founder_phone:
+                await send_whatsapp_message(settings.founder_phone, help_alert)
+            else:
+                logger.warning("FOUNDER_PHONE not set — help alert logged only.")
     else:
         logger.info(
             'Employee %s marked task "%s" as %s.',
@@ -524,9 +542,36 @@ async def process_incoming_message(
 
     extracted = await extract_task_from_message(text, known_employee_names=known_names)
 
-
     if not extracted.get("title"):
-        logger.info("No task detected — message ignored.")
+        logger.info("No task detected — routing to AI assistant.")
+        # If this is a known employee asking something unrecognized, answer with AI
+        if employee_for_update and sender != "unknown":
+            # Gather their active tasks for context
+            stmt = (
+                select(Task)
+                .where(
+                    Task.assigned_employee_id == employee_for_update.id,
+                    Task.company_id == employee_for_update.company_id,
+                    Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]),
+                )
+                .order_by(Task.created_at.desc())
+                .limit(5)
+            )
+            task_res = await db.execute(stmt)
+            active_tasks = task_res.scalars().all()
+            tasks_for_context = [
+                {
+                    "title": t.title,
+                    "description": t.description,
+                    "due_at": t.due_at.strftime("%b %d, %I:%M %p") if t.due_at else None,
+                    "status": t.status.value,
+                }
+                for t in active_tasks
+            ]
+            ai_reply = await ask_employee_assistant(text, tasks_for_context)
+            await send_whatsapp_message(sender, ai_reply)
+            logger.info("AI assistant handled unrecognized message from %s", employee_for_update.name)
+            return {"status": "ai_assistant_reply", "message_log_id": log.id}
         return {"status": "no_task_detected", "message_log_id": log.id}
 
     # ── Resolve employee (lookup only — never auto-create) ───────

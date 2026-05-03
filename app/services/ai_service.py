@@ -353,6 +353,69 @@ def _rule_based_extract(text: str, known_names: list[str] | None = None) -> dict
     }
 
 # ---------------------------------------------------------------------------
+# Employee AI assistant
+# ---------------------------------------------------------------------------
+
+_EMPLOYEE_ASSISTANT_SYSTEM = """You are a helpful work assistant for PhantomPilot.
+You only help employees with their tasks and work-related questions.
+
+The employee's current active tasks:
+{task_context}
+
+Keep replies short and practical — this is WhatsApp (max 3-4 sentences).
+Do not discuss anything unrelated to work or their tasks.
+If asked something off-topic, politely redirect to work."""
+
+
+async def ask_employee_assistant(question: str, tasks: list[dict]) -> str:
+    """Ask the AI assistant a question on behalf of an employee.
+
+    tasks: list of dicts with keys: title, description, due_at, status
+    Returns the assistant's reply as a plain string.
+    """
+    if not tasks:
+        task_context = "No active tasks assigned."
+    else:
+        lines = []
+        for t in tasks:
+            due = f" (due {t['due_at']})" if t.get("due_at") else ""
+            desc = f" — {t['description']}" if t.get("description") else ""
+            lines.append(f"• {t['title']}{due}{desc} [{t.get('status', 'pending')}]")
+        task_context = "\n".join(lines)
+
+    if not settings.openai_api_key or settings.openai_api_key.startswith("sk-your"):
+        return "I can help with your tasks! Please contact your manager for more details."
+
+    sys_prompt = _EMPLOYEE_ASSISTANT_SYSTEM.format(task_context=task_context)
+    payload = {
+        "model": settings.openai_model,
+        "messages": [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": question},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 300,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            if not response.is_success:
+                logger.error("OpenAI assistant HTTP %s — %s", response.status_code, response.text[:200])
+                return "Sorry, I couldn't process that right now. Please contact your manager."
+            return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception as exc:
+        logger.error("OpenAI assistant failed: %s", exc)
+        return "Sorry, I couldn't process that right now. Please contact your manager."
+
+
+# ---------------------------------------------------------------------------
 # Progress-update analyser
 # ---------------------------------------------------------------------------
 
