@@ -141,7 +141,7 @@ async def handle_reply(
         return None  # Not a command
 
     # Look up employee by phone number (no company_id needed — phone is globally unique per employee)
-    logger.info("handle_reply: looking up employee for phone=%r command=%r", sender, text)
+    logger.info("handle_reply: looking up employee for phone=%r command=%r", sender, upper)
     employee = await get_employee_by_phone(db, sender)
     if not employee:
         logger.warning("handle_reply: NO employee found for phone=%r", sender)
