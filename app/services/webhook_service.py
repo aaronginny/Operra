@@ -198,7 +198,7 @@ async def handle_reply(
             'Employee %s marked task "%s" as completed.',
             employee.name, task.title,
         )
-        await send_whatsapp_message(sender, "Task marked complete.")
+        await send_whatsapp_message(sender, f"Great job! ✅ We'll notify your manager that \"{task.title}\" is done. Keep it up!")
     elif new_status == TaskStatus.needs_help:
         logger.info(
             'Employee %s requested help on task "%s".',
@@ -223,7 +223,7 @@ async def handle_reply(
             # Bare HELP — acknowledge employee and alert manager
             await send_whatsapp_message(
                 sender,
-                f"Got it! Your team lead has been notified that you need help with \"{task.title}\". They'll reach out shortly.",
+                f"Understood! I've informed your manager about your concern with \"{task.title}\". They'll get back to you soon. Hang tight! 💪",
             )
             deadline_str = (
                 task.due_at.strftime("%b %d, %I:%M %p").lstrip("0") if task.due_at else "No deadline"
@@ -527,7 +527,7 @@ async def process_incoming_message(
                     'Employee %s updated "%s": %s%% — %s',
                     employee_for_update.name, active_task.title, pct, summary,
                 )
-                confirm_msg = "Task marked complete!" if is_completion else (f"Progress updated: {pct}%. Keep it up!" if pct is not None else "Update received! Keep it up!")
+                confirm_msg = f"Great job! ✅ We'll notify your manager that \"{active_task.title}\" is done. Keep it up!" if is_completion else (f"Got it! 👍 Your manager will be updated — {pct}% progress on \"{active_task.title}\". Keep going!" if pct is not None else f"Got it! 👍 Your manager will be updated on \"{active_task.title}\". Keep going!")
                 confirm_msg += checkpoint_msg
                 await send_whatsapp_message(sender, confirm_msg)
                 
