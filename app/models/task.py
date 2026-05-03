@@ -103,3 +103,4 @@ class Task(Base):
 
     # Relationships
     assigned_employee = relationship("Employee", back_populates="tasks")
+    messages = relationship("TaskMessage", back_populates="task", order_by="TaskMessage.created_at", cascade="all, delete-orphan")

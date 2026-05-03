@@ -8,3 +8,4 @@ from app.models.task import Task  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.enquiry import Enquiry  # noqa: F401
 from app.models.project import Project  # noqa: F401
+from app.models.task_message import TaskMessage  # noqa: F401

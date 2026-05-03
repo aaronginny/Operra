@@ -9,6 +9,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.schemas.auth_schema import CurrentUser
 from app.models.task import Task
+from app.models.task_message import TaskMessage
 from app.models.employee import Employee
 from app.schemas.task_schema import OnboardTaskRequest, TaskCreate, TaskResponse
 from app.services.employee_service import get_or_create_employee
@@ -95,6 +96,33 @@ async def dashboard_employees(
             "phone_number": e.phone_number,
         }
         for e in employees
+    ]
+
+
+@router.get("/tasks/{task_id}/messages")
+async def task_messages(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Return the message thread for a task."""
+    stmt = (
+        select(TaskMessage)
+        .join(Task, Task.id == TaskMessage.task_id)
+        .where(Task.company_id == current_user.company_id, TaskMessage.task_id == task_id)
+        .order_by(TaskMessage.created_at.asc())
+    )
+    result = await db.execute(stmt)
+    messages = result.scalars().all()
+    return [
+        {
+            "id": m.id,
+            "sender": m.sender.value,
+            "message": m.message,
+            "acknowledged": m.acknowledged,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in messages
     ]
 
 

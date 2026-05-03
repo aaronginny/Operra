@@ -352,6 +352,7 @@
       align-items: center; gap: 14px; padding: 18px 20px;
       border-top: 1px solid var(--hairline); background: var(--row); transition: background 0.16s;
     }
+    .task-row.thread-open { padding-bottom: 0; }
     .task-row:hover { background: #fafafa; }
     .task-cell { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
     .t-name { font-size: 13.5px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -409,6 +410,33 @@
       padding: 32px 20px; text-align: center; color: var(--text-3);
       font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
     }
+
+    /* ─── MESSAGE THREAD ─── */
+    .msg-thread-wrap { display: none; grid-column: 1 / -1; border-top: 1px solid var(--hairline); background: #fafafa; padding: 12px 20px 14px; }
+    .task-row.thread-open .msg-thread-wrap { display: block; }
+    .msg-thread-title { font-size: 10.5px; font-weight: 700; color: var(--text-3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+    .msg-list { display: flex; flex-direction: column; gap: 7px; max-height: 220px; overflow-y: auto; }
+    .msg-bubble { display: flex; flex-direction: column; gap: 2px; max-width: 80%; }
+    .msg-bubble.employee { align-self: flex-start; }
+    .msg-bubble.manager { align-self: flex-end; }
+    .msg-text {
+      font-size: 12.5px; font-weight: 500; padding: 8px 12px; border-radius: 10px; line-height: 1.5;
+    }
+    .msg-bubble.employee .msg-text { background: #fff; border: 1px solid var(--hairline-2); color: var(--text); border-bottom-left-radius: 3px; }
+    .msg-bubble.manager .msg-text { background: linear-gradient(135deg, var(--accent), #6fb8ff); color: #fff; border-bottom-right-radius: 3px; }
+    .msg-meta { font-size: 10px; color: var(--text-3); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+    .msg-bubble.manager .msg-meta { justify-content: flex-end; }
+    .msg-ack { display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+    .msg-ack.green { color: var(--ok); background: rgba(126,232,182,0.12); }
+    .msg-ack.yellow { color: var(--warn); background: rgba(255,184,122,0.12); }
+    .msg-empty { font-size: 12px; color: var(--text-3); font-weight: 500; text-align: center; padding: 8px 0; }
+    .btn-msg-toggle {
+      width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--hairline);
+      background: transparent; color: var(--text-3); cursor: pointer;
+      display: grid; place-items: center; transition: all 0.16s;
+    }
+    .btn-msg-toggle:hover { border-color: rgba(168,127,255,0.3); color: var(--accent); background: rgba(168,127,255,0.06); }
+    .btn-msg-toggle.active { color: var(--accent); border-color: rgba(168,127,255,0.3); background: rgba(168,127,255,0.08); }
 
     /* ─── PIPELINES PAGE ─── */
     .pipelines-header {
@@ -1279,12 +1307,21 @@
         ${due.soon ? `<div class="due-soon">${due.soon}</div>` : ''}
       </div>
       <div class="row-actions">
+        <button class="btn-msg-toggle" data-action="messages" data-id="${t.id}" title="Messages">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </button>
         <button class="icon-btn check" data-action="complete" data-id="${t.id}" title="Mark complete">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
         </button>
         <button class="icon-btn del" data-action="delete" data-id="${t.id}" title="Archive">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
         </button>
+      </div>
+      <div class="msg-thread-wrap">
+        <div class="msg-thread-title">Message Thread</div>
+        <div class="msg-list" id="msg-list-${t.id}">
+          <div class="msg-empty">Loading…</div>
+        </div>
       </div>
     `;
     return div;
@@ -1391,7 +1428,44 @@
     const id = btn.dataset.id;
     if (btn.dataset.action === 'complete') await markDone(id, btn);
     if (btn.dataset.action === 'delete') await archiveTask(id, btn);
+    if (btn.dataset.action === 'messages') await toggleMessages(id, btn);
   });
+
+  async function toggleMessages(id, btn) {
+    const row = btn.closest('.task-row');
+    const isOpen = row.classList.toggle('thread-open');
+    btn.classList.toggle('active', isOpen);
+    if (!isOpen) return;
+
+    const listEl = document.getElementById(`msg-list-${id}`);
+    listEl.innerHTML = '<div class="msg-empty">Loading…</div>';
+    try {
+      const res = await fetch(`${API}/dashboard/tasks/${id}/messages`, { headers: headers() });
+      if (!res.ok) throw new Error();
+      const msgs = await res.json();
+      if (msgs.length === 0) {
+        listEl.innerHTML = '<div class="msg-empty">No messages yet.</div>';
+        return;
+      }
+      listEl.innerHTML = msgs.map(m => {
+        const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const ackBadge = m.sender === 'employee'
+          ? (m.acknowledged
+              ? '<span class="msg-ack green">✓ Acknowledged</span>'
+              : '<span class="msg-ack yellow">⏳ Pending</span>')
+          : '';
+        const label = m.sender === 'employee' ? 'Employee' : 'Manager';
+        return `
+          <div class="msg-bubble ${m.sender}">
+            <div class="msg-text">${escHtml(m.message)}</div>
+            <div class="msg-meta">${label} · ${time} ${ackBadge}</div>
+          </div>`;
+      }).join('');
+      listEl.scrollTop = listEl.scrollHeight;
+    } catch {
+      listEl.innerHTML = '<div class="msg-empty">Could not load messages.</div>';
+    }
+  }
 
   async function markDone(id, btn) {
     btn.disabled = true;

@@ -16,6 +16,7 @@ from app.models.employee import Employee
 from app.models.message_log import MessageLog
 from app.models.enquiry import Enquiry
 from app.models.task import Task, TaskStatus, SourceType
+from app.models.task_message import TaskMessage, MessageSender
 from app.services.ai_service import ask_employee_assistant, extract_enquiry_from_message, extract_task_from_message
 from app.services.employee_service import (
     find_employee_by_name,
@@ -255,6 +256,139 @@ async def handle_reply(
 
 
 # ---------------------------------------------------------------------------
+# Employee→manager message forwarding
+# ---------------------------------------------------------------------------
+
+# Regex: "OK" or "DELAY <reason>"
+_OK_PATTERN = re.compile(r"^OK\s*$", re.IGNORECASE)
+_DELAY_PATTERN = re.compile(r"^DELAY\s+(.+)$", re.IGNORECASE | re.DOTALL)
+
+
+async def forward_to_manager(
+    db: AsyncSession,
+    employee: "Employee",
+    task: Task,
+    raw_text: str,
+) -> None:
+    """Save the employee message and forward it to the manager via WhatsApp."""
+    from app.services.ai_service import ask_employee_assistant
+
+    # Let AI reformat the raw text into a clean, professional sentence
+    tasks_ctx = [{"title": task.title, "description": task.description,
+                   "due_at": task.due_at.strftime("%b %d, %I:%M %p") if task.due_at else None,
+                   "status": task.status.value}]
+    formatted = await ask_employee_assistant(
+        f"Rewrite this employee message as a single clear, professional sentence for their manager "
+        f"(keep it short, no extra commentary): {raw_text}",
+        tasks_ctx,
+    )
+
+    # Save to DB
+    msg = TaskMessage(
+        task_id=task.id,
+        sender=MessageSender.employee,
+        message=formatted,
+        acknowledged=False,
+    )
+    db.add(msg)
+    await db.flush()
+    await db.refresh(msg)
+
+    manager_phone = settings.founder_phone
+    if not manager_phone:
+        logger.warning("FOUNDER_PHONE not set — employee message logged only (task_message id=%s)", msg.id)
+        return
+
+    notif = (
+        f"📨 *Task Update from {employee.name}*\n"
+        f"Task: {task.title}\n"
+        f"Message: {formatted}\n\n"
+        f"Reply *OK* to acknowledge\n"
+        f"Reply *DELAY [reason]* to send them a message back"
+    )
+    await send_whatsapp_message(manager_phone, notif)
+    logger.info("Employee message forwarded to manager (task_message id=%s)", msg.id)
+
+
+async def handle_manager_reply(
+    db: AsyncSession,
+    sender: str,
+    text: str,
+    company_id: int,
+) -> dict | None:
+    """Handle OK / DELAY <reason> replies from the manager.
+
+    Looks for the most recent unacknowledged TaskMessage for this company,
+    marks it acknowledged, and notifies the employee.
+
+    Returns a result dict if handled, None if not an OK/DELAY command.
+    """
+    ok_match = _OK_PATTERN.match(text.strip())
+    delay_match = _DELAY_PATTERN.match(text.strip())
+
+    if not ok_match and not delay_match:
+        return None
+
+    # Find the most recent unacknowledged employee message in this company
+    stmt = (
+        select(TaskMessage)
+        .join(Task, Task.id == TaskMessage.task_id)
+        .where(
+            Task.company_id == company_id,
+            TaskMessage.sender == MessageSender.employee,
+            TaskMessage.acknowledged == False,  # noqa: E712
+        )
+        .order_by(TaskMessage.created_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    msg = result.scalars().first()
+
+    if not msg:
+        logger.info("Manager replied %r but no pending employee message found", text.strip())
+        return None
+
+    msg.acknowledged = True
+    await db.flush()
+
+    # Load the associated task and employee
+    task_stmt = select(Task).where(Task.id == msg.task_id)
+    task = (await db.execute(task_stmt)).scalars().first()
+    emp_phone = None
+    if task and task.assigned_employee_id:
+        emp_stmt = select(Employee).where(Employee.id == task.assigned_employee_id)
+        emp = (await db.execute(emp_stmt)).scalars().first()
+        if emp:
+            emp_phone = emp.phone_number
+
+    if ok_match:
+        if emp_phone:
+            await send_whatsapp_message(
+                emp_phone,
+                "✅ Your manager has acknowledged your message. You're good to continue! 💪",
+            )
+        return {"status": "manager_ok", "task_message_id": msg.id}
+    else:
+        reason = delay_match.group(1).strip()
+        # Save manager's reply as a message too
+        mgr_msg = TaskMessage(
+            task_id=msg.task_id,
+            sender=MessageSender.manager,
+            message=reason,
+            acknowledged=True,
+        )
+        db.add(mgr_msg)
+        await db.flush()
+
+        if emp_phone:
+            await send_whatsapp_message(
+                emp_phone,
+                f"⚠️ Message from your manager:\n{reason}",
+            )
+        return {"status": "manager_delay", "task_message_id": msg.id, "reason": reason}
+
+
+# ---------------------------------------------------------------------------
 # Full message processing pipeline
 # ---------------------------------------------------------------------------
 
@@ -338,6 +472,13 @@ async def process_incoming_message(
         if add_check is not None:
             add_check["message_log_id"] = log.id
             return add_check
+
+        # ── Manager reply to employee message (OK / DELAY <reason>) ──
+        mgr_reply = await handle_manager_reply(db, sender, text, ceo_company_id)
+        if mgr_reply is not None:
+            mgr_reply["message_log_id"] = log.id
+            await db.commit()
+            return mgr_reply
 
         ceo_result = await handle_ceo_command(db, ceo_user, sender, text)
         ceo_result["message_log_id"] = log.id
@@ -543,35 +684,15 @@ async def process_incoming_message(
     extracted = await extract_task_from_message(text, known_employee_names=known_names)
 
     if not extracted.get("title"):
-        logger.info("No task detected — routing to AI assistant.")
-        # If this is a known employee asking something unrecognized, answer with AI
-        if employee_for_update and sender != "unknown":
-            # Gather their active tasks for context
-            stmt = (
-                select(Task)
-                .where(
-                    Task.assigned_employee_id == employee_for_update.id,
-                    Task.company_id == employee_for_update.company_id,
-                    Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]),
-                )
-                .order_by(Task.created_at.desc())
-                .limit(5)
+        # Forward unrecognized employee messages to the manager
+        if employee_for_update and sender != "unknown" and active_task:
+            await forward_to_manager(db, employee_for_update, active_task, text)
+            await send_whatsapp_message(
+                sender,
+                "📨 Your message has been forwarded to your manager. They'll get back to you shortly!",
             )
-            task_res = await db.execute(stmt)
-            active_tasks = task_res.scalars().all()
-            tasks_for_context = [
-                {
-                    "title": t.title,
-                    "description": t.description,
-                    "due_at": t.due_at.strftime("%b %d, %I:%M %p") if t.due_at else None,
-                    "status": t.status.value,
-                }
-                for t in active_tasks
-            ]
-            ai_reply = await ask_employee_assistant(text, tasks_for_context)
-            await send_whatsapp_message(sender, ai_reply)
-            logger.info("AI assistant handled unrecognized message from %s", employee_for_update.name)
-            return {"status": "ai_assistant_reply", "message_log_id": log.id}
+            logger.info("Employee message forwarded to manager from %s", employee_for_update.name)
+            return {"status": "forwarded_to_manager", "message_log_id": log.id}
         return {"status": "no_task_detected", "message_log_id": log.id}
 
     # ── Resolve employee (lookup only — never auto-create) ───────

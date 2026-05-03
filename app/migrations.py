@@ -219,6 +219,20 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) NOT NULL DEFAULT 'unpaid';
         """,
     ),
+    # 018 — employee↔manager message threads per task
+    (
+        "task_messages.table",
+        """
+        CREATE TABLE IF NOT EXISTS task_messages (
+            id SERIAL PRIMARY KEY,
+            task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            sender VARCHAR(20) NOT NULL,
+            message TEXT NOT NULL,
+            acknowledged BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
 ]
 
 
