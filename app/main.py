@@ -24,6 +24,7 @@ from app.routes import enquiries as enquiries_router
 from app.routes import billing as billing_router
 from app.migrations import run_migrations
 from app.services.reminder_service import start_scheduler, stop_scheduler
+from app.services.messaging_service import subscribe_waba_webhook
 
 # Import models so Base.metadata knows about every table
 import app.models  # noqa: F401
@@ -51,6 +52,14 @@ async def lifespan(application: FastAPI):
 
     start_scheduler()
     logger.info("Reminder scheduler started.")
+
+    # ── WABA webhook subscription ─────────────────────────────
+    import asyncio as _asyncio
+    ok, msg = await _asyncio.to_thread(subscribe_waba_webhook)
+    if ok:
+        logger.info("WABA subscription: %s", msg)
+    else:
+        logger.warning("WABA subscription: %s", msg)
 
     # ── Twilio config check ───────────────────────────────────
     from app.config import settings as _s

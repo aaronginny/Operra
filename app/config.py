@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     # ── Meta WhatsApp Cloud API ───────────────────────────────
     meta_phone_number_id: str | None = None
     meta_access_token: str | None = None
+    meta_waba_id: str | None = None
 
     # ── WhatsApp webhook verification ─────────────────────────
     whatsapp_verify_token: str = ""

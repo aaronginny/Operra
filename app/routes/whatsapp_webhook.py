@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.services.messaging_service import subscribe_waba_webhook
 from app.services.webhook_service import process_incoming_message
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,17 @@ async def receive_message(
 # ---------------------------------------------------------------------------
 # Meta Cloud API webhook — real production endpoints
 # ---------------------------------------------------------------------------
+
+@router.get("/resubscribe", tags=["WhatsApp"])
+async def resubscribe_waba():
+    """Manually re-subscribe this app to the WABA webhook.
+
+    Hit this after changing the production phone number or WABA.
+    """
+    import asyncio as _asyncio
+    ok, msg = await _asyncio.to_thread(subscribe_waba_webhook)
+    return {"success": ok, "detail": msg}
+
 
 @router.get("/whatsapp")
 async def meta_verify_webhook(

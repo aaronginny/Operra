@@ -297,3 +297,55 @@ def format_deadline_alert(task_title: str) -> str:
         f"HELP - request assistance"
     )
 
+
+# ---------------------------------------------------------------------------
+# WABA webhook subscription
+# ---------------------------------------------------------------------------
+
+def subscribe_waba_webhook() -> tuple[bool, str]:
+    """POST to Meta Graph API to subscribe this app to the WABA.
+
+    Must be called after the app starts (or manually via the resubscribe
+    endpoint) whenever the production phone number / WABA changes.
+
+    Returns (success, message).
+    """
+    waba_id = settings.meta_waba_id
+    access_token = settings.meta_access_token
+
+    if not waba_id or not access_token:
+        msg = "META_WABA_ID or META_ACCESS_TOKEN not configured — skipping WABA subscription."
+        logger.warning(msg)
+        return False, msg
+
+    url = f"https://graph.facebook.com/v18.0/{waba_id}/subscribed_apps"
+    try:
+        response = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=15,
+        )
+        body = {}
+        try:
+            body = response.json()
+        except ValueError:
+            pass
+
+        if response.status_code == 200 and body.get("success"):
+            msg = f"WABA webhook subscribed OK (waba_id={waba_id})"
+            logger.info(msg)
+            return True, msg
+
+        err = body.get("error", {})
+        msg = (
+            f"WABA subscription failed: HTTP {response.status_code} "
+            f"code={err.get('code')} — {err.get('message') or response.text[:200]}"
+        )
+        logger.error(msg)
+        return False, msg
+
+    except requests.RequestException as exc:
+        msg = f"WABA subscription network error: {exc}"
+        logger.error(msg)
+        return False, msg
+
