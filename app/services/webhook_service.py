@@ -425,15 +425,13 @@ async def process_incoming_message(
 
     logger.info("=== INCOMING === sender=%r force_employee=%s text=%r", sender, force_employee_path, text[:120])
 
-    # ── CEO lookup — always run to identify sender and get company_id ──
-    # In TEST MODE we skip routing to CEO commands but still need company_id.
-    ceo_user = await get_ceo_user(db, sender)
-    if ceo_user and force_employee_path:
-        # TEST MODE: store company_id for the employee path, then skip CEO routing
-        if force_company_id is None:
-            force_company_id = ceo_user.company_id
-        logger.info("=== TEST MODE === CEO company_id=%s, routing to employee path", force_company_id)
-        ceo_user = None  # prevent CEO routing below
+    # ── CEO lookup — skipped entirely when force_employee_path is True ──
+    ceo_user = None
+    if not force_employee_path:
+        ceo_user = await get_ceo_user(db, sender)
+    else:
+        logger.info("=== TEST MODE === EMPLOYEE prefix detected — skipping CEO detection entirely")
+
     if ceo_user:
         # Resolve company_id from the CEO user record
         ceo_company_id = ceo_user.company_id

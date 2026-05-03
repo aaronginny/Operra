@@ -757,7 +757,13 @@ async def _openai_ceo_parse(text: str, employee_names: list[str]) -> dict:
 
             content = response.json()["choices"][0]["message"]["content"]
             try:
-                result = json.loads(content)
+                response_text = content.strip()
+                if response_text.startswith("```"):
+                    response_text = response_text.split("```")[1]
+                    if response_text.startswith("json"):
+                        response_text = response_text[4:]
+                response_text = response_text.strip()
+                result = json.loads(response_text)
                 return {
                     "intent": result.get("intent", "unknown"),
                     "employee_name": result.get("employee_name"),
