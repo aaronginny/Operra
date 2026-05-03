@@ -202,6 +202,11 @@ async def handle_reply(
             'Employee %s requested help on task "%s".',
             employee.name, task.title,
         )
+        # Acknowledge the employee immediately
+        await send_whatsapp_message(
+            sender,
+            f"Got it! Your request for assistance on \"{task.title}\" has been flagged. Your manager will reach out shortly.",
+        )
         deadline_str = (
             task.due_at.strftime("%I:%M %p").lstrip("0") if task.due_at else "No deadline"
         )
@@ -504,7 +509,7 @@ async def process_incoming_message(
                     'Employee %s updated "%s": %s%% — %s',
                     employee_for_update.name, active_task.title, pct, summary,
                 )
-                confirm_msg = "Task marked complete!" if is_completion else f"Progress updated: {pct}%. Keep it up!"
+                confirm_msg = "Task marked complete!" if is_completion else (f"Progress updated: {pct}%. Keep it up!" if pct is not None else "Update received! Keep it up!")
                 confirm_msg += checkpoint_msg
                 await send_whatsapp_message(sender, confirm_msg)
                 
