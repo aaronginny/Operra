@@ -1,4 +1,4 @@
-"""Daily Operations Report — generates and sends a summary to the founder."""
+"""Weekly Operations Report — generates and sends a summary to the founder every Monday."""
 
 import logging
 from datetime import date, datetime
@@ -65,7 +65,7 @@ async def generate_daily_report(db: AsyncSession, company_id: int | None = None)
         star_section = "  No standout performers yet."
 
     report = (
-        f"📊 Daily Operations Summary\n\n"
+        f"📊 Weekly Operations Summary\n\n"
         f"Date: {today}\n\n"
         f"Total tasks: {total}\n"
         f"Completed: {completed}\n"
@@ -121,24 +121,28 @@ async def send_daily_report() -> None:
         logger.warning("FOUNDER_PHONE not set — daily report not sent via WhatsApp.")
 
     if settings.founder_email:
-        await send_email(settings.founder_email, report, subject="📊 Daily Operations Summary")
+        await send_email(settings.founder_email, report, subject="📊 Weekly Operations Summary")
     else:
         logger.warning("FOUNDER_EMAIL not set — daily report not sent via email.")
 
 
 async def check_and_send_daily_report() -> None:
-    """Called every scheduler tick. Sends the report once per day at the configured time."""
+    """Called every scheduler tick. Sends the weekly report once per week on Mondays."""
     global _last_report_date
 
     now = datetime.now()
     target_hour, target_minute = _parse_report_time()
 
-    # Already sent today?
+    # Only run on Mondays (weekday() == 0)
+    if now.weekday() != 0:
+        return
+
+    # Already sent this Monday?
     if _last_report_date == now.date():
         return
 
     # Is it past the target time?
     if now.hour > target_hour or (now.hour == target_hour and now.minute >= target_minute):
         _last_report_date = now.date()
-        logger.info("Triggering daily report for %s", now.date())
+        logger.info("Triggering weekly report for %s", now.date())
         await send_daily_report()

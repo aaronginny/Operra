@@ -20,6 +20,13 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>PhantomPilot — Dashboard</title>
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PhantomPilot" />
+  <link rel="apple-touch-icon" href="/static/icon-192.png" />
+  <meta name="theme-color" content="#7928ca" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -611,6 +618,33 @@
       .task-row { grid-template-columns: 1fr 100px 90px 80px; }
       .task-row > .prog-cell { display: none; }
       .task-row > .row-actions { display: flex; }
+    }
+    @media (max-width: 600px) {
+      body { display: block; }
+      .main { min-width: 0; width: 100%; }
+      .hero { padding: 16px 16px 14px; grid-template-columns: 1fr; }
+      .hero-cta { display: none; }
+      .hero h1 { font-size: 20px; }
+      .content { padding: 14px 12px 60px; }
+      .cmd-stats { grid-template-columns: repeat(2,1fr); gap: 12px; margin-bottom: 18px; }
+      .cmd-card { padding: 14px 14px 12px; }
+      .cmd-card .c-val { font-size: 26px; }
+      .tasks-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .task-row {
+        grid-template-columns: 1fr 80px 70px;
+        font-size: 12px;
+        padding: 10px 10px;
+        gap: 6px;
+      }
+      .task-row > *:nth-child(n+4) { display: none; }
+      .task-row > .row-actions { display: flex; }
+      .task-row > .col-3 { display: flex; }
+      .modal-box { width: calc(100vw - 24px); padding: 20px 16px; margin: 12px; }
+      .modal-body { grid-template-columns: 1fr; }
+      .msg-bubble.manager { margin-left: 20px; }
+      .msg-bubble.employee { margin-right: 20px; }
+      .tasks-header { flex-wrap: wrap; gap: 8px; }
+      .tasks-header input { width: 100%; }
     }
   </style>
 </head>

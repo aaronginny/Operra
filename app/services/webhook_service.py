@@ -572,9 +572,10 @@ async def process_incoming_message(
     logger.info("Incoming message: %s", text)
     
     from app.services.ai_service import analyze_progress_update
-    
+
     # Let's see if the employee has an active task and this is a progress update
     employee_for_update = None
+    active_task = None
     if sender != "unknown":
         employee_for_update = await get_employee_by_phone(db, sender)
         
@@ -683,7 +684,7 @@ async def process_incoming_message(
 
     if not extracted.get("title"):
         # Forward unrecognized employee messages to the manager
-        if employee_for_update and sender != "unknown" and active_task:
+        if employee_for_update and sender != "unknown" and active_task is not None:
             await forward_to_manager(db, employee_for_update, active_task, text)
             await send_whatsapp_message(
                 sender,

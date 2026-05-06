@@ -145,15 +145,16 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
             logger.info("get_ceo_user: suffix match user_id=%s", user2.id)
             return user2
 
-    # 3. FOUNDER_PHONE env var fallback — if the CEO hasn't set whatsapp_number yet.
-    # Only returns the first user with role 'ceo' or 'founder' to avoid granting
-    # cross-tenant access via a shared phone fallback.
+    # 3. FOUNDER_PHONE env var fallback — only applies to the platform owner's number.
+    # This must NOT match other CEOs who registered via the app, to prevent
+    # cross-tenant access. Only the exact FOUNDER_PHONE number triggers this path.
     if settings.founder_phone:
         founder_normalized = normalize_phone_number(settings.founder_phone)
         founder_suffix = re.sub(r"\D", "", founder_normalized)[-10:]
         sender_suffix = re.sub(r"\D", "", normalized)[-10:]
         if founder_suffix and founder_suffix == sender_suffix:
-            # Phone matches FOUNDER_PHONE — find the first CEO/founder User
+            # Phone matches FOUNDER_PHONE — find the User whose whatsapp_number
+            # most closely matches (prefer exact suffix match over role fallback).
             stmt3 = (
                 select(User)
                 .where(User.role.in_(["ceo", "founder"]))

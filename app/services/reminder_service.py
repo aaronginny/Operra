@@ -114,7 +114,7 @@ async def _send_morning_pulse(db) -> None:
         next_cp = _get_next_checkpoint(priority_task)
         checkpoint_line = ""
         if next_cp:
-            checkpoint_line = f"\nThe CEO is looking for progress on: \"{next_cp}\".\n"
+            checkpoint_line = f"\nYour manager is looking for progress on: \"{next_cp}\".\n"
 
         task_count = len(emp_task_list)
         extra_tasks = ""

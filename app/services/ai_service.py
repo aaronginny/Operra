@@ -77,7 +77,12 @@ async def _openai_extract(text: str) -> dict:
                 return _rule_based_extract(text)
             content = response.json()["choices"][0]["message"]["content"]
             try:
-                return json.loads(content)
+                ct = content.strip()
+                if ct.startswith("```"):
+                    ct = ct.split("```")[1]
+                    if ct.startswith("json"):
+                        ct = ct[4:]
+                return json.loads(ct.strip())
             except json.JSONDecodeError:
                 logger.error("OpenAI returned non-JSON: %s", content[:200])
                 return _rule_based_extract(text)
@@ -641,7 +646,13 @@ async def _openai_enquiry(text: str) -> dict:
             )
             response.raise_for_status()
 
-        result = json.loads(response.json()["choices"][0]["message"]["content"])
+        raw = response.json()["choices"][0]["message"]["content"]
+        ct = raw.strip()
+        if ct.startswith("```"):
+            ct = ct.split("```")[1]
+            if ct.startswith("json"):
+                ct = ct[4:]
+        result = json.loads(ct.strip())
         return {
             "is_enquiry": result.get("is_enquiry", False),
             "client_name": result.get("client_name"),
@@ -977,7 +988,13 @@ async def _openai_progress(text: str, task_title: str, checkpoints_json: str | N
                     response.text[:300],
                 )
                 return _rule_based_progress(text, checkpoints_json)
-            result = json.loads(response.json()["choices"][0]["message"]["content"])
+            raw = response.json()["choices"][0]["message"]["content"]
+            ct = raw.strip()
+            if ct.startswith("```"):
+                ct = ct.split("```")[1]
+                if ct.startswith("json"):
+                    ct = ct[4:]
+            result = json.loads(ct.strip())
 
         ai_pct = result.get("progress_percent")
         # Blend with checkpoint progress if available
