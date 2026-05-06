@@ -26,8 +26,33 @@ from app.services.employee_service import (
 )
 from app.services.ceo_command_service import get_ceo_user, handle_ceo_command
 from app.services.messaging_service import send_welcome_message, send_whatsapp_message
+from app.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
+
+
+async def _get_manager_phone(db: AsyncSession, company_id: int) -> str | None:
+    """Return the WhatsApp number of the CEO/founder for the given company.
+
+    Falls back to FOUNDER_PHONE env var only when no CEO user is found (e.g.
+    during dev or for the platform owner's own company).
+    """
+    stmt = (
+        select(User)
+        .where(
+            User.company_id == company_id,
+            User.role.in_([UserRole.ceo, UserRole.founder]),
+        )
+        .order_by(User.id.asc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+    if user and user.whatsapp_number:
+        return user.whatsapp_number
+    # Platform-owner fallback
+    return settings.founder_phone
+
 
 # Regex to detect ADD <name> <phone_number> command
 _ADD_EMPLOYEE_PATTERN = re.compile(
@@ -200,6 +225,12 @@ async def handle_reply(
             employee.name, task.title,
         )
         await send_whatsapp_message(sender, f"Great job! ✅ We'll notify your manager that \"{task.title}\" is done. Keep it up!")
+    elif new_status == TaskStatus.in_progress:
+        logger.info(
+            'Employee %s marked task "%s" as in_progress.',
+            employee.name, task.title,
+        )
+        await send_whatsapp_message(sender, f"Got it! 👍 \"{task.title}\" is now marked as in progress. Keep going!")
     elif new_status == TaskStatus.needs_help:
         logger.info(
             'Employee %s requested help on task "%s".',
@@ -236,15 +267,11 @@ async def handle_reply(
                 f"Deadline: {deadline_str}\n\n"
                 f"The employee requested assistance."
             )
-            if settings.founder_phone:
-                await send_whatsapp_message(settings.founder_phone, help_alert)
+            manager_phone = await _get_manager_phone(db, employee.company_id)
+            if manager_phone:
+                await send_whatsapp_message(manager_phone, help_alert)
             else:
-                logger.warning("FOUNDER_PHONE not set — help alert logged only.")
-    else:
-        logger.info(
-            'Employee %s marked task "%s" as %s.',
-            employee.name, task.title, status_label,
-        )
+                logger.warning("No manager phone found for company_id=%s — help alert logged only.", employee.company_id)
 
     return {
         "status": "task_updated",
@@ -294,9 +321,9 @@ async def forward_to_manager(
     await db.flush()
     await db.refresh(msg)
 
-    manager_phone = settings.founder_phone
+    manager_phone = await _get_manager_phone(db, task.company_id)
     if not manager_phone:
-        logger.warning("FOUNDER_PHONE not set — employee message logged only (task_message id=%s)", msg.id)
+        logger.warning("No manager phone found for company_id=%s — employee message logged only (task_message id=%s)", task.company_id, msg.id)
         return
 
     notif = (
@@ -480,6 +507,10 @@ async def process_incoming_message(
 
         ceo_result = await handle_ceo_command(db, ceo_user, sender, text)
         ceo_result["message_log_id"] = log.id
+        # Send the reply back to the CEO via WhatsApp
+        reply_text = ceo_result.get("reply")
+        if reply_text:
+            await send_whatsapp_message(sender, reply_text)
         return ceo_result
 
     # ── resolve company_id from sender (employee path) ───────────
@@ -647,17 +678,18 @@ async def process_incoming_message(
                     except (ValueError, TypeError, KeyError):
                         pass
 
-                # ── CEO Blocker Alert ────────────────────────────
+                # ── Manager Blocker Alert ────────────────────────────
                 if analysis.get("is_blocker") and not is_completion:
-                    if settings.founder_phone:
+                    manager_phone = await _get_manager_phone(db, employee_for_update.company_id)
+                    if manager_phone:
                         alert_msg = (
                             f"⚠️ PhantomPilot Alert: {employee_for_update.name} is stuck "
                             f"on \"{active_task.title}\".\n"
                             f"Detail: {summary or text[:100]}"
                         )
-                        await send_whatsapp_message(settings.founder_phone, alert_msg)
+                        await send_whatsapp_message(manager_phone, alert_msg)
                         logger.info(
-                            "CEO blocker alert sent for task #%s — %s",
+                            "Manager blocker alert sent for task #%s — %s",
                             active_task.id, employee_for_update.name,
                         )
 

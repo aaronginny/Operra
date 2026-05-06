@@ -236,10 +236,11 @@ async def _check_and_remind() -> None:
                         task.last_update = now # reset interval
                         task.last_followup_sent = now
 
-        # ── Morning Pulse (9 AM daily) ──────────────────────────
+        # ── Morning Pulse (9 AM daily, 9:00–9:29 AM only) ───────
+        # Narrow window prevents duplicate sends after server restarts.
         global _last_morning_pulse_date
         today = now.date()
-        if now.hour >= 9 and _last_morning_pulse_date != today:
+        if now.hour == 9 and now.minute < 30 and _last_morning_pulse_date != today:
             try:
                 await _send_morning_pulse(db)
                 _last_morning_pulse_date = today
