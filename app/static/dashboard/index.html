@@ -838,8 +838,12 @@
 
     <!-- ══ EMPLOYEES PAGE ══ -->
     <div class="page-section" id="page-employees">
-      <div class="section-head" style="margin-bottom:20px;opacity:0;animation:rise .5s .1s ease-out forwards">
+      <div class="section-head" style="margin-bottom:20px;opacity:0;animation:rise .5s .1s ease-out forwards;display:flex;align-items:center;justify-content:space-between">
         <span class="section-title">Team Members</span>
+        <button class="btn-new-pipeline" id="btnAddEmployee" style="flex-shrink:0">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+          Add Employee
+        </button>
       </div>
       <div id="employeeGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;opacity:0;animation:rise .5s .2s ease-out forwards">
         <div class="placeholder-page" style="grid-column:1/-1">
@@ -947,6 +951,29 @@
     <div class="modal-actions">
       <button class="btn-cancel" id="btnModalCancel">Cancel</button>
       <button class="btn-submit" id="btnModalSubmit">Create task</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD EMPLOYEE MODAL -->
+<div class="modal-overlay" id="empModalOverlay">
+  <div class="modal">
+    <div class="modal-title">Add Employee</div>
+    <div class="form-group">
+      <label>Full name</label>
+      <input class="form-input" id="empName" type="text" placeholder="e.g. Sarah Johnson" />
+    </div>
+    <div class="form-group">
+      <label>WhatsApp number (with country code)</label>
+      <input class="form-input" id="empPhone" type="tel" placeholder="+1 555 123 4567" />
+    </div>
+    <div class="form-group">
+      <label>Email (optional)</label>
+      <input class="form-input" id="empEmail" type="email" placeholder="sarah@company.com" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btnEmpCancel">Cancel</button>
+      <button class="btn-submit" id="btnEmpSubmit">Add Employee</button>
     </div>
   </div>
 </div>
@@ -1603,6 +1630,56 @@
       grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><p>Failed to load employees.</p></div>';
     }
   }
+
+  /* ── Add Employee Modal ── */
+  const empModal = document.getElementById('empModalOverlay');
+  function openEmpModal() {
+    document.getElementById('empName').value = '';
+    document.getElementById('empPhone').value = '';
+    document.getElementById('empEmail').value = '';
+    empModal.classList.add('open');
+    document.getElementById('empName').focus();
+  }
+  function closeEmpModal() { empModal.classList.remove('open'); }
+
+  document.getElementById('btnAddEmployee').addEventListener('click', openEmpModal);
+  document.getElementById('btnEmpCancel').addEventListener('click', closeEmpModal);
+  empModal.addEventListener('click', e => { if (e.target === empModal) closeEmpModal(); });
+
+  document.getElementById('btnEmpSubmit').addEventListener('click', async () => {
+    const name = document.getElementById('empName').value.trim();
+    if (!name) { toast('Please enter a name.', 'error'); return; }
+
+    const btn = document.getElementById('btnEmpSubmit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Adding…';
+
+    try {
+      const res = await fetch(`${API}/employees`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+          name,
+          phone_number: document.getElementById('empPhone').value.trim() || null,
+          email: document.getElementById('empEmail').value.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast(`${name} added to your team!`);
+        closeEmpModal();
+        loadEmployees();
+        loadData();
+      } else {
+        toast(data.detail || 'Failed to add employee.', 'error');
+      }
+    } catch {
+      toast('Network error — please try again.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add Employee';
+    }
+  });
 
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => navigateTo(btn.dataset.nav));
