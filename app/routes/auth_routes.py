@@ -53,8 +53,22 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     # Check if user exists
     stmt = select(User).where(User.email == payload.email)
     result = await db.execute(stmt)
-    if result.scalars().first():
-        return {"success": False, "error": "Email already registered"}
+    existing_user = result.scalars().first()
+    if existing_user:
+        # If already verified, block re-registration
+        if existing_user.is_verified:
+            return {"success": False, "error": "Email already registered. Please log in instead."}
+        # Unverified account — resend OTP so they can complete signup
+        otp = generate_otp()
+        existing_user.otp_code = otp
+        existing_user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        await db.flush()
+        try:
+            send_otp_email(existing_user.email, otp)
+        except Exception as exc:
+            logger.error("[OTP] Failed to resend email to %s: %s", existing_user.email, exc)
+            return {"success": True, "needs_otp": True, "email": existing_user.email, "warning": "OTP email failed — use Resend."}
+        return {"success": True, "needs_otp": True, "email": existing_user.email}
 
     # Create company (set 7-day trial immediately)
     company = Company(
