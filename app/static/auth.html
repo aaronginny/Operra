@@ -14,63 +14,63 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 #ghost-bg{position:fixed;top:50%;right:-60px;transform:translateY(-50%);z-index:2;pointer-events:none;opacity:0.12;filter:drop-shadow(0 0 120px rgba(192,132,252,0.25));animation:ghostFloat 4.5s ease-in-out infinite}
 @keyframes ghostFloat{0%,100%{transform:translateY(-50%) translateY(0)}50%{transform:translateY(-50%) translateY(-20px)}}
 .page{position:fixed;inset:0;z-index:10;display:flex;align-items:stretch}
-.left{width:45%;display:flex;flex-direction:column;justify-content:center;padding:60px 64px;border-right:0.5px solid #111;position:relative}
+.left{width:45%;display:flex;flex-direction:column;justify-content:center;padding:60px 64px;border-right:0.5px solid #333;position:relative}
 .left-logo{position:absolute;top:32px;left:48px;font-family:'Playfair Display',serif;font-size:16px;color:#fff;letter-spacing:0.02em;text-decoration:none}
 .left-tagline{font-family:'Playfair Display',serif;font-size:clamp(32px,3.5vw,52px);font-weight:400;line-height:1.05;letter-spacing:-0.02em}
 .left-tagline .glow{display:block;text-shadow:0 0 40px rgba(255,255,255,0.8),0 0 80px rgba(255,255,255,0.25)}
-.left-tagline .dim{display:block;color:#555;font-style:italic}
-.left-sub{font-size:14px;color:#555;line-height:1.75;max-width:340px;margin-top:20px;font-weight:300}
+.left-tagline .dim{display:block;color:#888;font-style:italic}
+.left-sub{font-size:14px;color:#aaa;line-height:1.75;max-width:340px;margin-top:20px;font-weight:300}
 .left-features{margin-top:36px;display:flex;flex-direction:column;gap:12px}
-.left-feat{display:flex;align-items:center;gap:12px;font-size:12px;color:#444}
-.left-feat::before{content:'✓';color:#666;font-size:11px;flex-shrink:0}
-.beta-badge{margin-top:40px;display:inline-flex;align-items:center;gap:8px;font-size:10px;color:#555;border:0.5px solid #222;padding:6px 14px;border-radius:20px;letter-spacing:0.08em;text-transform:uppercase;width:fit-content}
+.left-feat{display:flex;align-items:center;gap:12px;font-size:12px;color:#bbb}
+.left-feat::before{content:'✓';color:#aaa;font-size:11px;flex-shrink:0}
+.beta-badge{margin-top:40px;display:inline-flex;align-items:center;gap:8px;font-size:10px;color:#aaa;border:0.5px solid #444;padding:6px 14px;border-radius:20px;letter-spacing:0.08em;text-transform:uppercase;width:fit-content}
 .beta-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#4ade80;display:block;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .right{width:55%;display:flex;align-items:center;justify-content:center;padding:40px 48px;overflow-y:auto}
 .form-box{width:100%;max-width:400px}
-.tabs{display:flex;gap:0;margin-bottom:36px;border-bottom:0.5px solid #111}
-.tab{flex:1;padding:12px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;text-align:center;cursor:pointer;color:#333;background:none;border:none;font-family:'DM Sans',sans-serif;border-bottom:1px solid transparent;margin-bottom:-0.5px;transition:color 0.2s,border-color 0.2s}
+.tabs{display:flex;gap:0;margin-bottom:36px;border-bottom:0.5px solid #333}
+.tab{flex:1;padding:12px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;text-align:center;cursor:pointer;color:#777;background:none;border:none;font-family:'DM Sans',sans-serif;border-bottom:1px solid transparent;margin-bottom:-0.5px;transition:color 0.2s,border-color 0.2s}
 .tab.active{color:#fff;border-bottom-color:#fff}
-.tab:hover{color:#888}
+.tab:hover{color:#bbb}
 .form-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:400;margin-bottom:6px;text-shadow:0 0 30px rgba(255,255,255,0.3)}
-.form-sub{font-size:13px;color:#555;margin-bottom:28px;line-height:1.6}
+.form-sub{font-size:13px;color:#aaa;margin-bottom:28px;line-height:1.6}
 .field{margin-bottom:16px}
-.field label{display:block;font-size:11px;color:#555;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px}
-.field input{width:100%;background:#080808;border:0.5px solid #1e1e1e;border-radius:3px;padding:12px 14px;font-size:13px;color:#fff;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s}
-.field input::placeholder{color:#2a2a2a}
-.field input:focus{border-color:#444}
-.field input.error{border-color:#7f1d1d}
+.field label{display:block;font-size:11px;color:#aaa;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px}
+.field input{width:100%;background:#141414;border:1px solid #383838;border-radius:3px;padding:12px 14px;font-size:13px;color:#fff;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s}
+.field input::placeholder{color:#666}
+.field input:focus{border-color:#888}
+.field input.error{border-color:#f87171}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .err-msg{font-size:11px;color:#f87171;margin-top:4px;display:none}
 .err-msg.show{display:block}
 .btn-submit{width:100%;background:#fff;color:#000;font-size:12px;font-weight:500;padding:13px;border-radius:3px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:0.08em;text-transform:uppercase;margin-top:8px;transition:all 0.2s;position:relative;overflow:hidden}
 .btn-submit:hover{background:#e8e8e8;transform:translateY(-1px)}
-.btn-submit:disabled{background:#1a1a1a;color:#333;cursor:not-allowed;transform:none}
-.btn-submit .spinner{display:none;width:14px;height:14px;border:1.5px solid #333;border-top-color:#000;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto}
+.btn-submit:disabled{background:#333;color:#777;cursor:not-allowed;transform:none}
+.btn-submit .spinner{display:none;width:14px;height:14px;border:1.5px solid #555;border-top-color:#000;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto}
 .btn-submit.loading .spinner{display:block}
 .btn-submit.loading .btn-text{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
-.form-switch{font-size:12px;color:#444;text-align:center;margin-top:20px}
-.form-switch a{color:#888;cursor:pointer;text-decoration:underline;text-underline-offset:3px;transition:color 0.2s}
+.form-switch{font-size:12px;color:#888;text-align:center;margin-top:20px}
+.form-switch a{color:#bbb;cursor:pointer;text-decoration:underline;text-underline-offset:3px;transition:color 0.2s}
 .form-switch a:hover{color:#fff}
 .view{display:none}
 .view.active{display:block}
 .otp-wrap{text-align:center}
 .otp-icon{font-size:40px;margin-bottom:16px}
 .otp-boxes{display:flex;gap:10px;justify-content:center;margin:24px 0}
-.otp-box{width:44px;height:52px;background:#080808;border:0.5px solid #222;border-radius:4px;font-size:20px;font-weight:500;color:#fff;text-align:center;outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.2s;caret-color:transparent}
-.otp-box:focus{border-color:#777}
-.otp-box.filled{border-color:#333}
-.otp-resend{font-size:12px;color:#444;margin-top:12px}
-.otp-resend a{color:#777;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.otp-box{width:44px;height:52px;background:#1a1a1a;border:1.5px solid #555;border-radius:4px;font-size:20px;font-weight:500;color:#fff;text-align:center;outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.2s,background 0.2s;caret-color:transparent}
+.otp-box:focus{border-color:#fff;background:#222}
+.otp-box.filled{border-color:#aaa;background:#222}
+.otp-resend{font-size:12px;color:#888;margin-top:12px}
+.otp-resend a{color:#bbb;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .otp-resend a:hover{color:#fff}
-.otp-email-display{font-size:13px;color:#666;margin-top:8px;word-break:break-all}
+.otp-email-display{font-size:13px;color:#bbb;margin-top:8px;word-break:break-all}
 .status-msg{padding:10px 14px;border-radius:3px;font-size:12px;margin-bottom:16px;display:none;line-height:1.5}
 .status-msg.show{display:block}
-.status-msg.success{background:#0a1a0a;border:0.5px solid #1a3a1a;color:#4ade80}
-.status-msg.error{background:#1a0a0a;border:0.5px solid #3a1a1a;color:#f87171}
-.status-msg.info{background:#0a0a1a;border:0.5px solid #1a1a3a;color:#818cf8}
-#resend-countdown{color:#555}
+.status-msg.success{background:#0d1f0d;border:1px solid #2d5a2d;color:#6ee76e}
+.status-msg.error{background:#1f0d0d;border:1px solid #5a2d2d;color:#f87171}
+.status-msg.info{background:#0d0d1f;border:1px solid #2d2d5a;color:#a5b4fc}
+#resend-countdown{color:#888}
 </style>
 </head>
 <body>
@@ -147,7 +147,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
           <div class="err-msg" id="err-password">Password must be at least 8 characters</div>
         </div>
         <div class="field">
-          <label>WhatsApp Number <span style="color:#333;font-size:10px;text-transform:none">(for Control Tower)</span></label>
+          <label>WhatsApp Number <span style="color:#888;font-size:10px;text-transform:none">(for Control Tower)</span></label>
           <input type="tel" id="su-whatsapp" placeholder="+91XXXXXXXXXX" autocomplete="tel"/>
           <div class="err-msg" id="err-whatsapp">Enter your WhatsApp number with country code</div>
         </div>
