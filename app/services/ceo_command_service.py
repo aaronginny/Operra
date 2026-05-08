@@ -118,21 +118,24 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
 
 
 async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
-    """Check if the sender phone matches a User's whatsapp_number OR the
-    FOUNDER_PHONE env var (fallback for accounts that haven't set their
-    WhatsApp number in Settings yet).
+    """Return the User record for any app user whose whatsapp_number matches
+    sender_phone. This covers every business owner / team leader on the platform
+    (cricket coaches, HR managers, etc.) — not just the platform founder.
+
+    Falls back to FOUNDER_PHONE env var when the user hasn't set their
+    WhatsApp number in Settings yet.
 
     Returns the User row if found, None otherwise.
     """
     normalized = normalize_phone_number(sender_phone)
     logger.info("get_ceo_user: checking sender=%r normalized=%r", sender_phone, normalized)
 
-    # 1. Exact match against users.whatsapp_number
+    # 1. Exact match against users.whatsapp_number (any role)
     stmt = select(User).where(User.whatsapp_number == normalized)
     result = await db.execute(stmt)
     user = result.scalars().first()
     if user:
-        logger.info("get_ceo_user: exact match user_id=%s", user.id)
+        logger.info("get_ceo_user: exact match user_id=%s role=%s", user.id, user.role)
         return user
 
     # 2. Suffix fallback (last 10 digits) — handles +91XXXXXXXXXX vs XXXXXXXXXX mismatches
@@ -142,22 +145,18 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
         result2 = await db.execute(stmt2)
         user2 = result2.scalars().first()
         if user2:
-            logger.info("get_ceo_user: suffix match user_id=%s", user2.id)
+            logger.info("get_ceo_user: suffix match user_id=%s role=%s", user2.id, user2.role)
             return user2
 
-    # 3. FOUNDER_PHONE env var fallback — only applies to the platform owner's number.
-    # This must NOT match other CEOs who registered via the app, to prevent
-    # cross-tenant access. Only the exact FOUNDER_PHONE number triggers this path.
+    # 3. FOUNDER_PHONE env var fallback — for the platform owner's own account when
+    # their whatsapp_number hasn't been saved to the DB yet.
     if settings.founder_phone:
         founder_normalized = normalize_phone_number(settings.founder_phone)
         founder_suffix = re.sub(r"\D", "", founder_normalized)[-10:]
         sender_suffix = re.sub(r"\D", "", normalized)[-10:]
         if founder_suffix and founder_suffix == sender_suffix:
-            # Phone matches FOUNDER_PHONE — find the User whose whatsapp_number
-            # most closely matches (prefer exact suffix match over role fallback).
             stmt3 = (
                 select(User)
-                .where(User.role.in_(["ceo", "founder"]))
                 .order_by(User.id.asc())
                 .limit(1)
             )
@@ -169,7 +168,7 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
                 )
                 return user3
 
-    logger.info("get_ceo_user: no CEO match for sender=%r", sender_phone)
+    logger.info("get_ceo_user: no app user found for sender=%r", sender_phone)
     return None
 
 
@@ -455,15 +454,25 @@ async def _handle_assign_task(
     due_str = due_at.strftime("%b %d, %I:%M %p").lstrip("0") if due_at else "No deadline"
 
     if employee.phone_number:
-        notification = (
-            f"PhantomPilot - New Task Assigned\n\n"
-            f"Task: {task_title}\n"
-            f"Due: {due_str}\n\n"
-            f"Reply with:\n"
-            f"DONE - mark complete\n"
-            f"HELP - request assistance\n"
-            f"UPDATE <text> - send progress"
+        # Count prior tasks for this employee — only send reply guide on first task
+        prior_count_res = await db.execute(
+            select(sa_func.count()).select_from(Task).where(
+                Task.assigned_employee_id == employee.id,
+                Task.company_id == company_id,
+                Task.id != task.id,
+            )
         )
+        prior_task_count = prior_count_res.scalar() or 0
+        is_first_task = prior_task_count == 0
+
+        notification = f"PhantomPilot - New Task Assigned\n\nTask: {task_title}\nDue: {due_str}"
+        if is_first_task:
+            notification += (
+                "\n\nReply with:\n"
+                "DONE - mark complete\n"
+                "HELP - request assistance\n"
+                "UPDATE <text> - send progress"
+            )
         await send_whatsapp_message(employee.phone_number, notification)
 
     logger.info("CEO assigned task %r to %s via WhatsApp", task_title, emp_name)

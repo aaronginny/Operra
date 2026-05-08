@@ -814,16 +814,30 @@ async def process_incoming_message(
     # ── Notify the assigned employee ─────────────────────────────
     if employee and employee.phone_number:
         desc_str = task.description or "No description"
+        # Count prior tasks — only send reply guide on first assignment
+        from sqlalchemy import func as _func
+        prior_res = await db.execute(
+            select(_func.count()).select_from(Task).where(
+                Task.assigned_employee_id == employee.id,
+                Task.company_id == company_id,
+                Task.id != task.id,
+            )
+        )
+        is_first_task = (prior_res.scalar() or 0) == 0
+
         task_notification = (
             f"PhantomPilot - New Task Assigned\n\n"
             f"Task: {task.title}\n"
             f"Description: {desc_str}\n"
-            f"Due: {due_str}\n\n"
-            f"Reply with:\n"
-            f"DONE - mark complete\n"
-            f"HELP - request assistance\n"
-            f"UPDATE <text> - send progress"
+            f"Due: {due_str}"
         )
+        if is_first_task:
+            task_notification += (
+                "\n\nReply with:\n"
+                "DONE - mark complete\n"
+                "HELP - request assistance\n"
+                "UPDATE <text> - send progress"
+            )
         await send_whatsapp_message(employee.phone_number, task_notification)
         task.notification_sent = True
         await db.flush()
