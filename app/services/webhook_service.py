@@ -481,7 +481,6 @@ async def process_incoming_message(
         control_tower_ok = await check_can_use_control_tower(db, ceo_company_id, user_role=ceo_user.role.value)
         if not control_tower_ok:
             logger.info("Control Tower blocked (free tier) for company=%s", ceo_company_id)
-            from app.services.messaging_service import send_whatsapp_message
             await send_whatsapp_message(
                 sender,
                 "PhantomPilot — Upgrade Required\n\n"

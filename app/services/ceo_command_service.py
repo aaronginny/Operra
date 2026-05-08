@@ -94,14 +94,14 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
                 changes["due_date"] = date_iso
                 parsed = {**parsed, "changes": changes}
 
-    # ── Fix 4: BLOCK create_task — CEO Control Tower never creates tasks ──
+    # ── Fix 4: create_task from AI → assign_task (our supported intent) ──
     if parsed.get("intent") == "create_task":
-        logger.warning("CEO parse: blocking create_task intent — converting to update_task")
+        logger.info("CEO parse: mapping create_task → assign_task")
         date_iso = _extract_date_from_text(raw_text)
         changes = dict(parsed.get("changes") or {})
         if date_iso and not changes.get("due_date"):
             changes["due_date"] = date_iso
-        parsed = {**parsed, "intent": "update_task", "changes": changes}
+        parsed = {**parsed, "intent": "assign_task", "changes": changes}
 
     # ── Fix 5: Extract task_keyword from raw text if missing ──
     if not parsed.get("task_keyword"):
@@ -403,12 +403,71 @@ async def _handle_send_message(
 _FALLBACK_HELP = (
     "PhantomPilot: Command not recognized.\n\n"
     "Try:\n"
+    "• \"Assign [task] to [employee] by [date]\"\n"
     "• \"Tell [employee] the deadline for [task] is [date]\"\n"
     "• \"How is [employee] doing on [task]?\"\n"
     "• \"Mark [employee]'s [task] as complete\"\n"
     "• \"Update [employee]'s task description to [text]\"\n"
     "• \"Tell [employee] to [message]\""
 )
+
+
+async def _handle_assign_task(
+    db: AsyncSession, company_id: int, parsed: dict, ceo_phone: str
+) -> str:
+    """Handle: 'Assign bedroom painting to Ryan by May 15th'"""
+    from app.models.task import SourceType
+    from app.services.employee_service import find_employee_by_name
+
+    emp_name = parsed.get("employee_name")
+    task_title = parsed.get("task_keyword") or parsed.get("summary") or parsed.get("message")
+    if not task_title:
+        return "PhantomPilot: I couldn't determine the task title. Try: \"Assign [task] to [employee] by [date]\""
+    if not emp_name:
+        return "PhantomPilot: I couldn't determine which employee to assign to. Try: \"Assign [task] to [employee]\""
+
+    employee = await find_employee_by_name(db, name=emp_name, company_id=company_id)
+    if not employee:
+        return f"PhantomPilot: Employee \"{emp_name}\" not found. Add them first with: ADD {emp_name} +<phone>"
+
+    due_at = None
+    if parsed.get("changes", {}).get("due_date"):
+        try:
+            due_at = datetime.fromisoformat(parsed["changes"]["due_date"])
+        except (ValueError, TypeError):
+            pass
+
+    task = Task(
+        company_id=company_id,
+        title=task_title,
+        description=parsed.get("description") or None,
+        assigned_to=employee.name,
+        assigned_employee_id=employee.id,
+        owner_id=None,
+        due_at=due_at,
+        status=TaskStatus.pending,
+        source_type=SourceType.whatsapp,
+    )
+    db.add(task)
+    await db.flush()
+    await db.refresh(task)
+
+    due_str = due_at.strftime("%b %d, %I:%M %p").lstrip("0") if due_at else "No deadline"
+
+    if employee.phone_number:
+        notification = (
+            f"PhantomPilot - New Task Assigned\n\n"
+            f"Task: {task_title}\n"
+            f"Due: {due_str}\n\n"
+            f"Reply with:\n"
+            f"DONE - mark complete\n"
+            f"HELP - request assistance\n"
+            f"UPDATE <text> - send progress"
+        )
+        await send_whatsapp_message(employee.phone_number, notification)
+
+    logger.info("CEO assigned task %r to %s via WhatsApp", task_title, emp_name)
+    return f"Done. Task \"{task_title}\" assigned to {employee.name} (due: {due_str}). They've been notified."
 
 
 # ---------------------------------------------------------------------------
@@ -421,6 +480,12 @@ _FALLBACK_HELP = (
 # Pattern: "Tell <Name> the deadline for <task> is now <date>"
 _HARD_DEADLINE_RE = re.compile(
     r"tell\s+([A-Za-z][A-Za-z'-]{1,30})\s+the\s+deadline\s+for\s+(.+?)\s+is\s+now\s+(.+)",
+    re.IGNORECASE,
+)
+
+# Pattern: "Assign <task> to <Name> [by <date>]" or "Assign <task> to <Name>"
+_HARD_ASSIGN_RE = re.compile(
+    r"assign\s+(.+?)\s+to\s+([A-Za-z][A-Za-z\s'-]{1,40})(?:\s+by\s+(.+))?$",
     re.IGNORECASE,
 )
 
@@ -443,7 +508,31 @@ async def handle_ceo_command(
     )
 
     try:
-        # ── Hardcoded regex intercept (bypasses AI for deadline updates) ──
+        # ── Hardcoded regex intercept (bypasses AI for common patterns) ──
+
+        # "Assign <task> to <Name> [by <date>]"
+        assign_match = _HARD_ASSIGN_RE.match(text.strip())
+        if assign_match:
+            task_title = assign_match.group(1).strip()
+            emp_name   = assign_match.group(2).strip().title()
+            date_raw   = (assign_match.group(3) or "").strip()
+            date_iso   = _extract_date_from_text(date_raw) if date_raw else None
+            logger.info(
+                "CEO assign hard-regex match: task=%r emp=%r date_raw=%r → date_iso=%r",
+                task_title, emp_name, date_raw, date_iso,
+            )
+            parsed = {
+                "intent": "assign_task",
+                "employee_name": emp_name,
+                "task_keyword": task_title,
+                "changes": {"due_date": date_iso} if date_iso else {},
+                "message": None,
+                "summary": f"Assign {task_title} to {emp_name}",
+            }
+            reply = await _handle_assign_task(db, company_id, parsed, sender)
+            return {"status": "ceo_command", "reply": reply}
+
+        # "Tell <Name> the deadline for <task> is now <date>"
         hard_match = _HARD_DEADLINE_RE.match(text.strip())
         if hard_match:
             emp_name = hard_match.group(1).strip().capitalize()
@@ -492,6 +581,8 @@ async def handle_ceo_command(
             reply = await _handle_complete_task(db, company_id, parsed)
         elif intent == "send_message":
             reply = await _handle_send_message(db, company_id, parsed)
+        elif intent == "assign_task":
+            reply = await _handle_assign_task(db, company_id, parsed, sender)
         else:
             reply = _FALLBACK_HELP
 

@@ -680,26 +680,28 @@ The CEO manages employees and tasks. Parse their natural language into a structu
 - Cross-check against Known employees list when possible; if the name appears in that list, prefer the match.
 
 ## Possible intents (pick the BEST match):
-1. "update_task" — CEO wants to change a task's deadline, description, or other field.
+1. "assign_task" — CEO wants to assign a NEW task to an employee.
+   Triggers: "assign", "give [employee] a task", "create task for", "add task", "[employee] needs to", "ask [employee] to do".
+   Examples:
+     "Assign bedroom painting to Ryan by May 15th" → assign_task, employee=Ryan, keyword=bedroom painting, due_date=2026-05-15
+     "Give Sarah a task: clean the office by Friday" → assign_task, employee=Sarah, keyword=clean the office
+     "Ask Aaron to fix the leak by tomorrow" → assign_task, employee=Aaron, keyword=fix the leak
+2. "update_task" — CEO wants to change an EXISTING task's deadline, description, or other field.
    Triggers: words like "deadline", "due date", "is now [date]", "change", "update [task field]", "extend", "move the deadline".
    Examples:
      "Tell Ryan the deadline for the plumbing job is now April 20th" → update_task, employee=Ryan, keyword=plumbing, due_date=2026-04-20
      "Tell aaron the deadline for the plumbing task is now April 25th" → update_task, employee=aaron, keyword=plumbing, due_date=2026-04-25
      "Update Ryan's task description to use copper pipes instead" → update_task, employee=Ryan, keyword=null, description="use copper pipes instead"
-2. "check_status" — CEO wants a status report on a task or employee.
+3. "check_status" — CEO wants a status report on a task or employee.
    Triggers: "how is", "how's", "status", "progress", "doing on", "update on".
    Examples: "How is Ryan doing on the plumbing task?" → check_status, employee=Ryan, keyword=plumbing
-3. "complete_task" — CEO wants to mark a task as completed.
+4. "complete_task" — CEO wants to mark a task as completed.
    Triggers: "mark as complete", "close", "finish".
    Examples: "Mark Ryan's bedroom task as complete" → complete_task, employee=Ryan, keyword=bedroom
-4. "send_message" — CEO wants to send a short freeform message to an employee (NO deadline/task field change).
+5. "send_message" — CEO wants to send a short freeform message to an employee (NO deadline/task field change).
    Triggers: "tell [name] to [action]", "let [name] know", "message [name]".
    Examples: "Tell Ryan to call me" → send_message, employee=Ryan, message="call me"
-5. "unknown" — Cannot determine intent.
-
-## CRITICAL: NO CREATE TASK INTENT
-- The CEO Control Tower NEVER creates tasks. Do NOT classify ANY command as "create_task".
-- "Tell [employee] the deadline for [task] is now [date]" must ALWAYS be classified as "update_task", never "create_task" or "send_message".
+6. "unknown" — Cannot determine intent.
 
 ## Priority when "Tell" appears:
 - If the sentence contains "deadline", "due date", "is now [date/time]", "description", or "change" → intent is "update_task".
@@ -712,7 +714,7 @@ The CEO manages employees and tasks. Parse their natural language into a structu
 Known employees: {employee_names}
 
 Return ONLY valid JSON with these keys:
-  "intent": one of ["update_task", "check_status", "complete_task", "send_message", "unknown"]
+  "intent": one of ["assign_task", "update_task", "check_status", "complete_task", "send_message", "unknown"]
   "employee_name": PERSON name only — never a month or date word (or null)
   "task_keyword": keyword(s) to identify the task (e.g. "plumbing", "bedroom painting") or null
   "changes": object with fields to update, only for update_task intent:
@@ -917,12 +919,23 @@ def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
 
     # ── Step 3: Detect intent (order matters) ────────────────────
     has_deadline_kw = any(kw in text_lower for kw in [
-        "deadline", "due date", "is now", "by", "extend", "move the deadline",
+        "deadline", "due date", "is now", "extend", "move the deadline",
     ])
     has_desc_kw = "description" in text_lower
     has_update_kw = any(kw in text_lower for kw in ["change", "update"])
 
-    if any(kw in text_lower for kw in ["how is", "how's", "status", "progress", "doing on", "update on"]):
+    if any(kw in text_lower for kw in ["assign", "give", "add task", "create task", "needs to", "ask", "do this"]):
+        result["intent"] = "assign_task"
+        # For assign, task_keyword is the task title — extract what comes after "assign" or "to do"
+        m_assign = re.search(r"assign\s+(.+?)\s+to\s+\w+", text, re.IGNORECASE)
+        if m_assign:
+            result["task_keyword"] = m_assign.group(1).strip()
+        elif not result["task_keyword"]:
+            # Grab the full text as the task if no keyword found
+            result["task_keyword"] = text.strip()
+        result["summary"] = f"Assign task to {result['employee_name'] or 'unknown employee'}"
+
+    elif any(kw in text_lower for kw in ["how is", "how's", "status", "progress", "doing on", "update on"]):
         result["intent"] = "check_status"
         result["summary"] = f"Check status for {result['employee_name'] or 'unknown employee'}"
 
@@ -934,7 +947,6 @@ def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
         # "Tell Aaron the deadline … is now April 25th" → update_task, not send_message
         result["intent"] = "update_task"
         if has_desc_kw:
-            # Extract everything after "description to"
             m = re.search(r"description\s+to\s+(.+)", text, re.IGNORECASE)
             if m:
                 result["changes"]["description"] = m.group(1).strip()
