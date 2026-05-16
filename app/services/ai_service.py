@@ -737,6 +737,17 @@ async def parse_ceo_command(text: str, employee_names: list[str]) -> dict:
     return await _openai_ceo_parse(text, employee_names)
 
 
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
+
+
+def _strip_json_fence(text: str) -> str:
+    """Strip markdown code fences from an LLM response, returning bare JSON."""
+    m = _JSON_FENCE_RE.search(text)
+    if m:
+        return m.group(1).strip()
+    return text.strip()
+
+
 async def _openai_ceo_parse(text: str, employee_names: list[str]) -> dict:
     """Use OpenAI to parse CEO command intent."""
     names_str = ", ".join(employee_names) if employee_names else "(none known)"
@@ -764,20 +775,16 @@ async def _openai_ceo_parse(text: str, employee_names: list[str]) -> dict:
             if not response.is_success:
                 logger.error(
                     "OpenAI CEO parse HTTP %s — body: %s",
-                    response.status_code, response.text[:300],
+                    response.status_code, response.text[:500],
                 )
                 return _rule_based_ceo_parse(text, employee_names)
 
             content = response.json()["choices"][0]["message"]["content"]
+            logger.info("=== CEO OPENAI RAW RESPONSE === %r", content[:500])
             try:
-                response_text = content.strip()
-                if response_text.startswith("```"):
-                    response_text = response_text.split("```")[1]
-                    if response_text.startswith("json"):
-                        response_text = response_text[4:]
-                response_text = response_text.strip()
-                result = json.loads(response_text)
-                return {
+                bare = _strip_json_fence(content)
+                result = json.loads(bare)
+                parsed = {
                     "intent": result.get("intent", "unknown"),
                     "employee_name": result.get("employee_name"),
                     "task_keyword": result.get("task_keyword"),
@@ -785,8 +792,17 @@ async def _openai_ceo_parse(text: str, employee_names: list[str]) -> dict:
                     "message": result.get("message"),
                     "summary": result.get("summary", ""),
                 }
-            except json.JSONDecodeError:
-                logger.error("OpenAI CEO parse returned non-JSON: %s", content[:200])
+                logger.info(
+                    "=== CEO OPENAI PARSED === intent=%r employee=%r keyword=%r changes=%r",
+                    parsed["intent"], parsed["employee_name"],
+                    parsed["task_keyword"], parsed["changes"],
+                )
+                return parsed
+            except json.JSONDecodeError as jde:
+                logger.error(
+                    "OpenAI CEO parse returned non-JSON (error=%s) raw=%r",
+                    jde, content[:400],
+                )
                 return _rule_based_ceo_parse(text, employee_names)
     except Exception as exc:
         logger.error("OpenAI CEO parse failed (%s) — falling back to rule-based", exc)
@@ -924,18 +940,9 @@ def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
     has_desc_kw = "description" in text_lower
     has_update_kw = any(kw in text_lower for kw in ["change", "update"])
 
-    if any(kw in text_lower for kw in ["assign", "give", "add task", "create task", "needs to", "ask", "do this"]):
-        result["intent"] = "assign_task"
-        # For assign, task_keyword is the task title — extract what comes after "assign" or "to do"
-        m_assign = re.search(r"assign\s+(.+?)\s+to\s+\w+", text, re.IGNORECASE)
-        if m_assign:
-            result["task_keyword"] = m_assign.group(1).strip()
-        elif not result["task_keyword"]:
-            # Grab the full text as the task if no keyword found
-            result["task_keyword"] = text.strip()
-        result["summary"] = f"Assign task to {result['employee_name'] or 'unknown employee'}"
-
-    elif any(kw in text_lower for kw in ["how is", "how's", "status", "progress", "doing on", "update on"]):
+    # Status-check keywords take highest priority to avoid misclassifying
+    # "How is Ryan doing?" as an assign/message command.
+    if any(kw in text_lower for kw in ["how is", "how's", "status", "progress", "doing on", "update on"]):
         result["intent"] = "check_status"
         result["summary"] = f"Check status for {result['employee_name'] or 'unknown employee'}"
 
@@ -952,11 +959,28 @@ def _rule_based_ceo_parse(text: str, employee_names: list[str]) -> dict:
                 result["changes"]["description"] = m.group(1).strip()
         result["summary"] = f"Update task for {result['employee_name'] or 'unknown employee'}"
 
+    # "ask X to do Y" / "give X a task" / explicit assign keywords
+    elif re.search(r"\bask\s+\w+\s+to\b", text_lower) or any(
+        kw in text_lower for kw in ["assign", "give", "add task", "create task", "needs to", "do this"]
+    ):
+        result["intent"] = "assign_task"
+        m_assign = re.search(r"assign\s+(.+?)\s+to\s+\w+", text, re.IGNORECASE)
+        if m_assign:
+            result["task_keyword"] = m_assign.group(1).strip()
+        elif not result["task_keyword"]:
+            result["task_keyword"] = text.strip()
+        result["summary"] = f"Assign task to {result['employee_name'] or 'unknown employee'}"
+
     elif any(kw in text_lower for kw in ["tell", "message", "notify", "inform", "let"]):
         result["intent"] = "send_message"
         result["message"] = text
         result["summary"] = f"Send message to {result['employee_name'] or 'unknown employee'}"
 
+    logger.info(
+        "=== CEO RULE-BASED PARSE === input=%r intent=%r employee=%r keyword=%r changes=%r",
+        text[:120], result["intent"], result["employee_name"],
+        result["task_keyword"], result["changes"],
+    )
     return result
 
 

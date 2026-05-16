@@ -541,6 +541,8 @@ async def handle_ceo_command(
             reply = await _handle_assign_task(db, company_id, parsed, sender)
             return {"status": "ceo_command", "reply": reply}
 
+        logger.info("CEO hard-regex ASSIGN did not match text=%r", text.strip()[:120])
+
         # "Tell <Name> the deadline for <task> is now <date>"
         hard_match = _HARD_DEADLINE_RE.match(text.strip())
         if hard_match:
@@ -549,7 +551,7 @@ async def handle_ceo_command(
             date_raw = hard_match.group(3).strip()
             date_iso = _extract_date_from_text(date_raw) or _extract_date_from_text(text)
             logger.info(
-                "CEO hard-regex match: emp=%r kw=%r date_raw=%r → date_iso=%r",
+                "CEO hard-regex DEADLINE match: emp=%r kw=%r date_raw=%r → date_iso=%r",
                 emp_name, task_kw, date_raw, date_iso,
             )
             if date_iso:
@@ -564,22 +566,25 @@ async def handle_ceo_command(
                 reply = await _handle_update_task(db, company_id, parsed, sender)
                 return {"status": "ceo_command", "reply": reply}
 
+        logger.info("CEO hard-regex DEADLINE did not match text=%r", text.strip()[:120])
+
         # ── AI / rule-based parsing path ──────────────────────────────────
         employee_names = await get_all_employee_names(db, company_id=company_id)
+        logger.info("CEO known employees for company %s: %r", company_id, employee_names)
 
         parsed = await parse_ceo_command(text, employee_names)
         logger.info(
-            "CEO raw parse: intent=%s employee=%r keyword=%r changes=%r",
+            "CEO raw parse: intent=%s employee=%r keyword=%r changes=%r message=%r",
             parsed.get("intent"), parsed.get("employee_name"),
-            parsed.get("task_keyword"), parsed.get("changes"),
+            parsed.get("task_keyword"), parsed.get("changes"), parsed.get("message"),
         )
 
         parsed = _sanitize_parsed(parsed, text, employee_names)
         intent = parsed.get("intent", "unknown")
         logger.info(
-            "CEO final parse: intent=%s employee=%r keyword=%r changes=%r",
+            "CEO final parse: intent=%s employee=%r keyword=%r changes=%r message=%r",
             intent, parsed.get("employee_name"),
-            parsed.get("task_keyword"), parsed.get("changes"),
+            parsed.get("task_keyword"), parsed.get("changes"), parsed.get("message"),
         )
 
         if intent == "check_status":
@@ -593,6 +598,10 @@ async def handle_ceo_command(
         elif intent == "assign_task":
             reply = await _handle_assign_task(db, company_id, parsed, sender)
         else:
+            logger.warning(
+                "CEO intent=%r fell through to FALLBACK_HELP — text=%r parsed=%r",
+                intent, text[:120], parsed,
+            )
             reply = _FALLBACK_HELP
 
     except Exception as exc:
