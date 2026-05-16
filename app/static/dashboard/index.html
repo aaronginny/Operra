@@ -912,6 +912,25 @@
       border-radius: 50%; animation: spin .6s linear infinite;
     }
 
+    /* ───── TOGGLE SWITCH ───── */
+    .toggle-switch { display: inline-flex; cursor: pointer; }
+    .toggle-switch input { display: none; }
+    .toggle-track {
+      width: 42px; height: 24px; border-radius: 999px;
+      background: var(--border-2);
+      position: relative; transition: background 0.2s;
+      flex: 0 0 42px;
+    }
+    .toggle-track::after {
+      content: ""; position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-track { background: var(--accent); }
+    .toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); }
+
     /* ───── RESPONSIVE ───── */
     @media (max-width: 1200px) {
       .stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1205,6 +1224,8 @@
         <div class="page-title">Settings</div>
       </div>
       <div class="settings-wrap">
+
+        <!-- Profile card -->
         <div class="settings-section">
           <div class="settings-card">
             <div class="settings-row">
@@ -1228,6 +1249,74 @@
             </div>
           </div>
         </div>
+
+        <!-- Reminders card -->
+        <div class="settings-section" style="opacity:0;animation:rise .35s .1s ease-out forwards">
+          <div style="font-size:13px;font-weight:700;color:var(--text-2);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:10px">Auto Reminders</div>
+          <div class="settings-card">
+            <p style="font-size:12.5px;color:var(--text-2);margin-bottom:18px">Configure how PhantomPilot follows up with your team</p>
+
+            <!-- Row 1: reminders on/off -->
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-label">Enable automatic reminders</div>
+                <div class="settings-hint">PhantomPilot will follow up with team members on pending tasks</div>
+              </div>
+              <div class="settings-row-control" style="display:flex;align-items:center;justify-content:flex-end">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="togReminders" checked />
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Row 2: frequency (hidden when reminders off) -->
+            <div class="settings-row" id="rowFrequency">
+              <div class="settings-row-info">
+                <div class="settings-label">Reminder frequency</div>
+                <div class="settings-hint">How often PhantomPilot sends follow-up messages</div>
+              </div>
+              <div class="settings-row-control">
+                <select class="form-input" id="selFrequency">
+                  <option value="2">Every 2 hours</option>
+                  <option value="4" selected>Every 4 hours</option>
+                  <option value="8">Every 8 hours</option>
+                  <option value="24">Once a day</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Row 3: morning pulse on/off -->
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-label">Morning pulse</div>
+                <div class="settings-hint">Send a daily summary to each team member at the start of the day</div>
+              </div>
+              <div class="settings-row-control" style="display:flex;align-items:center;justify-content:flex-end">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="togPulse" checked />
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Row 4: pulse time (hidden when pulse off) -->
+            <div class="settings-row" id="rowPulseTime">
+              <div class="settings-row-info">
+                <div class="settings-label">Send at</div>
+                <div class="settings-hint">The time each morning the pulse is sent to your team</div>
+              </div>
+              <div class="settings-row-control">
+                <input class="form-input" type="time" id="inpPulseTime" value="09:00" style="color-scheme:dark" />
+              </div>
+            </div>
+
+            <div style="margin-top:20px">
+              <button class="btn-submit" id="btnSaveReminders" style="width:100%;padding:11px">Save reminder settings</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1940,6 +2029,7 @@
     document.getElementById('breadcrumbText').textContent = labels[page] || 'Dashboard';
 
     if (page === 'employees') loadEmployees();
+    if (page === 'settings') loadReminderSettings();
   }
 
   async function loadEmployees() {
@@ -2167,6 +2257,54 @@
   }
   topSearch.addEventListener('input', e => applySearch(e.target.value));
   sideSearch.addEventListener('input', e => applySearch(e.target.value));
+
+  /* ── Reminder Settings ── */
+  async function loadReminderSettings() {
+    try {
+      const res = await fetch(`${API}/settings/reminders`, { headers: headers() });
+      if (!res.ok) return;
+      const s = await res.json();
+      document.getElementById('togReminders').checked = s.reminders_enabled;
+      document.getElementById('selFrequency').value = String(s.reminder_frequency_hours);
+      document.getElementById('togPulse').checked = s.morning_pulse_enabled;
+      document.getElementById('inpPulseTime').value = s.morning_pulse_time;
+      syncReminderVisibility();
+    } catch (_) {}
+  }
+
+  function syncReminderVisibility() {
+    const remOn = document.getElementById('togReminders').checked;
+    const pulseOn = document.getElementById('togPulse').checked;
+    document.getElementById('rowFrequency').style.display = remOn ? '' : 'none';
+    document.getElementById('rowPulseTime').style.display = pulseOn ? '' : 'none';
+  }
+
+  document.getElementById('togReminders').addEventListener('change', syncReminderVisibility);
+  document.getElementById('togPulse').addEventListener('change', syncReminderVisibility);
+
+  document.getElementById('btnSaveReminders').addEventListener('click', async () => {
+    const btn = document.getElementById('btnSaveReminders');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Saving…';
+    try {
+      const payload = {
+        reminders_enabled: document.getElementById('togReminders').checked,
+        reminder_frequency_hours: parseInt(document.getElementById('selFrequency').value),
+        morning_pulse_enabled: document.getElementById('togPulse').checked,
+        morning_pulse_time: document.getElementById('inpPulseTime').value || '09:00',
+      };
+      const res = await fetch(`${API}/settings/reminders`, {
+        method: 'POST', headers: headers(), body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Save failed.');
+      toast('Reminder settings saved.');
+    } catch (err) {
+      toast(err.message || 'Could not save settings.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save reminder settings';
+    }
+  });
 
   /* ── Add Enquiry Panel ── */
   function openEnqPanel() {

@@ -246,6 +246,20 @@ _MIGRATIONS = [
         );
         """,
     ),
+    # 020 — company_settings table (per-company reminder configuration)
+    (
+        "company_settings.table",
+        """
+        CREATE TABLE IF NOT EXISTS company_settings (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
+            morning_pulse_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            morning_pulse_time VARCHAR(5) NOT NULL DEFAULT '09:00',
+            reminder_frequency_hours INTEGER NOT NULL DEFAULT 4,
+            reminders_enabled BOOLEAN NOT NULL DEFAULT TRUE
+        );
+        """,
+    ),
 ]
 
 

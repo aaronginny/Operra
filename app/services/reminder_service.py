@@ -20,6 +20,7 @@ from app.config import settings
 
 from app.database import async_session
 from app.models.task import Task, TaskStatus
+from app.models.company_settings import CompanySettings
 from app.services.daily_report_service import check_and_send_daily_report
 from app.services.messaging_service import (
     format_deadline_alert,
@@ -48,6 +49,42 @@ OVERDUE_NAG_INTERVAL = timedelta(hours=4)
 _scheduler_task: asyncio.Task | None = None
 _last_checkin_date = None
 _last_morning_pulse_date = None
+
+# Cache of {company_id: CompanySettings} refreshed each scheduler tick
+_company_settings_cache: dict[int, CompanySettings] = {}
+
+
+async def _load_company_settings(db) -> dict[int, CompanySettings]:
+    result = await db.execute(select(CompanySettings))
+    return {row.company_id: row for row in result.scalars().all()}
+
+
+def _company_freq_hours(company_id: int) -> int:
+    s = _company_settings_cache.get(company_id)
+    if s and s.reminders_enabled:
+        return s.reminder_frequency_hours
+    return 4  # default
+
+
+def _company_reminders_enabled(company_id: int) -> bool:
+    s = _company_settings_cache.get(company_id)
+    return s.reminders_enabled if s is not None else True
+
+
+def _company_pulse_enabled(company_id: int) -> bool:
+    s = _company_settings_cache.get(company_id)
+    return s.morning_pulse_enabled if s is not None else True
+
+
+def _company_pulse_time(company_id: int) -> tuple[int, int]:
+    """Return (hour, minute) for this company's morning pulse time."""
+    s = _company_settings_cache.get(company_id)
+    time_str = s.morning_pulse_time if s else "09:00"
+    try:
+        h, m = time_str.split(":")
+        return int(h), int(m)
+    except Exception:
+        return 9, 0
 
 
 def _get_next_checkpoint(task) -> str | None:
@@ -105,6 +142,11 @@ async def _send_morning_pulse(db) -> None:
             logger.debug("Morning pulse skipped for company=%s (free tier)", company_id)
             continue
 
+        # Skip if pulse disabled in company settings
+        if not _company_pulse_enabled(company_id):
+            logger.debug("Morning pulse skipped for company=%s (disabled in settings)", company_id)
+            continue
+
         # Build message — pick the most important task (overdue first, then nearest deadline)
         priority_task = sorted(emp_task_list, key=lambda t: (
             0 if t.status == TaskStatus.overdue else 1,
@@ -139,6 +181,9 @@ async def _check_and_remind() -> None:
     now = datetime.now()
 
     async with async_session() as db:
+        global _company_settings_cache
+        _company_settings_cache = await _load_company_settings(db)
+
         stmt = (
             select(Task)
             .where(Task.status.in_([TaskStatus.pending, TaskStatus.in_progress, TaskStatus.overdue]))
@@ -148,6 +193,10 @@ async def _check_and_remind() -> None:
         tasks = list(result.scalars().all())
 
         for task in tasks:
+            # ── Guard: skip if reminders disabled for this company ──
+            if not _company_reminders_enabled(task.company_id):
+                continue
+
             # ── Guard: skip junk / brand-new tasks ───────────────
             created = (
                 task.created_at.replace(tzinfo=None)
@@ -185,10 +234,12 @@ async def _check_and_remind() -> None:
                             await send_email(assignee_email, msg)
                         logger.info("Marked task #%s as overdue.", task.id)
                     else:
-                        # Already overdue — nag every 4 hours
+                        # Already overdue — nag at company-configured frequency
+                        freq_hours = _company_freq_hours(task.company_id)
+                        nag_interval = timedelta(hours=freq_hours)
                         last_nag = task.last_urgent_reminder_sent or task.due_at
                         last_nag_naive = last_nag.replace(tzinfo=None) if last_nag.tzinfo else last_nag
-                        if (now - last_nag_naive) >= OVERDUE_NAG_INTERVAL:
+                        if (now - last_nag_naive) >= nag_interval:
                             hours_late = int((now - due).total_seconds() / 3600)
                             next_cp = _get_next_checkpoint(task)
                             cp_line = f'\nNext checkpoint: "{next_cp}"' if next_cp else ""
@@ -236,17 +287,28 @@ async def _check_and_remind() -> None:
                         task.last_update = now # reset interval
                         task.last_followup_sent = now
 
-        # ── Morning Pulse (9 AM daily, 9:00–9:29 AM only) ───────
-        # Narrow window prevents duplicate sends after server restarts.
+        # ── Morning Pulse (configurable time, 30-min window) ────
+        # Checks each company's configured pulse time and sends if within window.
         global _last_morning_pulse_date
         today = now.date()
-        if now.hour == 9 and now.minute < 30 and _last_morning_pulse_date != today:
-            try:
-                await _send_morning_pulse(db)
-                _last_morning_pulse_date = today
-                logger.info("Morning pulse completed for %s", today)
-            except Exception:
-                logger.exception("Morning pulse failed")
+        if _last_morning_pulse_date != today:
+            # Use the first company's pulse time as the global gate; per-company
+            # filtering happens inside _send_morning_pulse via _company_pulse_enabled.
+            should_pulse = False
+            for cid, cs in _company_settings_cache.items():
+                if cs.morning_pulse_enabled:
+                    ph, pm = _company_pulse_time(cid)
+                    pulse_dt = datetime(now.year, now.month, now.day, ph, pm)
+                    if pulse_dt <= now < pulse_dt + timedelta(minutes=30):
+                        should_pulse = True
+                        break
+            if should_pulse:
+                try:
+                    await _send_morning_pulse(db)
+                    _last_morning_pulse_date = today
+                    logger.info("Morning pulse completed for %s", today)
+                except Exception:
+                    logger.exception("Morning pulse failed")
 
         # Legacy daily check-in (replaced by morning pulse above)
         global _last_checkin_date
