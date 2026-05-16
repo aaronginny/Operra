@@ -1047,28 +1047,28 @@
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-icon danger">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
           <div class="stat-val" id="cmdOverdue">—</div>
           <div class="stat-label">Overdue tasks</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon purple">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           </div>
           <div class="stat-val" id="cmdActive">—</div>
           <div class="stat-label">Active tasks</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon cyan">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
           </div>
           <div class="stat-val" id="cmdTeam">—</div>
           <div class="stat-label">Team members</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon warn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </div>
           <div class="stat-val" id="cmdDueWeek">—</div>
           <div class="stat-label">Due this week</div>
@@ -1559,7 +1559,7 @@
   function renderRecentTasks() {
     const wrap = document.getElementById('recentTaskList');
     const recent = [...allTasks]
-      .filter(t => t.status !== 'archived')
+      .filter(t => t.status !== 'archived' && t.status !== 'completed')
       .sort((a, b) => new Date(b.last_update || b.created_at || 0) - new Date(a.last_update || a.created_at || 0))
       .slice(0, 6);
 
@@ -1969,7 +1969,7 @@
             <div>
               <div class="emp-name">${escHtml(e.name || 'Unknown')}</div>
               <div class="emp-role">${escHtml(e.role || 'Team Member')}</div>
-              ${e.phone ? `<div class="emp-phone">${escHtml(e.phone)}</div>` : ''}
+              ${e.phone_number ? `<div class="emp-phone">${escHtml(e.phone_number)}</div>` : '<div class="emp-phone" style="color:var(--text-3)">No phone set</div>'}
             </div>
           </div>
           <div class="emp-stats">
@@ -1978,7 +1978,7 @@
               <div class="es-label">Active</div>
             </div>
             <div class="emp-stat">
-              <div class="es-val" style="color:var(--cyan)">${e.whatsapp_number ? '✓' : '—'}</div>
+              <div class="es-val" style="font-size:13px;color:${e.phone_number ? 'var(--cyan)' : 'var(--text-3)'}">${e.phone_number ? escHtml(e.phone_number) : 'Not set'}</div>
               <div class="es-label">WhatsApp</div>
             </div>
           </div>
