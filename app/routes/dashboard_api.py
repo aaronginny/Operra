@@ -66,6 +66,7 @@ async def dashboard_tasks(
             "status": t.status.value,
             "progress_percent": t.progress_percent or 0,
             "last_update": t.last_update.isoformat() if t.last_update else None,
+            "last_update_summary": t.last_update_summary,
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "checkpoint_summary": _checkpoint_summary(t.checkpoints),
             "description": t.description,

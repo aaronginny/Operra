@@ -16,6 +16,7 @@ class TaskStatus(str, enum.Enum):
     delayed = "delayed"
     overdue = "overdue"
     needs_help = "needs_help"
+    pending_confirmation = "pending_confirmation"
     archived = "archived"
 
 

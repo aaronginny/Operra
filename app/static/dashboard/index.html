@@ -400,6 +400,9 @@
     .status-badge.delayed::before { background: var(--warn); }
     .status-badge.needs_help { color: var(--accent-3); border-color: rgba(255,127,200,0.2); background: rgba(255,127,200,0.07); }
     .status-badge.needs_help::before { background: var(--accent-3); }
+    .status-badge.pending_confirmation { color: var(--accent); border-color: rgba(168,127,255,0.25); background: rgba(168,127,255,0.07); }
+    .status-badge.pending_confirmation::before { background: var(--accent); }
+    .t-last-update { font-size: 11px; color: var(--text-2); margin-top: 4px; font-weight: 500; font-style: italic; line-height: 1.4; }
     .due-cell { display: flex; flex-direction: column; gap: 3px; }
     .due-when { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--text-2); }
     .due-late { font-size: 10px; color: var(--danger); font-weight: 600; }
@@ -1135,7 +1138,7 @@
 
   /* ── Counts ── */
   function counts() {
-    const c = { pending: 0, in_progress: 0, overdue: 0, delayed: 0, needs_help: 0, completed: 0 };
+    const c = { pending: 0, in_progress: 0, overdue: 0, delayed: 0, needs_help: 0, pending_confirmation: 0, completed: 0 };
     allTasks.forEach(t => { if (c[t.status] !== undefined) c[t.status]++; });
     return c;
   }
@@ -1343,13 +1346,16 @@
     const statusLabel = {
       pending: 'Pending', in_progress: 'In Progress', overdue: 'Overdue',
       completed: 'Completed', delayed: 'Delayed', needs_help: 'Needs Help',
+      pending_confirmation: 'Awaiting Confirmation',
     }[t.status] || t.status;
     const pipelineTag = t.pipeline ? `<div class="t-pipeline-tag">${escHtml(t.pipeline)}</div>` : '';
+    const lastUpdateText = t.last_update_summary ? `<div class="t-last-update">${escHtml(t.last_update_summary)}</div>` : '';
 
     div.innerHTML = `
       <div class="task-cell">
         <div class="t-name">${escHtml(t.task)}</div>
         <div class="t-sub">${t.checkpoint_summary || 'No checkpoints'}</div>
+        ${lastUpdateText}
         ${pipelineTag}
       </div>
       <div class="assignee-cell">

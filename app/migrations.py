@@ -233,6 +233,19 @@ _MIGRATIONS = [
         );
         """,
     ),
+    # 019 — task_updates table (employee UPDATE <text> messages saved per task)
+    (
+        "task_updates.table",
+        """
+        CREATE TABLE IF NOT EXISTS task_updates (
+            id SERIAL PRIMARY KEY,
+            task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+            employee_id INTEGER,
+            update_text TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
 ]
 
 

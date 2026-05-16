@@ -17,6 +17,7 @@ from app.models.message_log import MessageLog
 from app.models.enquiry import Enquiry
 from app.models.task import Task, TaskStatus, SourceType
 from app.models.task_message import TaskMessage, MessageSender
+from app.models.task_update import TaskUpdate
 from app.services.ai_service import ask_employee_assistant, extract_enquiry_from_message, extract_task_from_message
 from app.services.employee_service import (
     find_employee_by_name,
@@ -148,7 +149,11 @@ async def handle_add_employee(
 async def handle_reply(
     db: AsyncSession, sender: str, command: str
 ) -> dict | None:
-    """Check if the message is a reply command (DONE / STARTED / HELP / HELP <question>).
+    """Check if the message is a reply command (DONE / STARTED / HELP / HELP <message> / UPDATE <text>).
+
+    DONE  → status becomes pending_confirmation (CEO must CONFIRM/REJECT).
+    HELP  → status becomes needs_help, CEO is notified with the employee's message.
+    UPDATE <text> → saves a TaskUpdate row + notifies CEO + updates last_update_summary.
 
     Returns a response dict if handled, None otherwise.
     """
@@ -157,12 +162,15 @@ async def handle_reply(
     upper_words = upper.split()
 
     # Determine action
+    is_update_cmd = bool(upper_words) and upper_words[0] == "UPDATE" and len(stripped) > len("UPDATE")
     if upper == "DONE":
-        new_status = TaskStatus.completed
+        new_status = TaskStatus.pending_confirmation
     elif upper == "STARTED":
         new_status = TaskStatus.in_progress
     elif upper == "HELP" or upper_words[0] == "HELP":
         new_status = TaskStatus.needs_help
+    elif is_update_cmd:
+        new_status = None  # handled separately
     else:
         return None  # Not a command
 
@@ -177,13 +185,19 @@ async def handle_reply(
         }
     logger.info("handle_reply: found employee id=%s name=%r company_id=%s", employee.id, employee.name, employee.company_id)
 
-    # Find most recent pending/in_progress task for this employee — scoped to their company
+    # Find most recent open task for this employee — scoped to their company.
+    # Include needs_help and pending_confirmation so subsequent commands can still target the same task.
     stmt = (
         select(Task)
         .where(
             Task.assigned_employee_id == employee.id,
             Task.company_id == employee.company_id,
-            Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]),
+            Task.status.in_([
+                TaskStatus.pending,
+                TaskStatus.in_progress,
+                TaskStatus.needs_help,
+                TaskStatus.pending_confirmation,
+            ]),
         )
         .order_by(Task.created_at.desc())
         .limit(1)
@@ -193,7 +207,7 @@ async def handle_reply(
 
     if not task:
         logger.warning(
-            "handle_reply: no pending/in-progress task for employee id=%s name=%r",
+            "handle_reply: no open task for employee id=%s name=%r",
             employee.id, employee.name,
         )
         await send_whatsapp_message(
@@ -202,14 +216,66 @@ async def handle_reply(
         )
         return {
             "status": "error",
-            "detail": f"No pending/in-progress task found for {employee.name}",
+            "detail": f"No open task found for {employee.name}",
         }
+
+    # ── UPDATE <text> command ────────────────────────────────────────
+    if is_update_cmd:
+        update_text = stripped[len("UPDATE"):].strip()
+        logger.info("handle_reply: UPDATE for task id=%s text=%r", task.id, update_text[:120])
+
+        # Persist to task_updates table
+        tu = TaskUpdate(
+            task_id=task.id,
+            employee_id=employee.id,
+            update_text=update_text,
+        )
+        db.add(tu)
+
+        # Reflect on the task itself so the dashboard shows it under the task
+        task.last_update = datetime.now()
+        task.last_update_summary = update_text[:500]
+        if task.status == TaskStatus.pending:
+            task.status = TaskStatus.in_progress
+            if not task.started_at:
+                task.started_at = datetime.now()
+
+        await db.flush()
+
+        # Notify CEO
+        manager_phone = await _get_manager_phone(db, employee.company_id)
+        if manager_phone:
+            ceo_msg = (
+                f"📊 *Update from {employee.name}* on task: *{task.title}*\n"
+                f"{update_text}"
+            )
+            await send_whatsapp_message(manager_phone, ceo_msg)
+        else:
+            logger.warning(
+                "No manager phone found for company_id=%s — update logged only.",
+                employee.company_id,
+            )
+
+        await send_whatsapp_message(
+            sender,
+            f"Got it! 👍 Your manager has been updated on \"{task.title}\".",
+        )
+
+        return {
+            "status": "task_update_saved",
+            "employee": employee.name,
+            "task_id": task.id,
+            "task_title": task.title,
+            "update_text": update_text,
+        }
+
     logger.info("handle_reply: updating task id=%s %r → %s", task.id, task.title, new_status)
 
     # Apply the status change + intelligence tracking
     task.status = new_status
-    if new_status == TaskStatus.completed:
-        task.completed_at = datetime.now()
+    if new_status == TaskStatus.pending_confirmation:
+        # Don't set completed_at yet — CEO must confirm first
+        pass
     elif new_status == TaskStatus.in_progress:
         task.started_at = datetime.now()
     elif new_status == TaskStatus.needs_help:
@@ -219,12 +285,28 @@ async def handle_reply(
 
     # Log the action and send confirmations
     status_label = new_status.value
-    if new_status == TaskStatus.completed:
+    if new_status == TaskStatus.pending_confirmation:
         logger.info(
-            'Employee %s marked task "%s" as completed.',
+            'Employee %s marked task "%s" as DONE → pending CEO confirmation.',
             employee.name, task.title,
         )
-        await send_whatsapp_message(sender, f"Great job! ✅ We'll notify your manager that \"{task.title}\" is done. Keep it up!")
+        await send_whatsapp_message(
+            sender,
+            f"Got it! ✅ Your manager has been asked to confirm completion of \"{task.title}\".",
+        )
+        manager_phone = await _get_manager_phone(db, employee.company_id)
+        if manager_phone:
+            ceo_msg = (
+                f"✅ *{employee.name}* says task *{task.title}* is done.\n"
+                f"Reply CONFIRM {task.id} to mark complete\n"
+                f"Reply REJECT {task.id} to send it back"
+            )
+            await send_whatsapp_message(manager_phone, ceo_msg)
+        else:
+            logger.warning(
+                "No manager phone found for company_id=%s — DONE confirmation request logged only.",
+                employee.company_id,
+            )
     elif new_status == TaskStatus.in_progress:
         logger.info(
             'Employee %s marked task "%s" as in_progress.',
@@ -236,42 +318,34 @@ async def handle_reply(
             'Employee %s requested help on task "%s".',
             employee.name, task.title,
         )
-        # Check if HELP was followed by a question (e.g. "HELP how do I measure the pipe?")
+        # Capture the message text after HELP (if any)
         question = stripped[4:].strip() if len(stripped) > 4 else ""
-        if question:
-            # Route question to AI assistant with task context
-            tasks_for_context = [
-                {
-                    "title": task.title,
-                    "description": task.description,
-                    "due_at": task.due_at.strftime("%b %d, %I:%M %p") if task.due_at else None,
-                    "status": task.status.value,
-                }
-            ]
-            ai_reply = await ask_employee_assistant(question, tasks_for_context)
-            await send_whatsapp_message(sender, ai_reply)
-            logger.info("AI assistant replied to %s question: %r", employee.name, question[:80])
-        else:
-            # Bare HELP — acknowledge employee and alert manager
-            await send_whatsapp_message(
-                sender,
-                f"Understood! I've informed your manager about your concern with \"{task.title}\". They'll get back to you soon. Hang tight! 💪",
-            )
-            deadline_str = (
-                task.due_at.strftime("%b %d, %I:%M %p").lstrip("0") if task.due_at else "No deadline"
-            )
+
+        await send_whatsapp_message(
+            sender,
+            f"Understood! I've informed your manager about your concern with \"{task.title}\". They'll get back to you soon. Hang tight! 💪",
+        )
+
+        manager_phone = await _get_manager_phone(db, employee.company_id)
+        if manager_phone:
+            employee_msg = question if question else "(no additional details)"
             help_alert = (
-                f"⚠️ Employee Needs Help\n\n"
-                f"Employee: {employee.name}\n"
-                f"Task: {task.title}\n"
-                f"Deadline: {deadline_str}\n\n"
-                f"The employee requested assistance."
+                f"🆘 *{employee.name}* needs help with task: *{task.title}*\n"
+                f"They said: {employee_msg}\n\n"
+                f"Reply OK to acknowledge"
             )
-            manager_phone = await _get_manager_phone(db, employee.company_id)
-            if manager_phone:
-                await send_whatsapp_message(manager_phone, help_alert)
-            else:
-                logger.warning("No manager phone found for company_id=%s — help alert logged only.", employee.company_id)
+            await send_whatsapp_message(manager_phone, help_alert)
+        else:
+            logger.warning(
+                "No manager phone found for company_id=%s — help alert logged only.",
+                employee.company_id,
+            )
+
+        # Save the help message so it shows on the dashboard under the task
+        if question:
+            task.last_update = datetime.now()
+            task.last_update_summary = f"HELP: {question[:480]}"
+            await db.flush()
 
     return {
         "status": "task_updated",
@@ -289,6 +363,82 @@ async def handle_reply(
 # Regex: "OK" or "DELAY <reason>"
 _OK_PATTERN = re.compile(r"^OK\s*$", re.IGNORECASE)
 _DELAY_PATTERN = re.compile(r"^DELAY\s+(.+)$", re.IGNORECASE | re.DOTALL)
+# CEO confirmation flow for DONE tasks: "CONFIRM 42" / "REJECT 42"
+_CONFIRM_PATTERN = re.compile(r"^CONFIRM\s+(\d+)\s*$", re.IGNORECASE)
+_REJECT_PATTERN = re.compile(r"^REJECT\s+(\d+)\s*$", re.IGNORECASE)
+
+
+async def handle_ceo_confirm_reject(
+    db: AsyncSession,
+    sender: str,
+    text: str,
+    company_id: int,
+) -> dict | None:
+    """Handle CEO replies of the form `CONFIRM <task_id>` / `REJECT <task_id>`.
+
+    Returns a result dict if handled, None otherwise.
+    """
+    stripped = text.strip()
+    confirm_m = _CONFIRM_PATTERN.match(stripped)
+    reject_m = _REJECT_PATTERN.match(stripped)
+    if not confirm_m and not reject_m:
+        return None
+
+    task_id = int((confirm_m or reject_m).group(1))
+    task = await db.get(Task, task_id)
+    if not task or task.company_id != company_id:
+        await send_whatsapp_message(
+            sender,
+            f"PhantomPilot: I couldn't find task #{task_id} in your company.",
+        )
+        return {"status": "ceo_confirm_unknown_task", "task_id": task_id}
+
+    # Look up the assigned employee for notifications
+    employee_phone = None
+    employee_name = task.assigned_to or "the employee"
+    if task.assigned_employee_id:
+        emp = await db.get(Employee, task.assigned_employee_id)
+        if emp:
+            employee_phone = emp.phone_number
+            employee_name = emp.name
+
+    if confirm_m:
+        task.status = TaskStatus.completed
+        task.completed_at = datetime.now()
+        task.progress_percent = 100
+        await db.flush()
+        if employee_phone:
+            await send_whatsapp_message(
+                employee_phone,
+                "Great job! Your manager confirmed completion.",
+            )
+        await send_whatsapp_message(
+            sender,
+            f'Done. "{task.title}" marked as completed.',
+        )
+        return {
+            "status": "task_confirmed_complete",
+            "task_id": task.id,
+            "employee": employee_name,
+        }
+    else:
+        task.status = TaskStatus.in_progress
+        task.completed_at = None
+        await db.flush()
+        if employee_phone:
+            await send_whatsapp_message(
+                employee_phone,
+                "Your manager sent the task back. Please check and redo.",
+            )
+        await send_whatsapp_message(
+            sender,
+            f'Got it. "{task.title}" sent back to {employee_name}.',
+        )
+        return {
+            "status": "task_rejected",
+            "task_id": task.id,
+            "employee": employee_name,
+        }
 
 
 async def forward_to_manager(
@@ -496,6 +646,13 @@ async def process_incoming_message(
         if add_check is not None:
             add_check["message_log_id"] = log.id
             return add_check
+
+        # ── CEO CONFIRM / REJECT for DONE flow ───────────────────────
+        confirm_result = await handle_ceo_confirm_reject(db, sender, text, ceo_company_id)
+        if confirm_result is not None:
+            confirm_result["message_log_id"] = log.id
+            await db.commit()
+            return confirm_result
 
         # ── Manager reply to employee message (OK / DELAY <reason>) ──
         mgr_reply = await handle_manager_reply(db, sender, text, ceo_company_id)

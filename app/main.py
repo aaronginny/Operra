@@ -116,7 +116,7 @@ def signup_page():
 
 @app.get("/login", include_in_schema=False)
 def login_page():
-    return RedirectResponse(url="/static/auth.html")
+    return RedirectResponse(url="/static/auth.html?tab=login")
 
 @app.get("/dashboard", include_in_schema=False)
 def dashboard_page():
