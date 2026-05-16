@@ -1153,6 +1153,7 @@
     <div class="page-section" id="page-enquiries">
       <div class="page-header">
         <div class="page-title">Enquiries</div>
+        <button class="btn-add" id="btnAddEnquiry"><span class="plus">+</span> Add enquiry</button>
       </div>
       <div class="kanban-board" id="kanbanBoard">
         <div class="kanban-column" data-col="follow_up">
@@ -1324,6 +1325,36 @@
     </div>
   </div>
 </div>
+
+<!-- ADD ENQUIRY PANEL -->
+<div class="side-panel-overlay" id="enqPanelOverlay"></div>
+<aside class="side-panel" id="enqPanel">
+  <div class="sp-head">
+    <button class="sp-close" id="enqPanelClose" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <span class="sp-status-label">New Enquiry</span>
+  </div>
+  <div class="sp-body">
+    <div class="sp-title" style="font-size:18px;margin-bottom:22px">Add enquiry</div>
+    <div class="form-group">
+      <label>Customer name</label>
+      <input class="form-input" id="enqName" type="text" placeholder="e.g. Jane Smith" />
+    </div>
+    <div class="form-group">
+      <label>Phone number</label>
+      <input class="form-input" id="enqPhone" type="tel" placeholder="+1 555 123 4567" />
+    </div>
+    <div class="form-group">
+      <label>Service / Notes</label>
+      <textarea class="form-input" id="enqNotes" rows="5" placeholder="What are they enquiring about?" style="resize:vertical;line-height:1.5"></textarea>
+    </div>
+  </div>
+  <div class="sp-footer" style="display:flex">
+    <button class="btn-cancel" id="enqPanelCancel" style="flex:0 0 auto">Cancel</button>
+    <button class="btn-submit" id="enqPanelSubmit" style="flex:1">Add enquiry</button>
+  </div>
+</aside>
 
 <!-- TOAST -->
 <div class="toast-container" id="toastContainer"></div>
@@ -2136,6 +2167,61 @@
   }
   topSearch.addEventListener('input', e => applySearch(e.target.value));
   sideSearch.addEventListener('input', e => applySearch(e.target.value));
+
+  /* ── Add Enquiry Panel ── */
+  function openEnqPanel() {
+    document.getElementById('enqName').value = '';
+    document.getElementById('enqPhone').value = '';
+    document.getElementById('enqNotes').value = '';
+    document.getElementById('enqPanelOverlay').classList.add('open');
+    document.getElementById('enqPanel').classList.add('open');
+    document.getElementById('enqName').focus();
+  }
+  function closeEnqPanel() {
+    document.getElementById('enqPanelOverlay').classList.remove('open');
+    document.getElementById('enqPanel').classList.remove('open');
+  }
+
+  document.getElementById('btnAddEnquiry').addEventListener('click', openEnqPanel);
+  document.getElementById('enqPanelClose').addEventListener('click', closeEnqPanel);
+  document.getElementById('enqPanelCancel').addEventListener('click', closeEnqPanel);
+  document.getElementById('enqPanelOverlay').addEventListener('click', closeEnqPanel);
+
+  document.getElementById('enqPanelSubmit').addEventListener('click', async () => {
+    const name = document.getElementById('enqName').value.trim();
+    if (!name) { toast('Please enter a customer name.', 'error'); return; }
+
+    const btn = document.getElementById('enqPanelSubmit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Adding…';
+
+    try {
+      const res = await fetch(`${API}/enquiries`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+          client_name: name,
+          service_requested: document.getElementById('enqNotes').value.trim() || null,
+          notes: document.getElementById('enqPhone').value.trim() ? `Phone: ${document.getElementById('enqPhone').value.trim()}` : null,
+          status: 'new',
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Failed to create enquiry.');
+      }
+      const newEnq = await res.json();
+      enquiries.unshift(newEnq);
+      renderKanban();
+      toast(`Enquiry for ${name} added.`);
+      closeEnqPanel();
+    } catch (err) {
+      toast(err.message || 'Network error.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add enquiry';
+    }
+  });
 
   /* ── Boot ── */
   loadData();
