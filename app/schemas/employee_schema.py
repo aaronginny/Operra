@@ -11,6 +11,7 @@ class EmployeeCreate(BaseModel):
     name: str
     phone_number: str | None = None
     email: str | None = None
+    gender: str = "neutral"
     is_active: bool = True
     company_id: int | None = None
 
@@ -22,6 +23,7 @@ class EmployeeResponse(BaseModel):
     name: str
     phone_number: str | None = None
     email: str | None = None
+    gender: str = "neutral"
     is_active: bool = True
     company_id: int | None = None
     created_at: datetime

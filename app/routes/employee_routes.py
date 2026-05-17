@@ -78,6 +78,7 @@ async def create_or_update_employee(
             name=payload.name.strip(),
             phone_number=normalized_phone,
             email=payload.email,
+            gender=payload.gender or "neutral",
             company_id=current_user.company_id,
             is_active=payload.is_active,
         )

@@ -326,6 +326,14 @@ _MIGRATIONS = [
         );
         """,
     ),
+    # 026 — gender field for employee character avatars
+    (
+        "employees.gender",
+        """
+        ALTER TABLE employees
+        ADD COLUMN IF NOT EXISTS gender VARCHAR(10) NOT NULL DEFAULT 'neutral';
+        """,
+    ),
 ]
 
 
