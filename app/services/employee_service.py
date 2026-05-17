@@ -103,14 +103,33 @@ async def find_employee_by_name(
     name: str,
     company_id: int | None = None,
 ) -> Employee | None:
-    """Look up an employee by name (case-insensitive). Returns None if not found."""
-    stmt = select(Employee).where(
-        sa_func.lower(Employee.name) == name.strip().lower()
-    )
+    """Look up an employee by name. Tries exact case-insensitive match first,
+    then falls back to a partial ILIKE match."""
+    clean = name.strip()
+    logger.info("find_employee_by_name: searching name=%r company_id=%s", clean, company_id)
+
+    # 1. Exact case-insensitive match
+    stmt = select(Employee).where(sa_func.lower(Employee.name) == clean.lower())
     if company_id is not None:
         stmt = stmt.where(Employee.company_id == company_id)
     result = await db.execute(stmt)
-    return result.scalars().first()
+    employee = result.scalars().first()
+    if employee:
+        logger.info("find_employee_by_name: exact match id=%s name=%r", employee.id, employee.name)
+        return employee
+
+    # 2. Partial ILIKE fallback (handles "Dharshana" matching "Dharshana M")
+    stmt2 = select(Employee).where(Employee.name.ilike(f"%{clean}%"))
+    if company_id is not None:
+        stmt2 = stmt2.where(Employee.company_id == company_id)
+    result2 = await db.execute(stmt2)
+    employee2 = result2.scalars().first()
+    if employee2:
+        logger.info("find_employee_by_name: partial match id=%s name=%r", employee2.id, employee2.name)
+        return employee2
+
+    logger.warning("find_employee_by_name: no match for name=%r company_id=%s", clean, company_id)
+    return None
 
 
 async def get_employee_by_phone(

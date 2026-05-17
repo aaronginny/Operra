@@ -661,10 +661,11 @@ async def process_incoming_message(
             await db.commit()
             return mgr_reply
 
-        # ── CEO HELP <text> — personal help request, not a Control Tower command ──
+        # ── CEO HELP — usage guide (bare "HELP" or "HELP <anything>") ──────────
         stripped_text = text.strip()
         upper_stripped = stripped_text.upper()
-        if upper_stripped.startswith("HELP ") and len(stripped_text) > 5:
+        _is_help = upper_stripped == "HELP" or upper_stripped.startswith("HELP ")
+        if _is_help:
             help_reply = (
                 "Hi! Here's how to use PhantomPilot Control Tower:\n\n"
                 "• \"Assign [task] to [name] by [date]\"\n"
