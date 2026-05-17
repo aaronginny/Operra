@@ -1444,6 +1444,15 @@
       <div class="sp-msg-list" id="spMsgList">
         <div class="msg-empty">Loading…</div>
       </div>
+      <div class="sp-reply-box" id="spReplyBox" style="margin-top:12px; display:none;">
+        <textarea id="spReplyText" class="form-input" rows="3"
+          style="width:100%; resize:vertical; font-size:13px; padding:10px; box-sizing:border-box;"
+          placeholder="Send a message to employee…"></textarea>
+        <button class="btn-submit" id="spReplySend"
+          style="margin-top:8px; width:100%; font-size:13px;">
+          Send via WhatsApp
+        </button>
+      </div>
     </div>
   </div>
   <div class="sp-footer" id="spFooter" style="display:none">
@@ -2057,6 +2066,17 @@
 
     document.getElementById('spMsgList').innerHTML = '<div class="msg-empty">Loading…</div>';
 
+    // Reply box — show only when there's an assigned employee
+    const replyBox = document.getElementById('spReplyBox');
+    const replyText = document.getElementById('spReplyText');
+    if (t.employee && t.employee !== 'Unassigned') {
+      replyBox.style.display = '';
+      replyText.placeholder = `Send a message to ${t.employee}…`;
+      replyText.value = '';
+    } else {
+      replyBox.style.display = 'none';
+    }
+
     document.getElementById('spOverlay').classList.add('open');
     document.getElementById('sidePanel').classList.add('open');
 
@@ -2133,6 +2153,37 @@
     } finally {
       btn.disabled = false;
       btn.textContent = 'Save & notify';
+    }
+  });
+
+  /* ── Manager reply via WhatsApp ── */
+  document.getElementById('spReplySend').addEventListener('click', async () => {
+    if (!openTaskId) return;
+    const text = document.getElementById('spReplyText').value.trim();
+    if (!text) { toast('Please enter a message.', 'error'); return; }
+
+    const btn = document.getElementById('spReplySend');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Sending…';
+
+    try {
+      const res = await fetch(`${API}/tasks/${openTaskId}/message`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ message: text }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Send failed');
+      }
+      const data = await res.json();
+      document.getElementById('spReplyText').value = '';
+      toast(`Sent to ${data.employee} ✓`);
+    } catch (err) {
+      toast(err.message || 'Failed to send message.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send via WhatsApp';
     }
   });
 

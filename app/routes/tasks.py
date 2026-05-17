@@ -372,3 +372,40 @@ async def toggle_checkpoint(
     await db.refresh(task)
 
     return task
+
+
+class TaskMessagePayload(BaseModel):
+    message: str
+
+
+@router.post("/{task_id}/message")
+async def send_task_message(
+    task_id: int,
+    payload: TaskMessagePayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Send a WhatsApp message to the employee assigned to a task."""
+    task = await get_task(db, task_id)
+    if task is None or task.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not payload.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    if not task.assigned_employee_id:
+        raise HTTPException(status_code=400, detail="No employee assigned to this task")
+
+    employee = await db.get(Employee, task.assigned_employee_id)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Assigned employee not found")
+    if not employee.phone_number:
+        raise HTTPException(status_code=400, detail=f"{employee.name} has no phone number on file")
+
+    msg = f"💬 Message from your manager:\n\n{payload.message.strip()}"
+    sent = await send_whatsapp_message(employee.phone_number, msg)
+    if not sent:
+        raise HTTPException(status_code=502, detail="WhatsApp delivery failed")
+
+    logger.info("Manager message sent to %s (task #%s)", employee.name, task_id)
+    return {"status": "sent", "employee": employee.name}
