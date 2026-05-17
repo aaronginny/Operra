@@ -246,6 +246,67 @@
     .page-section { display: none; }
     .page-section.active { display: block; }
 
+    /* ───── ARCHIVE ───── */
+    .archive-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+    .archive-row {
+      display: grid; grid-template-columns: 1fr 180px 140px 130px 130px;
+      align-items: center; gap: 12px;
+      background: var(--card); border: 1px solid var(--border-2);
+      border-radius: 8px; padding: 14px 16px;
+      transition: border-color .15s, background .15s;
+    }
+    .archive-row:hover { border-color: var(--accent); }
+    .archive-row.selected { border-color: var(--accent); background: var(--hover); }
+    .ar-title { font-size: 14px; color: var(--text); font-weight: 500; }
+    .ar-meta { font-size: 12px; color: var(--text-2); }
+    .ar-countdown { font-size: 12px; font-weight: 600; }
+    .ar-countdown.warn { color: var(--orange, #f59e0b); }
+    .ar-countdown.crit { color: var(--red, #ef4444); }
+    .ar-restore {
+      background: var(--accent); color: #fff; border: none;
+      padding: 7px 12px; border-radius: 6px; cursor: pointer;
+      font-size: 12px; font-weight: 500;
+    }
+    .ar-restore:hover { background: var(--accent-hover); }
+    .ar-empty { padding: 40px; text-align: center; color: var(--text-2); }
+
+    /* ───── KEYBOARD SHORTCUTS MODAL ───── */
+    .kbd-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      display: none; align-items: center; justify-content: center; z-index: 200;
+    }
+    .kbd-modal-overlay.open { display: flex; }
+    .kbd-modal {
+      background: var(--card); border: 1px solid var(--border-2);
+      border-radius: 12px; padding: 24px; width: 420px; max-width: 90vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .kbd-modal-title {
+      font-size: 18px; font-weight: 600; color: var(--text);
+      margin-bottom: 14px;
+    }
+    .kbd-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px solid var(--border-2);
+    }
+    .kbd-row:last-child { border-bottom: none; }
+    .kbd-label { font-size: 13px; color: var(--text); }
+    .kbd-key {
+      font-family: 'SF Mono', Menlo, monospace; font-size: 12px; font-weight: 600;
+      background: #2a2a3a; color: #ccc; border: 1px solid #3a3a4a;
+      padding: 3px 8px; border-radius: 4px; min-width: 24px; text-align: center;
+    }
+    .kbd-fab {
+      position: fixed; bottom: 24px; right: 24px;
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--card); border: 1px solid var(--border-2);
+      color: var(--text); font-size: 16px; font-weight: 600;
+      cursor: pointer; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, border-color .15s;
+    }
+    .kbd-fab:hover { background: var(--hover); border-color: var(--accent); }
+
     /* ───── DASHBOARD HOME ───── */
     .home-greeting {
       font-size: 26px; font-weight: 700; color: var(--text);
@@ -1003,6 +1064,10 @@
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       Tasks
     </button>
+    <button class="nav-item" data-nav="archive">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v11a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+      Archive
+    </button>
     <button class="nav-item" data-nav="employees">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       Employees
@@ -1154,6 +1219,17 @@
         <div id="taskGroups">
           <div class="empty-state">Loading tasks…</div>
         </div>
+      </div>
+    </div>
+
+    <!-- ══ ARCHIVE PAGE ══ -->
+    <div class="page-section" id="page-archive">
+      <div class="page-header">
+        <div class="page-title">Archive</div>
+        <div class="page-subtitle" style="color:var(--text-2); font-size:13px;">Completed tasks are auto-deleted 20 days after completion.</div>
+      </div>
+      <div class="archive-list" id="archiveList">
+        <div class="placeholder-page"><div class="spinner"></div></div>
       </div>
     </div>
 
@@ -1333,13 +1409,31 @@
     <span class="sp-status-label" id="spStatus">—</span>
   </div>
   <div class="sp-body">
-    <div class="sp-title" id="spTitle">Task</div>
+    <div class="sp-title-wrap" style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+      <div class="sp-title" id="spTitle" style="margin-bottom:0; flex:1;">Task</div>
+      <button class="sp-edit-btn" id="spEdit" title="Edit task" aria-label="Edit task"
+        style="background:transparent; border:1px solid var(--border-2); color:var(--text-2); padding:6px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+    </div>
+    <div id="spEditedLabel" style="display:none; font-size:11px; color:var(--text-2); margin-bottom:10px;"></div>
     <div class="sp-section">
       <div class="sp-section-label">Details</div>
       <div class="sp-row"><div class="k">Assignee</div><div class="v" id="spAssignee">—</div></div>
       <div class="sp-row"><div class="k">Due date</div><div class="v" id="spDue">—</div></div>
       <div class="sp-row"><div class="k">Status</div><div class="v" id="spStatusVal">—</div></div>
       <div class="sp-row"><div class="k">Pipeline</div><div class="v" id="spPipeline">—</div></div>
+    </div>
+    <!-- Inline edit form (hidden by default) -->
+    <div class="sp-section" id="spEditForm" style="display:none;">
+      <div class="sp-section-label">Edit task</div>
+      <div class="form-group"><label>Title</label><input class="form-input" id="spEditTitle" type="text" /></div>
+      <div class="form-group"><label>Description</label><input class="form-input" id="spEditDesc" type="text" /></div>
+      <div class="form-group"><label>Due date</label><input class="form-input" id="spEditDue" type="datetime-local" /></div>
+      <div class="modal-actions" style="margin-top:8px;">
+        <button class="btn-cancel" id="spEditCancel">Cancel</button>
+        <button class="btn-submit" id="spEditSave">Save &amp; notify</button>
+      </div>
     </div>
     <div class="sp-section" id="spLastUpdateWrap" style="display:none">
       <div class="sp-section-label">Latest update from employee</div>
@@ -1384,6 +1478,30 @@
     <div class="form-group">
       <label>Due date &amp; time</label>
       <input class="form-input" id="fDue" type="datetime-local" />
+    </div>
+    <div class="form-group" style="border-top:1px solid var(--border-2); padding-top:12px; margin-top:4px;">
+      <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>Send reminders</span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="fRemindersOn" checked />
+          <span class="toggle-track"></span>
+        </span>
+      </label>
+    </div>
+    <div class="form-group" id="fReminderFreqGroup">
+      <label>Remind every</label>
+      <select class="form-input" id="fReminderFreq">
+        <option value="1">1 hour</option>
+        <option value="2">2 hours</option>
+        <option value="4" selected>4 hours</option>
+        <option value="8">8 hours</option>
+        <option value="24">Daily</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </div>
+    <div class="form-group" id="fReminderCustomGroup" style="display:none;">
+      <label>Custom interval (hours)</label>
+      <input class="form-input" id="fReminderCustom" type="number" min="1" max="168" placeholder="e.g. 6" />
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="btnModalCancel">Cancel</button>
@@ -1444,6 +1562,22 @@
     <button class="btn-submit" id="enqPanelSubmit" style="flex:1">Add enquiry</button>
   </div>
 </aside>
+
+<!-- KEYBOARD SHORTCUTS MODAL -->
+<div class="kbd-modal-overlay" id="kbdModal">
+  <div class="kbd-modal">
+    <div class="kbd-modal-title">Keyboard shortcuts</div>
+    <div class="kbd-row"><div class="kbd-label">New task</div><div class="kbd-key">N</div></div>
+    <div class="kbd-row"><div class="kbd-label">Go to Home</div><div class="kbd-key">H</div></div>
+    <div class="kbd-row"><div class="kbd-label">Go to Tasks</div><div class="kbd-key">T</div></div>
+    <div class="kbd-row"><div class="kbd-label">Go to Archive</div><div class="kbd-key">A</div></div>
+    <div class="kbd-row"><div class="kbd-label">Go to Employees</div><div class="kbd-key">E</div></div>
+    <div class="kbd-row"><div class="kbd-label">Restore selected archived task</div><div class="kbd-key">R</div></div>
+    <div class="kbd-row"><div class="kbd-label">Close any open panel</div><div class="kbd-key">Esc</div></div>
+    <div class="kbd-row"><div class="kbd-label">Show this dialog</div><div class="kbd-key">?</div></div>
+  </div>
+</div>
+<button class="kbd-fab" id="kbdFab" aria-label="Keyboard shortcuts" title="Shortcuts (?)">?</button>
 
 <!-- TOAST -->
 <div class="toast-container" id="toastContainer"></div>
@@ -1891,6 +2025,25 @@
     document.getElementById('spDue').textContent = due.when + (due.late ? ` · ${due.late}` : '') + (due.soon ? ` · ${due.soon}` : '');
     document.getElementById('spPipeline').textContent = t.pipeline || '—';
 
+    // Edited indicator
+    const editedEl = document.getElementById('spEditedLabel');
+    if (t.edited_at) {
+      const ed = new Date(t.edited_at);
+      const diffMs = Date.now() - ed.getTime();
+      const mins = Math.floor(diffMs / 60000);
+      let rel;
+      if (mins < 1) rel = 'just now';
+      else if (mins < 60) rel = `${mins} min ago`;
+      else if (mins < 1440) rel = `${Math.floor(mins / 60)}h ago`;
+      else rel = `${Math.floor(mins / 1440)}d ago`;
+      editedEl.textContent = `Edited ${rel}`;
+      editedEl.style.display = '';
+    } else {
+      editedEl.style.display = 'none';
+    }
+
+    document.getElementById('spEditForm').style.display = 'none';
+
     const updWrap = document.getElementById('spLastUpdateWrap');
     if (t.last_update_summary) {
       document.getElementById('spLastUpdate').textContent = t.last_update_summary;
@@ -1920,6 +2073,67 @@
   document.getElementById('spOverlay').addEventListener('click', closeSidePanel);
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && openTaskId) closeSidePanel();
+  });
+
+  /* ── Task edit (inline) ── */
+  function openEditForm() {
+    if (!openTaskId) return;
+    const t = allTasks.find(x => x.id == openTaskId);
+    if (!t) return;
+    document.getElementById('spEditTitle').value = t.task || '';
+    document.getElementById('spEditDesc').value = t.description || '';
+    if (t.deadline && t.deadline !== 'No deadline') {
+      const d = new Date(t.deadline);
+      if (!isNaN(d.getTime())) {
+        const off = d.getTimezoneOffset();
+        const local = new Date(d.getTime() - off * 60 * 1000);
+        document.getElementById('spEditDue').value = local.toISOString().slice(0, 16);
+      } else {
+        document.getElementById('spEditDue').value = '';
+      }
+    } else {
+      document.getElementById('spEditDue').value = '';
+    }
+    document.getElementById('spEditForm').style.display = '';
+  }
+  function closeEditForm() { document.getElementById('spEditForm').style.display = 'none'; }
+  document.getElementById('spEdit').addEventListener('click', openEditForm);
+  document.getElementById('spEditCancel').addEventListener('click', closeEditForm);
+  document.getElementById('spEditSave').addEventListener('click', async () => {
+    if (!openTaskId) return;
+    const btn = document.getElementById('spEditSave');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const dueVal = document.getElementById('spEditDue').value;
+    const payload = {
+      title: document.getElementById('spEditTitle').value.trim() || null,
+      description: document.getElementById('spEditDesc').value.trim() || null,
+      due_at: dueVal ? new Date(dueVal).toISOString() : null,
+    };
+    try {
+      const res = await fetch(`${API}/tasks/${openTaskId}`, {
+        method: 'PATCH', headers: headers(), body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      const updated = await res.json();
+      const idx = allTasks.findIndex(x => x.id == updated.id);
+      if (idx >= 0) {
+        allTasks[idx].task = updated.title;
+        allTasks[idx].description = updated.description;
+        allTasks[idx].deadline = updated.due_at || 'No deadline';
+        allTasks[idx].edited_at = updated.edited_at;
+      }
+      render();
+      closeEditForm();
+      openSidePanel(openTaskId);
+      toast('Task updated. Employee notified on WhatsApp.');
+    } catch (err) {
+      toast(err.message || 'Failed to save task.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save & notify';
+    }
   });
 
   async function loadTaskMessages(id) {
@@ -2025,11 +2239,71 @@
     const labels = {
       dashboard: 'Dashboard', tasks: 'Tasks', employees: 'Employees',
       enquiries: 'Enquiries', settings: 'Settings', inbox: 'Inbox',
+      archive: 'Archive',
     };
     document.getElementById('breadcrumbText').textContent = labels[page] || 'Dashboard';
 
     if (page === 'employees') loadEmployees();
     if (page === 'settings') loadReminderSettings();
+    if (page === 'archive') loadArchive();
+  }
+
+  /* ── Archive ── */
+  let _selectedArchiveId = null;
+  async function loadArchive() {
+    const list = document.getElementById('archiveList');
+    list.innerHTML = '<div class="placeholder-page"><div class="spinner"></div></div>';
+    try {
+      const res = await fetch(`${API}/tasks/archive`, { headers: headers() });
+      if (!res.ok) throw new Error('Failed to load archive');
+      const items = await res.json();
+      if (!items.length) {
+        list.innerHTML = '<div class="ar-empty">No completed tasks yet. Completed tasks appear here for 20 days before being auto-deleted.</div>';
+        return;
+      }
+      list.innerHTML = items.map(t => {
+        const completed = t.completed_at ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+        const days = t.days_until_deletion;
+        let cdCls = '';
+        if (days !== null && days <= 3) cdCls = 'crit';
+        else if (days !== null && days <= 7) cdCls = 'warn';
+        const cdText = days === null ? 'No date' : (days === 0 ? 'Deletes today' : `${days} day${days === 1 ? '' : 's'} left`);
+        return `<div class="archive-row" data-archive-id="${t.id}">
+          <div class="ar-title">${escHtml(t.title)}</div>
+          <div class="ar-meta">${escHtml(t.employee_name || 'Unassigned')}</div>
+          <div class="ar-meta">${escHtml(completed)}</div>
+          <div class="ar-countdown ${cdCls}">${escHtml(cdText)}</div>
+          <button class="ar-restore" data-restore="${t.id}">Restore</button>
+        </div>`;
+      }).join('');
+
+      // Row click → select; button click → restore
+      list.querySelectorAll('.archive-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('[data-restore]')) return;
+          list.querySelectorAll('.archive-row').forEach(r => r.classList.remove('selected'));
+          row.classList.add('selected');
+          _selectedArchiveId = parseInt(row.dataset.archiveId, 10);
+        });
+      });
+      list.querySelectorAll('[data-restore]').forEach(btn => {
+        btn.addEventListener('click', () => restoreArchivedTask(btn.dataset.restore));
+      });
+    } catch (err) {
+      list.innerHTML = `<div class="ar-empty">${escHtml(err.message)}</div>`;
+    }
+  }
+
+  async function restoreArchivedTask(id) {
+    try {
+      const res = await fetch(`${API}/tasks/${id}/restore`, { method: 'POST', headers: headers() });
+      if (!res.ok) throw new Error('Restore failed');
+      toast('Task restored. Employee notified.');
+      await loadData();
+      await loadArchive();
+    } catch (err) {
+      toast(err.message || 'Restore failed.', 'error');
+    }
   }
 
   async function loadEmployees() {
@@ -2147,6 +2421,17 @@
     if (e.key === 'Escape') modal.classList.remove('open');
   });
 
+  // Reminder controls — show/hide based on toggle and dropdown
+  document.getElementById('fRemindersOn').addEventListener('change', (e) => {
+    const on = e.target.checked;
+    document.getElementById('fReminderFreqGroup').style.display = on ? '' : 'none';
+    if (!on) document.getElementById('fReminderCustomGroup').style.display = 'none';
+  });
+  document.getElementById('fReminderFreq').addEventListener('change', (e) => {
+    const isCustom = e.target.value === 'custom';
+    document.getElementById('fReminderCustomGroup').style.display = isCustom ? '' : 'none';
+  });
+
   document.getElementById('btnModalSubmit').addEventListener('click', async () => {
     const title = document.getElementById('fTitle').value.trim();
     if (!title) { toast('Please enter a task title.', 'error'); return; }
@@ -2158,12 +2443,27 @@
     const empId = document.getElementById('fEmployee').value;
     const dueVal = document.getElementById('fDue').value;
     const pipelineVal = document.getElementById('fPipeline').value.trim() || null;
+
+    // Reminders config
+    const remOn = document.getElementById('fRemindersOn').checked;
+    let reminderHours = 0; // 0 = disabled
+    if (remOn) {
+      const sel = document.getElementById('fReminderFreq').value;
+      if (sel === 'custom') {
+        const custom = parseInt(document.getElementById('fReminderCustom').value, 10);
+        reminderHours = (!isNaN(custom) && custom > 0) ? custom : 4;
+      } else {
+        reminderHours = parseInt(sel, 10);
+      }
+    }
+
     const payload = {
       title,
       description: document.getElementById('fDesc').value.trim() || null,
       assigned_employee_id: empId ? parseInt(empId) : null,
       due_at: dueVal ? new Date(dueVal).toISOString() : null,
       source_type: 'dashboard',
+      reminder_interval_hours: reminderHours,
     };
 
     try {
@@ -2188,6 +2488,11 @@
       ['fTitle','fDesc','fPipeline'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('fEmployee').value = '';
       document.getElementById('fDue').value = '';
+      document.getElementById('fRemindersOn').checked = true;
+      document.getElementById('fReminderFreq').value = '4';
+      document.getElementById('fReminderCustom').value = '';
+      document.getElementById('fReminderFreqGroup').style.display = '';
+      document.getElementById('fReminderCustomGroup').style.display = 'none';
 
       if (newTask.notify_status === 'sent') {
         toast(`Task created. WhatsApp sent to ${empName}.`);
@@ -2358,6 +2663,64 @@
     } finally {
       btn.disabled = false;
       btn.textContent = 'Add enquiry';
+    }
+  });
+
+  /* ── Keyboard shortcuts ── */
+  const kbdModal = document.getElementById('kbdModal');
+  const openKbdModal = () => kbdModal.classList.add('open');
+  const closeKbdModal = () => kbdModal.classList.remove('open');
+  document.getElementById('kbdFab').addEventListener('click', openKbdModal);
+  kbdModal.addEventListener('click', (e) => { if (e.target === kbdModal) closeKbdModal(); });
+
+  function _isTypingTarget(el) {
+    if (!el) return false;
+    const tag = (el.tagName || '').toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
+  function _anyPanelOpen() {
+    return document.querySelector('.side-panel.open, .modal-overlay.open, .kbd-modal-overlay.open');
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (_isTypingTarget(e.target)) return;
+    // Modifier-using shortcuts are handled elsewhere; we only handle bare keys.
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    // ? — show help (shift+/ on US layouts)
+    if (e.key === '?') {
+      e.preventDefault();
+      openKbdModal();
+      return;
+    }
+
+    // Escape — close any open panel/modal
+    if (e.key === 'Escape') {
+      if (kbdModal.classList.contains('open')) { closeKbdModal(); return; }
+      if (document.getElementById('sidePanel').classList.contains('open')) { closeSidePanel(); return; }
+      if (document.getElementById('enqPanel').classList.contains('open')) { closeEnqPanel(); return; }
+      const m = document.getElementById('modalOverlay');
+      if (m.classList.contains('open')) { m.classList.remove('open'); return; }
+      const em = document.getElementById('empModalOverlay');
+      if (em && em.classList.contains('open')) { em.classList.remove('open'); return; }
+      return;
+    }
+
+    // Don't fire single-key navigation while a modal/panel is open
+    if (_anyPanelOpen()) return;
+
+    const k = (e.key || '').toLowerCase();
+    if (k === 'n') { e.preventDefault(); modal.classList.add('open'); return; }
+    if (k === 'h') { e.preventDefault(); navigateTo('dashboard'); return; }
+    if (k === 't') { e.preventDefault(); navigateTo('tasks'); return; }
+    if (k === 'a') { e.preventDefault(); navigateTo('archive'); return; }
+    if (k === 'e') { e.preventDefault(); navigateTo('employees'); return; }
+    if (k === 'r') {
+      if (currentPage === 'archive' && _selectedArchiveId) {
+        e.preventDefault();
+        restoreArchivedTask(_selectedArchiveId);
+      }
+      return;
     }
   });
 

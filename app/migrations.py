@@ -293,6 +293,22 @@ _MIGRATIONS = [
         ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'pending_confirmation';
         """,
     ),
+    # 023 — per-task reminder schedule (hours)
+    (
+        "tasks.reminder_interval_hours",
+        """
+        ALTER TABLE tasks
+        ADD COLUMN IF NOT EXISTS reminder_interval_hours INTEGER DEFAULT 4;
+        """,
+    ),
+    # 024 — task edit tracking
+    (
+        "tasks.edited_at",
+        """
+        ALTER TABLE tasks
+        ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+        """,
+    ),
 ]
 
 

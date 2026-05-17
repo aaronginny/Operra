@@ -84,6 +84,14 @@ class Task(Base):
     reminder_interval_days: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
+    # Per-task reminder schedule (hours) — overrides company-level reminder_frequency_hours
+    reminder_interval_hours: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=4
+    )
+    # Manager edit tracking
+    edited_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     progress_percent: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
     )

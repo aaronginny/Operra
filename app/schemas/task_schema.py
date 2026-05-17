@@ -17,6 +17,7 @@ class TaskCreate(BaseModel):
     due_at: datetime | None = None
     source_type: str = "whatsapp"
     reminder_interval_days: int | None = None
+    reminder_interval_hours: int | None = None  # per-task override (hours)
     progress_percent: int = 0
     last_update: datetime | None = None
     checkpoints: list[str] | None = None  # e.g. ["Check logo", "Buy fabric"]
@@ -34,6 +35,7 @@ class TaskUpdate(BaseModel):
     due_at: datetime | None = None
     status: str | None = None
     reminder_interval_days: int | None = None
+    reminder_interval_hours: int | None = None
     progress_percent: int | None = None
     last_update: datetime | None = None
     checkpoints: str | None = None  # Raw JSON string
@@ -54,6 +56,9 @@ class TaskResponse(BaseModel):
     source_type: str
     created_at: datetime
     reminder_interval_days: int | None = None
+    reminder_interval_hours: int | None = None
+    edited_at: datetime | None = None
+    completed_at: datetime | None = None
     progress_percent: int
     last_update: datetime | None = None
     last_update_summary: str | None = None

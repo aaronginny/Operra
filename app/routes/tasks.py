@@ -118,6 +118,86 @@ async def create_task_endpoint(
     return response
 
 
+@router.get("/archive")
+async def list_archive(
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """List completed tasks for the current company with a days-until-deletion
+    countdown. Tasks are auto-deleted 20 days after completion."""
+    from datetime import timedelta
+    from app.models.task import TaskStatus
+
+    stmt = (
+        select(Task)
+        .where(
+            Task.company_id == current_user.company_id,
+            Task.status == TaskStatus.completed,
+        )
+        .order_by(Task.completed_at.desc().nullslast())
+    )
+    result = await db.execute(stmt)
+    tasks = list(result.scalars().all())
+
+    now = datetime.utcnow()
+    out = []
+    for t in tasks:
+        completed = t.completed_at
+        completed_naive = completed.replace(tzinfo=None) if completed and completed.tzinfo else completed
+        days_left = None
+        if completed_naive:
+            elapsed = (now - completed_naive).days
+            days_left = max(0, 20 - elapsed)
+
+        employee_name = None
+        if t.assigned_employee_id:
+            emp = await db.get(Employee, t.assigned_employee_id)
+            if emp:
+                employee_name = emp.name
+
+        out.append({
+            "id": t.id,
+            "title": t.title,
+            "employee_name": employee_name or t.assigned_to,
+            "completed_at": completed.isoformat() if completed else None,
+            "days_until_deletion": days_left,
+        })
+    return out
+
+
+@router.post("/{task_id}/restore")
+async def restore_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Restore an archived (completed) task back to pending status and
+    notify the assigned employee."""
+    from app.models.task import TaskStatus
+
+    task = await get_task(db, task_id)
+    if task is None or task.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task.status = TaskStatus.pending
+    task.completed_at = None
+    task.progress_percent = 0
+    await db.flush()
+    await db.refresh(task)
+
+    if task.assigned_employee_id:
+        employee = await db.get(Employee, task.assigned_employee_id)
+        if employee and employee.phone_number:
+            msg = (
+                f"🔄 Your manager has restored task: *{task.title}*\n\n"
+                f"Please continue working on it."
+            )
+            await send_whatsapp_message(employee.phone_number, msg)
+            logger.info("Restore notification sent to %s (task #%s)", employee.name, task.id)
+
+    return {"status": "restored", "task_id": task.id}
+
+
 @router.get("/billing-status")
 async def billing_status(
     db: AsyncSession = Depends(get_db),
@@ -163,12 +243,49 @@ async def update_task_endpoint(
     db: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Partially update a task (e.g. mark as completed)."""
+    """Partially update a task. Tracks manager edits (title/description/due_at)
+    and notifies the assigned employee on WhatsApp with a diff of what changed.
+    """
     task = await get_task(db, task_id)
     if task is None or task.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # ── Capture pre-edit snapshot for diffing ─────────────────────────
+    before = {
+        "title": task.title,
+        "description": task.description,
+        "due_at": task.due_at,
+    }
+
     updated_task = await update_task(db, task_id, payload)
+
+    # ── Diff only manager-visible fields ──────────────────────────────
+    changes: list[str] = []
+    if payload.title is not None and payload.title != before["title"]:
+        changes.append(f"Title → {updated_task.title}")
+    if payload.description is not None and payload.description != before["description"]:
+        changes.append("Description updated")
+    if payload.due_at is not None and payload.due_at != before["due_at"]:
+        due_display = updated_task.due_at.strftime("%b %d, %I:%M %p").lstrip("0") if updated_task.due_at else "—"
+        changes.append(f"Due date → {due_display}")
+
+    if changes:
+        updated_task.edited_at = datetime.utcnow()
+        await db.flush()
+        await db.refresh(updated_task)
+
+        if updated_task.assigned_employee_id:
+            employee = await db.get(Employee, updated_task.assigned_employee_id)
+            if employee and employee.phone_number:
+                change_summary = "\n".join(f"• {c}" for c in changes)
+                msg = (
+                    f"✏️ Your manager updated task: *{updated_task.title}*\n\n"
+                    f"{change_summary}\n\n"
+                    f"Please check your updated task details."
+                )
+                await send_whatsapp_message(employee.phone_number, msg)
+                logger.info("Task edit notification sent to %s (task #%s)", employee.name, updated_task.id)
+
     return updated_task
 
 

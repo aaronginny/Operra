@@ -70,6 +70,8 @@ async def dashboard_tasks(
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "checkpoint_summary": _checkpoint_summary(t.checkpoints),
             "description": t.description,
+            "edited_at": t.edited_at.isoformat() if t.edited_at else None,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
             "pipeline": None,  # not yet stored on the model — client-side only for now
         }
         for t in tasks

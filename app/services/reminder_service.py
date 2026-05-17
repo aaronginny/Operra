@@ -49,6 +49,7 @@ OVERDUE_NAG_INTERVAL = timedelta(hours=4)
 _scheduler_task: asyncio.Task | None = None
 _last_checkin_date = None
 _last_morning_pulse_date = None
+_last_archive_cleanup_date = None
 
 # Cache of {company_id: CompanySettings} refreshed each scheduler tick
 _company_settings_cache: dict[int, CompanySettings] = {}
@@ -197,6 +198,10 @@ async def _check_and_remind() -> None:
             if not _company_reminders_enabled(task.company_id):
                 continue
 
+            # ── Guard: per-task reminders explicitly disabled (hours=0) ──
+            if task.reminder_interval_hours == 0:
+                continue
+
             # ── Guard: skip junk / brand-new tasks ───────────────
             created = (
                 task.created_at.replace(tzinfo=None)
@@ -234,8 +239,9 @@ async def _check_and_remind() -> None:
                             await send_email(assignee_email, msg)
                         logger.info("Marked task #%s as overdue.", task.id)
                     else:
-                        # Already overdue — nag at company-configured frequency
-                        freq_hours = _company_freq_hours(task.company_id)
+                        # Already overdue — nag at per-task frequency if set,
+                        # otherwise fall back to company-configured frequency
+                        freq_hours = task.reminder_interval_hours or _company_freq_hours(task.company_id)
                         nag_interval = timedelta(hours=freq_hours)
                         last_nag = task.last_urgent_reminder_sent or task.due_at
                         last_nag_naive = last_nag.replace(tzinfo=None) if last_nag.tzinfo else last_nag
@@ -326,6 +332,32 @@ def _cooldown_ok(last_sent: datetime | None, now: datetime) -> bool:
     return (now - last) >= NUDGE_COOLDOWN
 
 
+async def _cleanup_archived_tasks() -> None:
+    """Delete completed tasks older than 20 days. Runs at most once per day."""
+    global _last_archive_cleanup_date
+    today = datetime.now().date()
+    if _last_archive_cleanup_date == today:
+        return
+
+    from sqlalchemy import delete
+    cutoff = datetime.now() - timedelta(days=20)
+
+    async with async_session() as db:
+        result = await db.execute(
+            delete(Task).where(
+                Task.status == TaskStatus.completed,
+                Task.completed_at.is_not(None),
+                Task.completed_at < cutoff,
+            )
+        )
+        await db.commit()
+        deleted = result.rowcount or 0
+        if deleted:
+            logger.info("Archive cleanup: deleted %d completed tasks older than 20 days", deleted)
+
+    _last_archive_cleanup_date = today
+
+
 async def _scheduler_loop() -> None:
     """Infinite loop that runs _check_and_remind every CHECK_INTERVAL seconds."""
     logger.info("Reminder scheduler started (interval=%ss).", CHECK_INTERVAL)
@@ -340,6 +372,12 @@ async def _scheduler_loop() -> None:
             await check_and_send_daily_report()
         except Exception:
             logger.exception("Error in daily report check.")
+
+        # Daily archive cleanup (auto-delete completed tasks older than 20 days)
+        try:
+            await _cleanup_archived_tasks()
+        except Exception:
+            logger.exception("Error in archive cleanup.")
 
         await asyncio.sleep(CHECK_INTERVAL)
 

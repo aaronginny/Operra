@@ -45,6 +45,7 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
         status=TaskStatus.pending,
         source_type=SourceType(data.source_type),
         checkpoints=checkpoints_json,
+        reminder_interval_hours=data.reminder_interval_hours if data.reminder_interval_hours is not None else 4,
     )
     db.add(task)
     await db.flush()
