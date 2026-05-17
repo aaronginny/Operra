@@ -260,6 +260,31 @@ _MIGRATIONS = [
         );
         """,
     ),
+    # 021 — fix CEO phone linked to wrong company_id
+    #        The user with whatsapp_number '+919150016161' was registered under
+    #        company_id=14 (a stale signup row) but all real data lives in company_id=1.
+    #        Re-point their company_id so get_ceo_user() resolves the right company,
+    #        then delete any remaining duplicate users in company 14 with no real data.
+    (
+        "users.fix_ceo_company",
+        """
+        UPDATE users
+        SET company_id = 1
+        WHERE whatsapp_number = '+919150016161'
+          AND company_id != 1;
+        """,
+    ),
+    (
+        "users.drop_orphan_company14_users",
+        """
+        DELETE FROM users
+        WHERE company_id = 14
+          AND whatsapp_number IS NULL
+          AND email NOT IN (
+              SELECT email FROM users WHERE company_id = 1 AND email IS NOT NULL
+          );
+        """,
+    ),
 ]
 
 
