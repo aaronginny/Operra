@@ -28,8 +28,35 @@ from app.services.employee_service import (
 from app.services.ceo_command_service import get_ceo_user, handle_ceo_command
 from app.services.messaging_service import send_welcome_message, send_whatsapp_message
 from app.models.user import User, UserRole
+from app.models.notification import Notification
 
 logger = logging.getLogger(__name__)
+
+
+async def _create_notification(
+    db: AsyncSession,
+    company_id: int,
+    task_id: int | None,
+    employee_id: int | None,
+    employee_name: str | None,
+    message: str,
+    notif_type: str,
+) -> None:
+    """Insert a notification row. Silently logs on error — never raises."""
+    try:
+        n = Notification(
+            company_id=company_id,
+            task_id=task_id,
+            employee_id=employee_id,
+            employee_name=employee_name,
+            message=message,
+            type=notif_type,
+            is_read=False,
+        )
+        db.add(n)
+        await db.flush()
+    except Exception:
+        logger.exception("Failed to create notification (non-fatal)")
 
 
 async def _get_manager_phone(db: AsyncSession, company_id: int) -> str | None:
@@ -256,6 +283,12 @@ async def handle_reply(
                 employee.company_id,
             )
 
+        await _create_notification(
+            db, employee.company_id, task.id, employee.id, employee.name,
+            f"{employee.name} sent an update on \"{task.title}\": {update_text[:200]}",
+            "update",
+        )
+
         await send_whatsapp_message(
             sender,
             f"Got it! 👍 Your manager has been updated on \"{task.title}\".",
@@ -307,6 +340,11 @@ async def handle_reply(
                 "No manager phone found for company_id=%s — DONE confirmation request logged only.",
                 employee.company_id,
             )
+        await _create_notification(
+            db, employee.company_id, task.id, employee.id, employee.name,
+            f"{employee.name} marked \"{task.title}\" as done — awaiting your confirmation.",
+            "done",
+        )
     elif new_status == TaskStatus.in_progress:
         logger.info(
             'Employee %s marked task "%s" as in_progress.',
@@ -340,6 +378,12 @@ async def handle_reply(
                 "No manager phone found for company_id=%s — help alert logged only.",
                 employee.company_id,
             )
+
+        await _create_notification(
+            db, employee.company_id, task.id, employee.id, employee.name,
+            f"{employee.name} needs help with \"{task.title}\"{': ' + question[:200] if question else '.'}",
+            "help",
+        )
 
         # Save the help message so it shows on the dashboard under the task
         if question:
@@ -877,7 +921,19 @@ async def process_incoming_message(
                 confirm_msg = f"Great job! ✅ We'll notify your manager that \"{active_task.title}\" is done. Keep it up!" if is_completion else (f"Got it! 👍 Your manager will be updated — {pct}% progress on \"{active_task.title}\". Keep going!" if pct is not None else f"Got it! 👍 Your manager will be updated on \"{active_task.title}\". Keep going!")
                 confirm_msg += checkpoint_msg
                 await send_whatsapp_message(sender, confirm_msg)
-                
+
+                notif_type = "done" if is_completion else "update"
+                notif_msg = (
+                    f"{employee_for_update.name} completed \"{active_task.title}\"."
+                    if is_completion
+                    else f"{employee_for_update.name} updated \"{active_task.title}\": {summary or text[:150]}"
+                )
+                await _create_notification(
+                    db, employee_for_update.company_id, active_task.id,
+                    employee_for_update.id, employee_for_update.name,
+                    notif_msg, notif_type,
+                )
+
                 return {
                     "status": "task_updated",
                     "employee": employee_for_update.name,
@@ -893,6 +949,12 @@ async def process_incoming_message(
         # Forward unrecognized employee messages to the manager
         if employee_for_update and sender != "unknown" and active_task is not None:
             await forward_to_manager(db, employee_for_update, active_task, text)
+            await _create_notification(
+                db, employee_for_update.company_id, active_task.id,
+                employee_for_update.id, employee_for_update.name,
+                f"{employee_for_update.name}: {text[:200]}",
+                "message",
+            )
             await send_whatsapp_message(
                 sender,
                 "📨 Your message has been forwarded to your manager. They'll get back to you shortly!",

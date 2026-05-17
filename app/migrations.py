@@ -309,6 +309,23 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
         """,
     ),
+    # 025 — notifications table (in-app inbox for employee activity)
+    (
+        "notifications.table",
+        """
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+            employee_id INTEGER,
+            employee_name VARCHAR(255),
+            message TEXT NOT NULL,
+            type VARCHAR(20) NOT NULL,
+            is_read BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
 ]
 
 

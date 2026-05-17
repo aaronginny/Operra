@@ -246,6 +246,44 @@
     .page-section { display: none; }
     .page-section.active { display: block; }
 
+    /* ───── INBOX ───── */
+    .notif-card {
+      display: flex; align-items: flex-start; gap: 14px;
+      background: var(--card); border: 1px solid var(--border-2);
+      border-radius: 10px; padding: 14px 16px;
+      transition: border-color .15s;
+    }
+    .notif-card.unread { border-left: 3px solid var(--accent); }
+    .notif-card:hover { border-color: var(--accent); }
+    .notif-av {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--accent); color: #fff; font-weight: 700;
+      font-size: 14px; display: flex; align-items: center;
+      justify-content: center; flex: 0 0 38px;
+    }
+    .notif-body { flex: 1; min-width: 0; }
+    .notif-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+    .notif-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .notif-badge {
+      font-size: 11px; font-weight: 600; padding: 2px 8px;
+      border-radius: 99px; white-space: nowrap;
+    }
+    .notif-badge.help   { background: rgba(239,68,68,.15);  color: #ef4444; }
+    .notif-badge.update { background: rgba(99,102,241,.15); color: #818cf8; }
+    .notif-badge.done   { background: rgba(34,197,94,.15);  color: #22c55e; }
+    .notif-badge.message{ background: rgba(251,191,36,.15); color: #f59e0b; }
+    .notif-time { font-size: 11px; color: var(--text-3); margin-left: auto; white-space: nowrap; }
+    .notif-msg { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notif-actions { margin-top: 8px; }
+    .notif-view {
+      font-size: 12px; color: var(--accent); background: transparent;
+      border: 1px solid var(--accent); padding: 4px 10px;
+      border-radius: 6px; cursor: pointer; font-weight: 500;
+    }
+    .notif-view:hover { background: var(--accent); color: #fff; }
+    .inbox-empty { text-align: center; padding: 60px 20px; color: var(--text-2); }
+    .inbox-empty svg { width: 40px; height: 40px; opacity: .4; margin: 0 auto 12px; display: block; }
+
     /* ───── ARCHIVE ───── */
     .archive-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
     .archive-row {
@@ -1114,8 +1152,9 @@
     </div>
     <div class="topbar-actions">
       <button class="btn-add" id="btnAddTask"><span class="plus">+</span> Add task</button>
-      <button class="topbar-icon-btn" aria-label="Notifications">
+      <button class="topbar-icon-btn" id="btnBell" aria-label="Notifications" style="position:relative;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <span id="bellBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;line-height:1;padding:2px 5px;border-radius:99px;min-width:16px;text-align:center;"></span>
       </button>
       <div class="topbar-avatar" id="topAvatar">A</div>
     </div>
@@ -1288,9 +1327,14 @@
 
     <!-- ══ INBOX PAGE ══ -->
     <div class="page-section" id="page-inbox">
-      <div class="placeholder-page">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg>
-        <p>Inbox — coming soon</p>
+      <div class="page-header" style="align-items:center;">
+        <div class="page-title">Inbox</div>
+        <button class="btn-add" id="btnMarkAllRead" style="background:transparent;border:1px solid var(--border-2);color:var(--text-2);font-size:12px;">
+          Mark all as read
+        </button>
+      </div>
+      <div id="inboxList" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+        <div class="placeholder-page"><div class="spinner"></div></div>
       </div>
     </div>
 
@@ -2297,6 +2341,11 @@
     if (page === 'employees') loadEmployees();
     if (page === 'settings') loadReminderSettings();
     if (page === 'archive') loadArchive();
+    if (page === 'inbox') {
+      loadInbox();
+      // Auto-mark all read when opening inbox
+      markAllRead();
+    }
   }
 
   /* ── Archive ── */
@@ -2717,6 +2766,117 @@
     }
   });
 
+  /* ── Inbox / Notifications ── */
+  function _timeAgo(isoStr) {
+    if (!isoStr) return '';
+    const diff = Date.now() - new Date(isoStr).getTime();
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return 'just now';
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} min ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  const _badgeLabel = { help: '🆘 Help', update: '📊 Update', done: '✅ Done', message: '💬 Message' };
+
+  async function loadInbox() {
+    const list = document.getElementById('inboxList');
+    list.innerHTML = '<div class="placeholder-page"><div class="spinner"></div></div>';
+    try {
+      const res = await fetch(`${API}/notifications`, { headers: headers() });
+      if (!res.ok) throw new Error('Failed to load notifications');
+      const items = await res.json();
+      if (!items.length) {
+        list.innerHTML = `<div class="inbox-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+          <p>No new notifications</p>
+        </div>`;
+        return;
+      }
+      list.innerHTML = items.map(n => {
+        const initials = (n.employee_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const badgeType = n.type || 'message';
+        const badgeLabel = _badgeLabel[badgeType] || '💬 Message';
+        const unreadCls = !n.is_read ? 'unread' : '';
+        const viewBtn = n.task_id
+          ? `<button class="notif-view" data-task="${n.task_id}">View Task →</button>`
+          : '';
+        return `<div class="notif-card ${unreadCls}" data-notif-id="${n.id}">
+          <div class="notif-av">${escHtml(initials)}</div>
+          <div class="notif-body">
+            <div class="notif-top">
+              <span class="notif-name">${escHtml(n.employee_name || 'Employee')}</span>
+              <span class="notif-badge ${badgeType}">${badgeLabel}</span>
+              <span class="notif-time">${_timeAgo(n.created_at)}</span>
+            </div>
+            <div class="notif-msg">${escHtml(n.message)}</div>
+            ${viewBtn ? `<div class="notif-actions">${viewBtn}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+      // View Task → open Tasks page + side panel for that task
+      list.querySelectorAll('[data-task]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const taskId = btn.dataset.task;
+          navigateTo('tasks');
+          // Wait a tick for the tasks page to render then open the panel
+          setTimeout(() => openSidePanel(taskId), 80);
+        });
+      });
+    } catch (err) {
+      list.innerHTML = `<div class="inbox-empty">${escHtml(err.message)}</div>`;
+    }
+  }
+
+  async function updateNotifCount() {
+    try {
+      const res = await fetch(`${API}/notifications/count`, { headers: headers() });
+      if (!res.ok) return;
+      const { count } = await res.json();
+
+      // Bell badge
+      const bell = document.getElementById('bellBadge');
+      if (count > 0) {
+        bell.textContent = count > 99 ? '99+' : count;
+        bell.style.display = '';
+      } else {
+        bell.style.display = 'none';
+      }
+
+      // Sidebar badge
+      const sideInbox = document.getElementById('sidebarInboxBadge');
+      if (count > 0) {
+        sideInbox.textContent = count > 99 ? '99+' : count;
+        sideInbox.style.display = '';
+      } else {
+        sideInbox.style.display = 'none';
+      }
+    } catch (_) {}
+  }
+
+  async function markAllRead() {
+    try {
+      await fetch(`${API}/notifications/read-all`, { method: 'POST', headers: headers() });
+      await updateNotifCount();
+      // Refresh list cards to remove unread styling
+      document.querySelectorAll('.notif-card.unread').forEach(c => c.classList.remove('unread'));
+    } catch (_) {}
+  }
+
+  document.getElementById('btnMarkAllRead').addEventListener('click', async () => {
+    await markAllRead();
+    toast('All notifications marked as read.');
+  });
+
+  // Bell → go to Inbox
+  document.getElementById('btnBell').addEventListener('click', () => navigateTo('inbox'));
+
+  // Poll count every 30 s
+  setInterval(updateNotifCount, 30000);
+
   /* ── Keyboard shortcuts ── */
   const kbdModal = document.getElementById('kbdModal');
   const openKbdModal = () => kbdModal.classList.add('open');
@@ -2777,6 +2937,7 @@
 
   /* ── Boot ── */
   loadData();
+  updateNotifCount();
   setInterval(loadData, 30000);
 </script>
 </body>

@@ -11,3 +11,4 @@ from app.models.project import Project  # noqa: F401
 from app.models.task_message import TaskMessage  # noqa: F401
 from app.models.task_update import TaskUpdate  # noqa: F401
 from app.models.company_settings import CompanySettings  # noqa: F401
+from app.models.notification import Notification  # noqa: F401
