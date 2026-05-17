@@ -106,7 +106,15 @@ async def find_employee_by_name(
     """Look up an employee by name. Tries exact case-insensitive match first,
     then falls back to a partial ILIKE match."""
     clean = name.strip()
-    logger.info("find_employee_by_name: searching name=%r company_id=%s", clean, company_id)
+    print(f"EMPLOYEE LOOKUP: searching for '{clean}' in company {company_id}", flush=True)
+
+    # Dump all employees in company for debug visibility in Render logs
+    _all_stmt = select(Employee)
+    if company_id is not None:
+        _all_stmt = _all_stmt.where(Employee.company_id == company_id)
+    _all_result = await db.execute(_all_stmt)
+    _all_emps = _all_result.scalars().all()
+    print(f"EMPLOYEE LOOKUP: found {len(_all_emps)} employees: {[e.name for e in _all_emps]}", flush=True)
 
     # 1. Exact case-insensitive match
     stmt = select(Employee).where(sa_func.lower(Employee.name) == clean.lower())
