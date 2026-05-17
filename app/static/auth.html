@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PhantomPilot — Sign In</title>
+<link rel="icon" type="image/png" href="/static/images/logo-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -15,7 +16,8 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 @keyframes ghostFloat{0%,100%{transform:translateY(-50%) translateY(0)}50%{transform:translateY(-50%) translateY(-20px)}}
 .page{position:fixed;inset:0;z-index:10;display:flex;align-items:stretch}
 .left{width:45%;display:flex;flex-direction:column;justify-content:center;padding:60px 64px;border-right:0.5px solid #333;position:relative}
-.left-logo{position:absolute;top:32px;left:48px;font-family:'Playfair Display',serif;font-size:16px;color:#fff;letter-spacing:0.02em;text-decoration:none}
+.left-logo{position:absolute;top:32px;left:48px;font-family:'Playfair Display',serif;font-size:16px;color:#fff;letter-spacing:0.02em;text-decoration:none;display:flex;align-items:center;gap:8px}
+.left-logo img{width:28px;height:28px;object-fit:contain}
 .left-tagline{font-family:'Playfair Display',serif;font-size:clamp(32px,3.5vw,52px);font-weight:400;line-height:1.05;letter-spacing:-0.02em}
 .left-tagline .glow{display:block;text-shadow:0 0 40px rgba(255,255,255,0.8),0 0 80px rgba(255,255,255,0.25)}
 .left-tagline .dim{display:block;color:#888;font-style:italic}
@@ -99,7 +101,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 </div>
 <div class="page">
   <div class="left">
-    <a href="/" class="left-logo">PhantomPilot</a>
+    <a href="/" class="left-logo"><img src="/static/images/logo-icon.png" alt="PhantomPilot logo" />PhantomPilot</a>
     <div class="left-tagline">
       <span class="glow">Your team.</span>
       <span class="dim">Managed.</span>

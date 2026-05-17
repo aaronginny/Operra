@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PhantomPilot — Run Your Team from WhatsApp</title>
+<link rel="icon" type="image/png" href="/static/images/logo-icon.png">
 <meta name="description" content="Assign tasks, track progress, and manage your entire operation from WhatsApp. No app downloads. Built for Indian businesses.">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -23,7 +24,8 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
 .nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 0;transition:all .35s ease}
 .nav.scrolled{background:rgba(6,6,10,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.05);padding:14px 0}
 .nav .container{display:flex;align-items:center;justify-content:space-between}
-.nav-logo{font-family:Georgia,serif;font-size:1.2rem;color:#fff;letter-spacing:-.3px}
+.nav-logo{font-family:Georgia,serif;font-size:1.2rem;color:#fff;letter-spacing:-.3px;display:flex;align-items:center;gap:8px;text-decoration:none}
+.nav-logo img{width:28px;height:28px;object-fit:contain}
 .nav-links{display:flex;align-items:center;gap:36px}
 .nav-links a{font-size:.82rem;color:#666;letter-spacing:.5px;transition:color .2s}
 .nav-links a:hover{color:#fff}
@@ -216,7 +218,7 @@ h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;color:#fff;font-weight:4
 <!-- ═══════════════ NAVBAR ═══════════════ -->
 <nav class="nav" id="navbar">
   <div class="container">
-    <a href="#" class="nav-logo">PhantomPilot</a>
+    <a href="#" class="nav-logo"><img src="/static/images/logo-icon.png" alt="PhantomPilot" />PhantomPilot</a>
     <div class="nav-links" id="navLinks">
       <a href="#features" onclick="closeNav()">Features</a>
       <a href="#pricing" onclick="closeNav()">Pricing</a>
