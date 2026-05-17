@@ -285,6 +285,14 @@ _MIGRATIONS = [
           );
         """,
     ),
+    # 022 — add pending_confirmation value to PostgreSQL taskstatus enum
+    #        IF NOT EXISTS is supported since PostgreSQL 9.6 — safe to re-run.
+    (
+        "022_taskstatus_pending_confirmation",
+        """
+        ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'pending_confirmation';
+        """,
+    ),
 ]
 
 
