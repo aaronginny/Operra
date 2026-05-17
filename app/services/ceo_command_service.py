@@ -73,6 +73,10 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
             logger.info("CEO parse: corrected employee_name %r → %r", emp, fixed_name)
             parsed = {**parsed, "employee_name": fixed_name}
 
+    # ── Normalize employee_name: strip whitespace ──────────────────────────────
+    if parsed.get("employee_name"):
+        parsed = {**parsed, "employee_name": parsed["employee_name"].strip()}
+
     # ── Fix 2: intent is send_message but message has deadline/date → update_task ──
     if parsed.get("intent") == "send_message":
         has_update_kw = any(kw in text_lower for kw in _UPDATE_KEYWORDS)

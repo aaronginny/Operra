@@ -661,6 +661,24 @@ async def process_incoming_message(
             await db.commit()
             return mgr_reply
 
+        # ── CEO HELP <text> — personal help request, not a Control Tower command ──
+        stripped_text = text.strip()
+        upper_stripped = stripped_text.upper()
+        if upper_stripped.startswith("HELP ") and len(stripped_text) > 5:
+            help_reply = (
+                "Hi! Here's how to use PhantomPilot Control Tower:\n\n"
+                "• \"Assign [task] to [name] by [date]\"\n"
+                "• \"Tell [name] the deadline for [task] is now [date]\"\n"
+                "• \"How is [name] doing on [task]?\"\n"
+                "• \"Mark [name]'s [task] as complete\"\n"
+                "• \"Tell [name] to [message]\"\n"
+                "• \"Update [name]'s [task] description to [text]\"\n\n"
+                "Need more help? Visit your dashboard."
+            )
+            await send_whatsapp_message(sender, help_reply)
+            await db.commit()
+            return {"status": "ceo_help_info", "message_log_id": log.id}
+
         ceo_result = await handle_ceo_command(db, ceo_user, sender, text)
         ceo_result["message_log_id"] = log.id
         # Send the reply back to the CEO via WhatsApp
