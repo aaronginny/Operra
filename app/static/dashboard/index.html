@@ -2320,7 +2320,7 @@
   async function loadTaskMessages(id) {
     const listEl = document.getElementById('spMsgList');
     try {
-      const res = await fetch(`${API}/dashboard/tasks/${id}/messages`, { headers: headers() });
+      const res = await fetch(`${API}/api/dashboard/tasks/${id}/messages`, { headers: headers() });
       if (!res.ok) throw new Error();
       const msgs = await res.json();
       if (!msgs.length) {
