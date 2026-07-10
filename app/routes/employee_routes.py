@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.employee import Employee
 from app.models.task import Task, TaskStatus
-from app.schemas.employee_schema import EmployeeCreate, EmployeeResponse
+from app.schemas.employee_schema import EmployeeCreate, EmployeeResponse, EmployeeUpdate
 from app.schemas.task_schema import TaskResponse
 from app.dependencies import get_current_user
 from app.schemas.auth_schema import CurrentUser
@@ -131,6 +131,38 @@ async def list_employees(
         employees.append(emp)
 
     return employees
+
+
+@router.patch("/{employee_id}", response_model=EmployeeResponse)
+async def update_employee(
+    employee_id: int,
+    payload: EmployeeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update an existing employee's name, phone, role, and/or gender."""
+
+    employee = await db.get(Employee, employee_id)
+    if not employee or employee.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name cannot be empty")
+        employee.name = name
+    if payload.phone_number is not None:
+        phone = payload.phone_number.strip()
+        employee.phone_number = normalize_phone_number(phone) if phone else None
+    if payload.role is not None:
+        employee.role = payload.role.strip() or None
+    if payload.gender is not None:
+        employee.gender = payload.gender
+
+    await db.flush()
+    await db.refresh(employee)
+    logger.info("Employee patched: id=%s name=%r", employee.id, employee.name)
+    return employee
 
 
 @router.get("/{employee_id}")

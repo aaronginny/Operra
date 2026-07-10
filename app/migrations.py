@@ -334,6 +334,14 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS gender VARCHAR(10) NOT NULL DEFAULT 'neutral';
         """,
     ),
+    # 027 — role field for employee cards (job title, editable from dashboard)
+    (
+        "employees.role",
+        """
+        ALTER TABLE employees
+        ADD COLUMN IF NOT EXISTS role VARCHAR(255) DEFAULT NULL;
+        """,
+    ),
 ]
 
 

@@ -11,9 +11,19 @@ class EmployeeCreate(BaseModel):
     name: str
     phone_number: str | None = None
     email: str | None = None
+    role: str | None = None
     gender: str = "neutral"
     is_active: bool = True
     company_id: int | None = None
+
+
+class EmployeeUpdate(BaseModel):
+    """Payload to update an existing employee's editable fields."""
+
+    name: str | None = None
+    phone_number: str | None = None
+    role: str | None = None
+    gender: str | None = None
 
 
 class EmployeeResponse(BaseModel):
@@ -23,6 +33,7 @@ class EmployeeResponse(BaseModel):
     name: str
     phone_number: str | None = None
     email: str | None = None
+    role: str | None = None
     gender: str = "neutral"
     is_active: bool = True
     company_id: int | None = None

@@ -1602,6 +1602,45 @@
   </div>
 </div>
 
+<!-- EDIT EMPLOYEE PANEL -->
+<div class="side-panel-overlay" id="empEditPanelOverlay"></div>
+<aside class="side-panel" id="empEditPanel">
+  <div class="sp-head">
+    <button class="sp-close" id="empEditPanelClose" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <span class="sp-status-label">Edit Employee</span>
+  </div>
+  <div class="sp-body">
+    <div class="sp-title" style="font-size:18px;margin-bottom:22px">Edit employee</div>
+    <input type="hidden" id="empEditId" />
+    <div class="form-group">
+      <label>Full name</label>
+      <input class="form-input" id="empEditName" type="text" placeholder="e.g. Sarah Johnson" />
+    </div>
+    <div class="form-group">
+      <label>WhatsApp number (with country code)</label>
+      <input class="form-input" id="empEditPhone" type="tel" placeholder="+1 555 123 4567" />
+    </div>
+    <div class="form-group">
+      <label>Role</label>
+      <input class="form-input" id="empEditRole" type="text" placeholder="e.g. Sales Executive" />
+    </div>
+    <div class="form-group">
+      <label>Gender</label>
+      <select class="form-input" id="empEditGender">
+        <option value="neutral">Neutral (initials)</option>
+        <option value="male">Male character</option>
+        <option value="female">Female character</option>
+      </select>
+    </div>
+  </div>
+  <div class="sp-footer">
+    <button class="btn-cancel" id="empEditCancel" style="flex:1">Cancel</button>
+    <button class="btn-submit" id="empEditSave" style="flex:1">Save changes</button>
+  </div>
+</aside>
+
 <!-- ADD ENQUIRY PANEL -->
 <div class="side-panel-overlay" id="enqPanelOverlay"></div>
 <aside class="side-panel" id="enqPanel">
@@ -2498,6 +2537,7 @@
     try {
       const res = await fetch(`${API}/employees`, { headers: headers() });
       const emps = await res.json();
+      employees = emps;
       if (!emps.length) {
         grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><p>No employees yet.</p></div>';
         return;
@@ -2515,11 +2555,14 @@
               ${avatarSVG(e.name, e.gender || 'neutral')}
               <span class="status-dot ${dotClass}"></span>
             </div>
-            <div>
+            <div style="flex:1;min-width:0;">
               <div class="emp-name">${escHtml(e.name || 'Unknown')}</div>
               <div class="emp-role">${escHtml(e.role || 'Team Member')}</div>
               ${e.phone_number ? `<div class="emp-phone">${escHtml(e.phone_number)}</div>` : '<div class="emp-phone" style="color:var(--text-3)">No phone set</div>'}
             </div>
+            <button class="icon-btn emp-edit-btn" data-emp-id="${e.id}" aria-label="Edit employee" title="Edit employee">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+            </button>
           </div>
           <div class="emp-stats">
             <div class="emp-stat">
@@ -2533,6 +2576,9 @@
           </div>
         </div>`;
       }).join('');
+      grid.querySelectorAll('.emp-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => openEmpEditPanel(btn.dataset.empId));
+      });
     } catch {
       grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><p>Failed to load employees.</p></div>';
     }
@@ -2587,6 +2633,65 @@
     } finally {
       btn.disabled = false;
       btn.textContent = 'Add Employee';
+    }
+  });
+
+  /* ── Edit Employee Panel ── */
+  function openEmpEditPanel(employeeId) {
+    const emp = employees.find(x => String(x.id) === String(employeeId));
+    if (!emp) { toast('Employee not found.', 'error'); return; }
+    document.getElementById('empEditId').value = emp.id;
+    document.getElementById('empEditName').value = emp.name || '';
+    document.getElementById('empEditPhone').value = emp.phone_number || '';
+    document.getElementById('empEditRole').value = emp.role || '';
+    document.getElementById('empEditGender').value = emp.gender || 'neutral';
+    document.getElementById('empEditPanelOverlay').classList.add('open');
+    document.getElementById('empEditPanel').classList.add('open');
+    document.getElementById('empEditName').focus();
+  }
+  function closeEmpEditPanel() {
+    document.getElementById('empEditPanelOverlay').classList.remove('open');
+    document.getElementById('empEditPanel').classList.remove('open');
+  }
+
+  document.getElementById('empEditPanelClose').addEventListener('click', closeEmpEditPanel);
+  document.getElementById('empEditCancel').addEventListener('click', closeEmpEditPanel);
+  document.getElementById('empEditPanelOverlay').addEventListener('click', closeEmpEditPanel);
+
+  document.getElementById('empEditSave').addEventListener('click', async () => {
+    const id = document.getElementById('empEditId').value;
+    const name = document.getElementById('empEditName').value.trim();
+    if (!name) { toast('Please enter a name.', 'error'); return; }
+
+    const btn = document.getElementById('empEditSave');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Saving…';
+
+    try {
+      const res = await fetch(`${API}/employees/${id}`, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({
+          name,
+          phone_number: document.getElementById('empEditPhone').value.trim() || null,
+          role: document.getElementById('empEditRole').value.trim() || null,
+          gender: document.getElementById('empEditGender').value || 'neutral',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast('Employee updated');
+        closeEmpEditPanel();
+        loadEmployees();
+        loadData();
+      } else {
+        toast(data.detail || 'Failed to update employee.', 'error');
+      }
+    } catch {
+      toast('Network error — please try again.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save changes';
     }
   });
 
@@ -2997,6 +3102,7 @@
       if (kbdModal.classList.contains('open')) { closeKbdModal(); return; }
       if (document.getElementById('sidePanel').classList.contains('open')) { closeSidePanel(); return; }
       if (document.getElementById('enqPanel').classList.contains('open')) { closeEnqPanel(); return; }
+      if (document.getElementById('empEditPanel').classList.contains('open')) { closeEmpEditPanel(); return; }
       const m = document.getElementById('modalOverlay');
       if (m.classList.contains('open')) { m.classList.remove('open'); return; }
       const em = document.getElementById('empModalOverlay');

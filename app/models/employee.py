@@ -15,6 +15,7 @@ class Employee(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    role: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gender: Mapped[str] = mapped_column(String(10), nullable=False, default="neutral")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     company_id: Mapped[int | None] = mapped_column(
