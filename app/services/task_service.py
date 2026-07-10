@@ -46,6 +46,7 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
         source_type=SourceType(data.source_type),
         checkpoints=checkpoints_json,
         reminder_interval_hours=data.reminder_interval_hours if data.reminder_interval_hours is not None else 4,
+        department_id=data.department_id,
     )
     db.add(task)
     await db.flush()
@@ -57,13 +58,16 @@ async def get_tasks(
     db: AsyncSession,
     company_id: int | None = None,
     status: str | None = None,
+    department_id: int | None = None,
 ) -> list[Task]:
-    """Return tasks, optionally filtered by company and/or status."""
+    """Return tasks, optionally filtered by company, status and/or department."""
     stmt = select(Task).order_by(Task.created_at.desc())
     if company_id is not None:
         stmt = stmt.where(Task.company_id == company_id)
     if status is not None:
         stmt = stmt.where(Task.status == TaskStatus(status))
+    if department_id is not None:
+        stmt = stmt.where(Task.department_id == department_id)
     result = await db.execute(stmt)
     return list(result.scalars().all())
 

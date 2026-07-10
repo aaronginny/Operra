@@ -72,6 +72,7 @@ async def dashboard_tasks(
             "description": t.description,
             "edited_at": t.edited_at.isoformat() if t.edited_at else None,
             "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "department_id": t.department_id,
             "pipeline": None,  # not yet stored on the model — client-side only for now
         }
         for t in tasks
@@ -97,6 +98,8 @@ async def dashboard_employees(
             "id": e.id,
             "name": e.name,
             "phone_number": e.phone_number,
+            "gender": e.gender,
+            "department_id": e.department_id,
         }
         for e in employees
     ]

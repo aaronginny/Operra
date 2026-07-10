@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.employee import Employee
+from app.models.department import Department
 from app.models.task import Task, TaskStatus
 from app.schemas.employee_schema import EmployeeCreate, EmployeeResponse, EmployeeUpdate
 from app.schemas.task_schema import TaskResponse
@@ -41,6 +42,8 @@ async def create_or_update_employee(
             employee.phone_number = normalize_phone_number(payload.phone_number)
         if payload.email is not None:
             employee.email = payload.email
+        if payload.department_id is not None:
+            employee.department_id = payload.department_id
         employee.is_active = payload.is_active
         await db.flush()
         await db.refresh(employee)
@@ -80,6 +83,7 @@ async def create_or_update_employee(
             email=payload.email,
             gender=payload.gender or "neutral",
             company_id=current_user.company_id,
+            department_id=payload.department_id,
             is_active=payload.is_active,
         )
         db.add(employee)
@@ -117,8 +121,13 @@ async def list_employees(
     )
 
     stmt = (
-        select(Employee, sa_func.coalesce(subq.c.active_task_count, 0).label("active_task_count"))
+        select(
+            Employee,
+            sa_func.coalesce(subq.c.active_task_count, 0).label("active_task_count"),
+            Department.name.label("department_name"),
+        )
         .outerjoin(subq, Employee.id == subq.c.assigned_employee_id)
+        .outerjoin(Department, Employee.department_id == Department.id)
         .where(Employee.company_id == current_user.company_id)
         .order_by(Employee.name)
     )
@@ -126,8 +135,9 @@ async def list_employees(
     result = await db.execute(stmt)
 
     employees = []
-    for emp, count in result:
+    for emp, count, department_name in result:
         emp.active_task_count = count
+        emp.department_name = department_name
         employees.append(emp)
 
     return employees
@@ -158,10 +168,20 @@ async def update_employee(
         employee.role = payload.role.strip() or None
     if payload.gender is not None:
         employee.gender = payload.gender
+    if payload.department_id is not None:
+        # -1 sentinel clears the department (unassign); any other id sets it
+        employee.department_id = None if payload.department_id == -1 else payload.department_id
 
     await db.flush()
     await db.refresh(employee)
-    logger.info("Employee patched: id=%s name=%r", employee.id, employee.name)
+    logger.info("Employee patched: id=%s name=%r dept=%s", employee.id, employee.name, employee.department_id)
+
+    # Reload department name for the response
+    if employee.department_id:
+        dept = await db.get(Department, employee.department_id)
+        employee.department_name = dept.name if dept else None
+    else:
+        employee.department_name = None
     return employee
 
 

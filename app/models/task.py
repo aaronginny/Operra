@@ -109,6 +109,10 @@ class Task(Base):
     project_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("projects.id"), nullable=True, index=True
     )
+    # Department/team grouping (nullable — tasks can be untagged)
+    department_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("departments.id"), nullable=True, index=True
+    )
 
     # Relationships
     assigned_employee = relationship("Employee", back_populates="tasks")

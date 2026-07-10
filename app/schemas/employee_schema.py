@@ -15,6 +15,7 @@ class EmployeeCreate(BaseModel):
     gender: str = "neutral"
     is_active: bool = True
     company_id: int | None = None
+    department_id: int | None = None
 
 
 class EmployeeUpdate(BaseModel):
@@ -24,6 +25,7 @@ class EmployeeUpdate(BaseModel):
     phone_number: str | None = None
     role: str | None = None
     gender: str | None = None
+    department_id: int | None = None
 
 
 class EmployeeResponse(BaseModel):
@@ -37,6 +39,8 @@ class EmployeeResponse(BaseModel):
     gender: str = "neutral"
     is_active: bool = True
     company_id: int | None = None
+    department_id: int | None = None
+    department_name: str | None = None
     created_at: datetime
     active_task_count: int = 0
 

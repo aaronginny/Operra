@@ -342,16 +342,80 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS role VARCHAR(255) DEFAULT NULL;
         """,
     ),
+    # 028 — departments/teams table (multi-business support)
+    (
+        "departments.table",
+        """
+        CREATE TABLE IF NOT EXISTS departments (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+            name VARCHAR(100),
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        """,
+    ),
+    # 029 — department_id FK on employees (assign a team member to a department)
+    (
+        "employees.department_id",
+        """
+        ALTER TABLE employees
+        ADD COLUMN IF NOT EXISTS department_id INTEGER
+            REFERENCES departments(id) ON DELETE SET NULL DEFAULT NULL;
+        """,
+    ),
+    # 030 — department_id FK on tasks (tag/filter tasks by team)
+    (
+        "tasks.department_id",
+        """
+        ALTER TABLE tasks
+        ADD COLUMN IF NOT EXISTS department_id INTEGER
+            REFERENCES departments(id) ON DELETE SET NULL DEFAULT NULL;
+        """,
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# SQLite fallbacks — the PostgreSQL migrations above use `IF NOT EXISTS`,
+# `SERIAL` and `REFERENCES … ON DELETE`, which SQLite does not accept. On a
+# fresh SQLite dev DB `create_all` builds every table/column from the ORM
+# models, but existing SQLite DBs still need these ALTERs. SQLite ignores the
+# duplicate-column error via the try/except in run_migrations().
+# ---------------------------------------------------------------------------
+
+_SQLITE_MIGRATIONS = [
+    (
+        "sqlite.departments.table",
+        """
+        CREATE TABLE IF NOT EXISTS departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER REFERENCES companies(id),
+            name VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.employees.department_id",
+        "ALTER TABLE employees ADD COLUMN department_id INTEGER REFERENCES departments(id);",
+    ),
+    (
+        "sqlite.tasks.department_id",
+        "ALTER TABLE tasks ADD COLUMN department_id INTEGER REFERENCES departments(id);",
+    ),
 ]
 
 
 async def run_migrations(engine: AsyncEngine) -> None:
     """Run all pending column migrations on startup."""
+    is_sqlite = engine.dialect.name == "sqlite"
+    migrations = _SQLITE_MIGRATIONS if is_sqlite else _MIGRATIONS
+
     async with engine.begin() as conn:
-        for name, sql in _MIGRATIONS:
+        for name, sql in migrations:
             try:
                 await conn.execute(text(sql.strip()))
                 logger.info("Migration OK: %s", name)
             except Exception as exc:
-                # Log but don't crash — column may already exist on non-PG drivers
+                # Log but don't crash — column may already exist on this driver
                 logger.warning("Migration skipped (%s): %s", name, exc)

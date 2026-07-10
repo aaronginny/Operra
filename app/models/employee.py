@@ -21,6 +21,9 @@ class Employee(Base):
     company_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("companies.id"), nullable=True
     )
+    department_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("departments.id"), nullable=True
+    )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

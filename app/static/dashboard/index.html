@@ -143,6 +143,34 @@
       background: rgba(255,255,255,0.22); color: #fff;
     }
 
+    /* ── Department sub-items under Tasks ── */
+    .nav-sub { display: flex; flex-direction: column; margin: 2px 0 4px 0; }
+    .nav-subitem {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 12px 5px 34px; margin: 0.5px 0;
+      border-radius: 6px; cursor: pointer;
+      color: var(--text-3); font-size: 12.5px; font-weight: 500;
+      background: transparent; border: none; width: 100%;
+      text-align: left; font-family: var(--font);
+      transition: background 0.16s, color 0.16s;
+      position: relative;
+    }
+    .nav-subitem::before {
+      content: ''; position: absolute; left: 20px; top: 0; bottom: 0;
+      width: 1px; background: var(--border-2);
+    }
+    .nav-subitem:hover { background: var(--hover); color: var(--text); }
+    .nav-subitem.active { color: var(--text); font-weight: 600; }
+    .nav-subitem.active .nav-subdot { background: var(--accent); }
+    .nav-subdot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-3); flex: 0 0 6px;
+    }
+    .nav-subitem .sub-count {
+      margin-left: auto; font-size: 10px; font-weight: 700;
+      color: var(--text-3);
+    }
+
     .sidebar-foot {
       margin-top: auto; padding: 10px;
       background: var(--panel);
@@ -481,6 +509,24 @@
     .team-list {
       display: flex; flex-direction: column;
     }
+    /* ── Department grouping in the home team-status panel ── */
+    .team-dept:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .team-dept-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 11px 20px 7px;
+      background: var(--bg);
+    }
+    .team-dept-name {
+      font-size: 12px; font-weight: 700; color: var(--text);
+      letter-spacing: 0.03em; text-transform: uppercase;
+    }
+    .team-dept-meta {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text-3); font-weight: 500;
+    }
+    .team-dept-help {
+      color: #ef4444; font-weight: 700; margin-left: 2px;
+    }
     .team-item {
       display: flex; align-items: center; gap: 12px;
       padding: 12px 20px;
@@ -623,6 +669,14 @@
       font-size: 10px; font-weight: 600;
       padding: 2px 7px; border-radius: 4px;
       background: var(--accent-soft); color: var(--accent);
+      margin-top: 3px; width: fit-content;
+    }
+    .t-dept-tag {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 4px;
+      background: var(--cyan-soft, rgba(34,211,238,0.14));
+      color: var(--cyan, #22d3ee);
       margin-top: 3px; width: fit-content;
     }
     .assignee-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
@@ -813,6 +867,30 @@
       gap: 14px;
       opacity: 0; animation: rise .35s .1s ease-out forwards;
     }
+    /* ── Department grouping on the Employees page ── */
+    .dept-group { margin-bottom: 26px; }
+    .dept-group-head {
+      display: flex; align-items: center; gap: 10px;
+      margin: 0 0 12px 0; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .dept-group-title {
+      font-size: 14px; font-weight: 700; color: var(--text);
+      letter-spacing: 0.01em;
+    }
+    .dept-group-count {
+      font-size: 11px; font-weight: 600; color: var(--accent);
+      background: var(--accent-soft); padding: 2px 9px; border-radius: 999px;
+    }
+    .dept-empty {
+      font-size: 12.5px; color: var(--text-3); padding: 6px 2px 2px;
+    }
+    .emp-dept-badge {
+      display: inline-flex; align-items: center; margin-top: 6px;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 8px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent);
+    }
     .emp-card {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -863,6 +941,29 @@
       border: 1px solid var(--border);
       border-radius: 12px; padding: 22px;
     }
+    /* ── Department settings rows ── */
+    .dept-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .dept-row:last-child { border-bottom: none; }
+    .dept-row-name { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--text); min-width: 0; }
+    .dept-row-count { font-size: 11px; color: var(--text-3); font-weight: 500; }
+    .dept-row-input {
+      flex: 1; background: var(--bg); border: 1px solid var(--accent);
+      border-radius: 6px; padding: 6px 9px; color: var(--text);
+      font-size: 13.5px; font-family: var(--font);
+    }
+    .dept-act {
+      background: transparent; border: 1px solid var(--border-2);
+      color: var(--text-2); border-radius: 6px; padding: 5px 11px;
+      font-size: 11.5px; font-weight: 600; cursor: pointer;
+      font-family: var(--font); transition: all 0.15s;
+    }
+    .dept-act:hover { background: var(--hover); color: var(--text); }
+    .dept-act.danger:hover { border-color: #ef4444; color: #ef4444; }
+    .dept-act.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .dept-empty-settings { font-size: 12.5px; color: var(--text-3); padding: 4px 0; }
     .settings-row {
       display: flex; gap: 28px; align-items: flex-start;
     }
@@ -1109,6 +1210,9 @@
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       Tasks
     </button>
+    <div class="nav-sub" id="sidebarDepts">
+      <!-- populated by renderSidebarDepartments() -->
+    </div>
     <button class="nav-item" data-nav="archive">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v11a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
       Archive
@@ -1235,6 +1339,10 @@
     <div class="page-section" id="page-tasks">
       <div class="page-header">
         <div class="page-title">Tasks</div>
+        <div id="deptFilterChip" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--text-2);">
+          <span>Filtered by <b id="deptFilterChipName" style="color:var(--text)"></b></span>
+          <button id="deptFilterClear" style="background:var(--hover);border:1px solid var(--border-2);color:var(--text-2);border-radius:999px;padding:2px 10px;font-size:11px;cursor:pointer;">Clear ✕</button>
+        </div>
       </div>
 
       <div class="filter-tabs" id="pillsBar">
@@ -1250,6 +1358,9 @@
       <div class="toolbar">
         <select class="emp-select" id="empFilter">
           <option value="">All Employees</option>
+        </select>
+        <select class="emp-select" id="deptFilterSelect">
+          <option value="">All Departments</option>
         </select>
       </div>
 
@@ -1283,9 +1394,12 @@
     <div class="page-section" id="page-employees">
       <div class="page-header">
         <div class="page-title">Team Members</div>
-        <button class="btn-add" id="btnAddEmployee"><span class="plus">+</span> Add employee</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-add" id="btnAddDept" style="background:transparent;border:1px solid var(--border-2);color:var(--text-2);"><span class="plus">+</span> Add department</button>
+          <button class="btn-add" id="btnAddEmployee"><span class="plus">+</span> Add employee</button>
+        </div>
       </div>
-      <div class="emp-grid" id="employeeGrid">
+      <div id="employeeGroups">
         <div class="placeholder-page" style="grid-column:1/-1"><div class="spinner"></div></div>
       </div>
     </div>
@@ -1444,6 +1558,20 @@
           </div>
         </div>
 
+        <!-- Departments card -->
+        <div class="settings-section" style="opacity:0;animation:rise .35s .15s ease-out forwards">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:700;color:var(--text-2);letter-spacing:0.04em;text-transform:uppercase">Departments</div>
+            <button class="btn-add" id="btnAddDeptSettings" style="padding:6px 12px;font-size:12px"><span class="plus">+</span> Add department</button>
+          </div>
+          <div class="settings-card">
+            <p style="font-size:12.5px;color:var(--text-2);margin-bottom:16px">Organise your team and tasks by business line. Renaming keeps existing assignments; deleting unassigns members and tasks (nothing is lost).</p>
+            <div id="deptSettingsList">
+              <div class="placeholder-page"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1531,6 +1659,13 @@
       </select>
     </div>
     <div class="form-group">
+      <label>Department (optional)</label>
+      <select class="form-input" id="fDepartment">
+        <option value="">No department</option>
+      </select>
+      <p style="font-size:11px;color:var(--text-3);margin-top:5px">Auto-selected from the assignee's team — change it to tag a different department.</p>
+    </div>
+    <div class="form-group">
       <label>Pipeline (optional)</label>
       <input class="form-input" id="fPipeline" type="text" placeholder="e.g. Client onboarding, Website redesign…" list="pipelineSuggestions" />
       <datalist id="pipelineSuggestions"></datalist>
@@ -1586,6 +1721,15 @@
       <label>Email (optional)</label>
       <input class="form-input" id="empEmail" type="email" placeholder="sarah@company.com" />
     </div>
+    <div class="form-group" id="empDeptGroup">
+      <label>Department</label>
+      <select class="form-input" id="empDept">
+        <option value="">No department</option>
+      </select>
+      <p class="empDeptHint" id="empDeptHint" style="display:none;font-size:11px;color:var(--text-3);margin-top:5px">
+        No departments yet — <a href="#" id="empDeptCreateLink" style="color:var(--accent)">create one first</a>.
+      </p>
+    </div>
     <div class="form-group">
       <label>Avatar style</label>
       <select class="form-input" id="empGender">
@@ -1598,6 +1742,22 @@
     <div class="modal-actions">
       <button class="btn-cancel" id="btnEmpCancel">Cancel</button>
       <button class="btn-submit" id="btnEmpSubmit">Add Employee</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DEPARTMENT MODAL -->
+<div class="modal-overlay" id="deptModalOverlay">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-title">Add Department</div>
+    <div class="form-group">
+      <label>Department name</label>
+      <input class="form-input" id="deptName" type="text" placeholder="e.g. Logistics" />
+      <p style="font-size:11px;color:var(--text-3);margin-top:5px">Group your team and tasks by business line (Logistics, Import &amp; Export, Agriculture…).</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btnDeptCancel">Cancel</button>
+      <button class="btn-submit" id="btnDeptSubmit">Create department</button>
     </div>
   </div>
 </div>
@@ -1625,6 +1785,12 @@
     <div class="form-group">
       <label>Role</label>
       <input class="form-input" id="empEditRole" type="text" placeholder="e.g. Sales Executive" />
+    </div>
+    <div class="form-group">
+      <label>Department</label>
+      <select class="form-input" id="empEditDept">
+        <option value="">No department</option>
+      </select>
     </div>
     <div class="form-group">
       <label>Gender</label>
@@ -1765,19 +1931,109 @@
   let allTasks = [];
   let employees = [];
   let enquiries = [];
+  let departments = [];
   let activeFilter = 'all';
   let empFilter = '';
+  let deptFilter = '';   // '' = all departments; otherwise a department id (string)
   let pipelines = {};
   let currentPage = 'dashboard';
+
+  /* ── Department helpers ── */
+  function deptName(id) {
+    if (id === null || id === undefined || id === '') return null;
+    const d = departments.find(x => String(x.id) === String(id));
+    return d ? d.name : null;
+  }
+
+  // Fill a <select> with department options. `includeAll` adds an "All / none"
+  // first option; `noneLabel` is the label for the empty value.
+  function fillDeptSelect(sel, selectedId, noneLabel) {
+    if (!sel) return;
+    const opts = [`<option value="">${escHtml(noneLabel || 'No department')}</option>`];
+    departments.forEach(d => {
+      const sel2 = String(selectedId) === String(d.id) ? ' selected' : '';
+      opts.push(`<option value="${d.id}"${sel2}>${escHtml(d.name || 'Unnamed')}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+  }
+
+  async function loadDepartments() {
+    try {
+      const res = await fetch(`${API}/departments`, { headers: headers() });
+      if (!res.ok) return;
+      departments = await res.json();
+    } catch (_) {}
+  }
+
+  // Count active (non-completed/archived) tasks for a department id, or all.
+  function deptTaskCount(deptId) {
+    return allTasks.filter(t => {
+      if (t.status === 'completed' || t.status === 'archived') return false;
+      if (deptId === '') return true;
+      return String(t.department_id) === String(deptId);
+    }).length;
+  }
+
+  /* ── Sidebar department sub-items (under Tasks) ── */
+  function renderSidebarDepartments() {
+    const wrap = document.getElementById('sidebarDepts');
+    if (!wrap) return;
+    const rows = [
+      { id: '', name: 'All' },
+      ...departments.map(d => ({ id: String(d.id), name: d.name || 'Unnamed' })),
+    ];
+    wrap.innerHTML = rows.map(r => {
+      const active = String(deptFilter) === String(r.id) ? ' active' : '';
+      const count = deptTaskCount(r.id);
+      return `<button class="nav-subitem${active}" data-dept="${escHtml(r.id)}">
+        <span class="nav-subdot"></span>
+        <span class="nav-sublabel">${escHtml(r.name)}</span>
+        <span class="sub-count">${count}</span>
+      </button>`;
+    }).join('');
+
+    wrap.querySelectorAll('.nav-subitem').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setDeptFilter(btn.dataset.dept);
+        navigateTo('tasks');
+      });
+    });
+  }
+
+  // Single source of truth for the active department filter — keeps the
+  // sidebar sub-items, the toolbar <select>, the header chip and the task
+  // list all in sync.
+  function setDeptFilter(id) {
+    deptFilter = (id === null || id === undefined) ? '' : String(id);
+    renderSidebarDepartments();
+    syncDeptFilterUI();
+    renderTaskRows(filteredTasks());
+  }
+
+  function syncDeptFilterUI() {
+    const sel = document.getElementById('deptFilterSelect');
+    if (sel && sel.value !== deptFilter) sel.value = deptFilter;
+    const chip = document.getElementById('deptFilterChip');
+    const name = deptName(deptFilter);
+    if (chip) {
+      if (deptFilter !== '' && name) {
+        document.getElementById('deptFilterChipName').textContent = name;
+        chip.style.display = 'flex';
+      } else {
+        chip.style.display = 'none';
+      }
+    }
+  }
   let openTaskId = null;
 
   /* ── Fetch data ── */
   async function loadData() {
     try {
-      const [tRes, eRes, enqRes] = await Promise.all([
+      const [tRes, eRes, enqRes, dRes] = await Promise.all([
         fetch(`${API}/api/dashboard/tasks`, { headers: headers() }),
         fetch(`${API}/api/dashboard/employees`, { headers: headers() }),
         fetch(`${API}/enquiries`, { headers: headers() }),
+        fetch(`${API}/departments`, { headers: headers() }),
       ]);
       if (tRes.status === 401 || eRes.status === 401) {
         window.location.replace('/static/auth.html');
@@ -1786,8 +2042,10 @@
       allTasks = await tRes.json();
       employees = await eRes.json();
       enquiries = enqRes.ok ? (await enqRes.json()) : [];
+      departments = dRes.ok ? (await dRes.json()) : [];
 
       rebuildPipelines();
+      renderSidebarDepartments();
       render();
       populateEmployeeFilters();
     } catch (e) {
@@ -1821,6 +2079,22 @@
 
     const pipelineNames = Object.keys(pipelines).filter(k => k !== '__unassigned__');
     datalist.innerHTML = pipelineNames.map(n => `<option value="${escHtml(n)}">`).join('');
+
+    // Department filter select (tasks toolbar)
+    const deptSel = document.getElementById('deptFilterSelect');
+    if (deptSel) {
+      deptSel.innerHTML = '<option value="">All Departments</option>' +
+        departments.map(d => `<option value="${d.id}">${escHtml(d.name || 'Unnamed')}</option>`).join('');
+      deptSel.value = deptFilter;
+    }
+    // Department dropdowns in the add-task and add-employee panels.
+    // Only refresh when the panel is closed so we don't wipe an in-progress edit
+    // during the periodic background reload.
+    const taskModalOpen = document.getElementById('modalOverlay').classList.contains('open');
+    const empModalOpen = document.getElementById('empModalOverlay').classList.contains('open');
+    if (!taskModalOpen) fillDeptSelect(document.getElementById('fDepartment'), '', 'No department');
+    if (!empModalOpen) fillDeptSelect(document.getElementById('empDept'), '', 'No department');
+    syncDeptFilterUI();
 
     try {
       const payload = JSON.parse(atob(token().split('.')[1]));
@@ -1999,6 +2273,28 @@
   }
 
   /* ── Team status (home) ── */
+  function teamMemberItem(e) {
+    const myTasks = allTasks.filter(t => t.employee && t.employee.toLowerCase() === (e.name || '').toLowerCase());
+    const overdueMine = myTasks.filter(t => t.status === 'overdue').length;
+    const needsHelp = myTasks.filter(t => t.status === 'needs_help').length;
+    const active = myTasks.filter(t => t.status !== 'completed' && t.status !== 'archived').length;
+    let dotClass = 'green';
+    if (needsHelp > 0) dotClass = 'red';
+    else if (overdueMine > 0) dotClass = 'orange';
+    return `
+      <div class="team-item">
+        <div class="team-av">
+          ${avatarSVG(e.name, e.gender || 'neutral')}
+          <span class="status-dot ${dotClass}"></span>
+        </div>
+        <div class="team-info">
+          <div class="team-name">${escHtml(e.name || 'Unknown')}</div>
+          <div class="team-tasks">${active} active task${active!==1?'s':''}${needsHelp?` · needs help`:''}${overdueMine?` · ${overdueMine} overdue`:''}</div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderTeamStatus() {
     const wrap = document.getElementById('teamStatusList');
     if (!employees.length) {
@@ -2006,24 +2302,49 @@
       return;
     }
 
-    wrap.innerHTML = employees.map(e => {
-      const myTasks = allTasks.filter(t => t.employee && t.employee.toLowerCase() === (e.name || '').toLowerCase());
-      const overdueMine = myTasks.filter(t => t.status === 'overdue').length;
-      const needsHelp = myTasks.filter(t => t.status === 'needs_help').length;
-      const active = myTasks.filter(t => t.status !== 'completed' && t.status !== 'archived').length;
-      let dotClass = 'green';
-      if (needsHelp > 0) dotClass = 'red';
-      else if (overdueMine > 0) dotClass = 'orange';
+    // No departments defined → keep the simple flat list
+    if (!departments.length) {
+      wrap.innerHTML = employees.map(teamMemberItem).join('');
+      return;
+    }
+
+    // Group employees by department, then aggregate stats per department
+    const buckets = new Map();  // key '' = No department
+    departments.forEach(d => buckets.set(String(d.id), { name: d.name || 'Unnamed', emps: [] }));
+    employees.forEach(e => {
+      const key = (e.department_id === null || e.department_id === undefined) ? '' : String(e.department_id);
+      if (!buckets.has(key)) buckets.set(key, { name: key === '' ? 'No department' : (deptName(key) || 'Unknown'), emps: [] });
+      buckets.get(key).emps.push(e);
+    });
+
+    const named = [...buckets.entries()].filter(([k]) => k !== '').sort((a, b) => a[1].name.localeCompare(b[1].name));
+    const none = buckets.get('');
+    const ordered = [...named];
+    if (none && none.emps.length) ordered.push(['', none]);
+
+    wrap.innerHTML = ordered.map(([key, bucket]) => {
+      // Active tasks + needs-help are computed at department level
+      const deptTasks = allTasks.filter(t => key === '' ? !t.department_id : String(t.department_id) === String(key));
+      const activeCount = deptTasks.filter(t => t.status !== 'completed' && t.status !== 'archived').length;
+      const helpCount = deptTasks.filter(t => t.status === 'needs_help').length;
+      const helpTag = helpCount > 0
+        ? `<span class="team-dept-help">${helpCount} needs help</span>`
+        : '';
+      const members = bucket.emps.length
+        ? bucket.emps.map(teamMemberItem).join('')
+        : `<div class="panel-empty" style="padding:8px 0">No members yet.</div>`;
       return `
-        <div class="team-item">
-          <div class="team-av">
-            ${avatarSVG(e.name, e.gender || 'neutral')}
-            <span class="status-dot ${dotClass}"></span>
+        <div class="team-dept">
+          <div class="team-dept-head">
+            <div class="team-dept-name">${escHtml(bucket.name)}</div>
+            <div class="team-dept-meta">
+              <span>${bucket.emps.length} member${bucket.emps.length===1?'':'s'}</span>
+              <span>·</span>
+              <span>${activeCount} active</span>
+              ${helpTag}
+            </div>
           </div>
-          <div class="team-info">
-            <div class="team-name">${escHtml(e.name || 'Unknown')}</div>
-            <div class="team-tasks">${active} active task${active!==1?'s':''}${needsHelp?` · needs help`:''}${overdueMine?` · ${overdueMine} overdue`:''}</div>
-          </div>
+          ${members}
         </div>
       `;
     }).join('');
@@ -2041,6 +2362,7 @@
   function filteredTasks() {
     let tasks = allTasks;
     if (empFilter) tasks = tasks.filter(t => (t.employee || '').toLowerCase() === empFilter.toLowerCase());
+    if (deptFilter !== '') tasks = tasks.filter(t => String(t.department_id) === String(deptFilter));
     if (activeFilter === 'all') return tasks.filter(t => t.status !== 'completed' && t.status !== 'archived');
     return tasks.filter(t => t.status === activeFilter);
   }
@@ -2061,6 +2383,8 @@
     const gender = empGender(t.employee);
     const isCompleted = t.status === 'completed';
     const pipelineTag = t.pipeline ? `<div class="t-pipeline-tag">${escHtml(t.pipeline)}</div>` : '';
+    const dName = deptName(t.department_id);
+    const deptTag = dName ? `<div class="t-dept-tag">${escHtml(dName)}</div>` : '';
     const lastUpdateText = t.last_update_summary ? `<div class="t-last-update">${escHtml(t.last_update_summary)}</div>` : '';
 
     return `
@@ -2072,7 +2396,7 @@
           <div class="t-text-wrap">
             <div class="t-name">${escHtml(t.task)}</div>
             ${lastUpdateText}
-            ${pipelineTag}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${pipelineTag}${deptTag}</div>
           </div>
         </div>
         <div class="assignee-cell">
@@ -2444,6 +2768,13 @@
     renderTaskRows(filteredTasks());
   });
 
+  document.getElementById('deptFilterSelect').addEventListener('change', e => {
+    setDeptFilter(e.target.value);
+  });
+  document.getElementById('deptFilterClear').addEventListener('click', () => {
+    setDeptFilter('');
+  });
+
   /* ── Navigation ── */
   function navigateTo(page) {
     currentPage = page;
@@ -2464,7 +2795,7 @@
     document.getElementById('breadcrumbText').textContent = labels[page] || 'Dashboard';
 
     if (page === 'employees') loadEmployees();
-    if (page === 'settings') loadReminderSettings();
+    if (page === 'settings') { loadReminderSettings(); renderDepartmentSettings(); }
     if (page === 'archive') loadArchive();
     if (page === 'inbox') {
       loadInbox();
@@ -2531,56 +2862,96 @@
     }
   }
 
+  function buildEmpCard(e) {
+    const myTasks = allTasks.filter(t => t.employee && t.employee.toLowerCase() === (e.name || '').toLowerCase());
+    const overdueMine = myTasks.filter(t => t.status === 'overdue').length;
+    const needsHelp = myTasks.filter(t => t.status === 'needs_help').length;
+    let dotClass = 'green';
+    if (needsHelp > 0) dotClass = 'red';
+    else if (overdueMine > 0) dotClass = 'orange';
+    // Department name may come from the /employees response, else resolve locally
+    const dName = e.department_name || deptName(e.department_id);
+    const deptBadge = dName
+      ? `<span class="emp-dept-badge">${escHtml(dName)}</span>`
+      : '';
+    return `<div class="emp-card">
+      <div class="emp-card-top">
+        <div class="emp-av-lg">
+          ${avatarSVG(e.name, e.gender || 'neutral')}
+          <span class="status-dot ${dotClass}"></span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="emp-name">${escHtml(e.name || 'Unknown')}</div>
+          <div class="emp-role">${escHtml(e.role || 'Team Member')}</div>
+          ${e.phone_number ? `<div class="emp-phone">${escHtml(e.phone_number)}</div>` : '<div class="emp-phone" style="color:var(--text-3)">No phone set</div>'}
+          ${deptBadge}
+        </div>
+        <button class="icon-btn emp-edit-btn" data-emp-id="${e.id}" aria-label="Edit employee" title="Edit employee">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        </button>
+      </div>
+      <div class="emp-stats">
+        <div class="emp-stat">
+          <div class="es-val">${e.active_task_count ?? 0}</div>
+          <div class="es-label">Active</div>
+        </div>
+        <div class="emp-stat">
+          <div class="es-val" style="font-size:13px;color:${e.phone_number ? 'var(--cyan)' : 'var(--text-3)'}">${e.phone_number ? escHtml(e.phone_number) : 'Not set'}</div>
+          <div class="es-label">WhatsApp</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   async function loadEmployees() {
-    const grid = document.getElementById('employeeGrid');
-    grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><div class="spinner"></div></div>';
+    const groups = document.getElementById('employeeGroups');
+    groups.innerHTML = '<div class="placeholder-page"><div class="spinner"></div></div>';
     try {
       const res = await fetch(`${API}/employees`, { headers: headers() });
       const emps = await res.json();
       employees = emps;
       if (!emps.length) {
-        grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><p>No employees yet.</p></div>';
+        groups.innerHTML = '<div class="placeholder-page"><p>No employees yet.</p></div>';
         return;
       }
-      grid.innerHTML = emps.map(e => {
-        const myTasks = allTasks.filter(t => t.employee && t.employee.toLowerCase() === (e.name || '').toLowerCase());
-        const overdueMine = myTasks.filter(t => t.status === 'overdue').length;
-        const needsHelp = myTasks.filter(t => t.status === 'needs_help').length;
-        let dotClass = 'green';
-        if (needsHelp > 0) dotClass = 'red';
-        else if (overdueMine > 0) dotClass = 'orange';
-        return `<div class="emp-card">
-          <div class="emp-card-top">
-            <div class="emp-av-lg">
-              ${avatarSVG(e.name, e.gender || 'neutral')}
-              <span class="status-dot ${dotClass}"></span>
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div class="emp-name">${escHtml(e.name || 'Unknown')}</div>
-              <div class="emp-role">${escHtml(e.role || 'Team Member')}</div>
-              ${e.phone_number ? `<div class="emp-phone">${escHtml(e.phone_number)}</div>` : '<div class="emp-phone" style="color:var(--text-3)">No phone set</div>'}
-            </div>
-            <button class="icon-btn emp-edit-btn" data-emp-id="${e.id}" aria-label="Edit employee" title="Edit employee">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-            </button>
+
+      // Bucket employees by department (id or null → "No department")
+      const buckets = new Map();  // key: dept id string ('' for none) → {name, emps:[]}
+      departments.forEach(d => buckets.set(String(d.id), { name: d.name || 'Unnamed', emps: [] }));
+      emps.forEach(e => {
+        const key = (e.department_id === null || e.department_id === undefined) ? '' : String(e.department_id);
+        if (!buckets.has(key)) {
+          buckets.set(key, { name: key === '' ? 'No department' : (deptName(key) || 'Unknown'), emps: [] });
+        }
+        buckets.get(key).emps.push(e);
+      });
+
+      // Render: named departments first (sorted, incl. empty ones), then "No department"
+      const named = [...buckets.entries()]
+        .filter(([k]) => k !== '')
+        .sort((a, b) => a[1].name.localeCompare(b[1].name));
+      const none = buckets.get('');
+      const ordered = [...named];
+      if (none && none.emps.length) ordered.push(['', none]);
+
+      groups.innerHTML = ordered.map(([key, bucket]) => {
+        const cards = bucket.emps.length
+          ? `<div class="emp-grid">${bucket.emps.map(buildEmpCard).join('')}</div>`
+          : `<div class="dept-empty">No team members in this department yet.</div>`;
+        return `<div class="dept-group">
+          <div class="dept-group-head">
+            <div class="dept-group-title">${escHtml(bucket.name)}</div>
+            <span class="dept-group-count">${bucket.emps.length} member${bucket.emps.length === 1 ? '' : 's'}</span>
           </div>
-          <div class="emp-stats">
-            <div class="emp-stat">
-              <div class="es-val">${e.active_task_count ?? 0}</div>
-              <div class="es-label">Active</div>
-            </div>
-            <div class="emp-stat">
-              <div class="es-val" style="font-size:13px;color:${e.phone_number ? 'var(--cyan)' : 'var(--text-3)'}">${e.phone_number ? escHtml(e.phone_number) : 'Not set'}</div>
-              <div class="es-label">WhatsApp</div>
-            </div>
-          </div>
+          ${cards}
         </div>`;
       }).join('');
-      grid.querySelectorAll('.emp-edit-btn').forEach(btn => {
+
+      groups.querySelectorAll('.emp-edit-btn').forEach(btn => {
         btn.addEventListener('click', () => openEmpEditPanel(btn.dataset.empId));
       });
     } catch {
-      grid.innerHTML = '<div class="placeholder-page" style="grid-column:1/-1"><p>Failed to load employees.</p></div>';
+      groups.innerHTML = '<div class="placeholder-page"><p>Failed to load employees.</p></div>';
     }
   }
 
@@ -2591,6 +2962,12 @@
     document.getElementById('empPhone').value = '';
     document.getElementById('empEmail').value = '';
     document.getElementById('empGender').value = 'neutral';
+    // Department dropdown + "create first" hint
+    const empDept = document.getElementById('empDept');
+    fillDeptSelect(empDept, '', 'No department');
+    const hasDepts = departments.length > 0;
+    empDept.disabled = !hasDepts;
+    document.getElementById('empDeptHint').style.display = hasDepts ? 'none' : 'block';
     empModal.classList.add('open');
     document.getElementById('empName').focus();
   }
@@ -2617,6 +2994,7 @@
           phone_number: document.getElementById('empPhone').value.trim() || null,
           email: document.getElementById('empEmail').value.trim() || null,
           gender: document.getElementById('empGender').value || 'neutral',
+          department_id: document.getElementById('empDept').value ? parseInt(document.getElementById('empDept').value, 10) : null,
         }),
       });
       const data = await res.json();
@@ -2636,6 +3014,61 @@
     }
   });
 
+  /* ── Add Department Modal ── */
+  const deptModal = document.getElementById('deptModalOverlay');
+  function openDeptModal() {
+    document.getElementById('deptName').value = '';
+    deptModal.classList.add('open');
+    document.getElementById('deptName').focus();
+  }
+  function closeDeptModal() { deptModal.classList.remove('open'); }
+
+  document.getElementById('btnAddDept').addEventListener('click', openDeptModal);
+  document.getElementById('btnDeptCancel').addEventListener('click', closeDeptModal);
+  deptModal.addEventListener('click', e => { if (e.target === deptModal) closeDeptModal(); });
+  document.getElementById('deptName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btnDeptSubmit').click(); }
+  });
+  // "create one first" link inside the Add Employee modal
+  document.getElementById('empDeptCreateLink').addEventListener('click', e => {
+    e.preventDefault();
+    closeEmpModal();
+    openDeptModal();
+  });
+
+  async function createDepartment(name) {
+    const res = await fetch(`${API}/departments`, {
+      method: 'POST', headers: headers(), body: JSON.stringify({ name }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Failed to create department.');
+    return data;
+  }
+
+  document.getElementById('btnDeptSubmit').addEventListener('click', async () => {
+    const name = document.getElementById('deptName').value.trim();
+    if (!name) { toast('Please enter a department name.', 'error'); return; }
+    const btn = document.getElementById('btnDeptSubmit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Creating…';
+    try {
+      const dept = await createDepartment(name);
+      departments.push(dept);
+      departments.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      toast(`Department "${name}" created.`);
+      closeDeptModal();
+      renderSidebarDepartments();
+      populateEmployeeFilters();
+      if (currentPage === 'employees') loadEmployees();
+      if (currentPage === 'settings') renderDepartmentSettings();
+    } catch (err) {
+      toast(err.message || 'Could not create department.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Create department';
+    }
+  });
+
   /* ── Edit Employee Panel ── */
   function openEmpEditPanel(employeeId) {
     const emp = employees.find(x => String(x.id) === String(employeeId));
@@ -2644,6 +3077,7 @@
     document.getElementById('empEditName').value = emp.name || '';
     document.getElementById('empEditPhone').value = emp.phone_number || '';
     document.getElementById('empEditRole').value = emp.role || '';
+    fillDeptSelect(document.getElementById('empEditDept'), emp.department_id ?? '', 'No department');
     document.getElementById('empEditGender').value = emp.gender || 'neutral';
     document.getElementById('empEditPanelOverlay').classList.add('open');
     document.getElementById('empEditPanel').classList.add('open');
@@ -2676,6 +3110,9 @@
           phone_number: document.getElementById('empEditPhone').value.trim() || null,
           role: document.getElementById('empEditRole').value.trim() || null,
           gender: document.getElementById('empEditGender').value || 'neutral',
+          // '' selection → -1 sentinel clears the department; else the chosen id
+          department_id: document.getElementById('empEditDept').value
+            ? parseInt(document.getElementById('empEditDept').value, 10) : -1,
         }),
       });
       const data = await res.json();
@@ -2705,12 +3142,31 @@
 
   /* ── Create Task Modal ── */
   const modal = document.getElementById('modalOverlay');
-  document.getElementById('btnAddTask').addEventListener('click', () => modal.classList.add('open'));
+  function openTaskModal() {
+    // Refresh the department dropdown each time (departments may have changed)
+    fillDeptSelect(document.getElementById('fDepartment'), '', 'No department');
+    // If the sidebar is filtered to a department, pre-tag the new task with it
+    if (deptFilter !== '') document.getElementById('fDepartment').value = deptFilter;
+    modal.classList.add('open');
+  }
+  document.getElementById('btnAddTask').addEventListener('click', openTaskModal);
   document.getElementById('btnModalCancel').addEventListener('click', () => modal.classList.remove('open'));
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
   document.addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); modal.classList.add('open'); }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); openTaskModal(); }
     if (e.key === 'Escape') modal.classList.remove('open');
+  });
+
+  // Auto-select the assignee's department when the assignee changes
+  // (only if the user hasn't already chosen a department manually).
+  document.getElementById('fEmployee').addEventListener('change', (e) => {
+    const empId = e.target.value;
+    const deptSel = document.getElementById('fDepartment');
+    if (!empId) return;
+    const emp = employees.find(x => String(x.id) === String(empId));
+    if (emp && emp.department_id !== null && emp.department_id !== undefined) {
+      deptSel.value = String(emp.department_id);
+    }
   });
 
   // Reminder controls — show/hide based on toggle and dropdown
@@ -2735,6 +3191,8 @@
     const empId = document.getElementById('fEmployee').value;
     const dueVal = document.getElementById('fDue').value;
     const pipelineVal = document.getElementById('fPipeline').value.trim() || null;
+    const deptVal = document.getElementById('fDepartment').value;
+    const deptIdVal = deptVal ? parseInt(deptVal, 10) : null;
 
     // Reminders config
     const remOn = document.getElementById('fRemindersOn').checked;
@@ -2756,6 +3214,7 @@
       due_at: dueVal ? new Date(dueVal).toISOString() : null,
       source_type: 'dashboard',
       reminder_interval_hours: reminderHours,
+      department_id: deptIdVal,
     };
 
     try {
@@ -2773,12 +3232,15 @@
         progress_percent: newTask.progress_percent || 0,
         last_update: newTask.last_update, created_at: newTask.created_at,
         pipeline: pipelineVal,
+        department_id: newTask.department_id ?? deptIdVal,
       });
       rebuildPipelines();
+      renderSidebarDepartments();
       render();
       modal.classList.remove('open');
       ['fTitle','fDesc','fPipeline'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('fEmployee').value = '';
+      document.getElementById('fDepartment').value = '';
       document.getElementById('fDue').value = '';
       document.getElementById('fRemindersOn').checked = true;
       document.getElementById('fReminderFreq').value = '4';
@@ -2854,6 +3316,104 @@
   }
   topSearch.addEventListener('input', e => applySearch(e.target.value));
   sideSearch.addEventListener('input', e => applySearch(e.target.value));
+
+  /* ── Department Settings (rename / delete / add) ── */
+  async function renderDepartmentSettings() {
+    const list = document.getElementById('deptSettingsList');
+    if (!list) return;
+    // Always fetch fresh so employee counts are accurate
+    await loadDepartments();
+
+    if (!departments.length) {
+      list.innerHTML = '<div class="dept-empty-settings">No departments yet. Click “Add department” to create your first team.</div>';
+      return;
+    }
+
+    list.innerHTML = departments.map(d => `
+      <div class="dept-row" data-dept-row="${d.id}">
+        <div class="dept-row-name">${escHtml(d.name || 'Unnamed')}</div>
+        <div class="dept-row-count">${d.employee_count ?? 0} member${(d.employee_count ?? 0) === 1 ? '' : 's'}</div>
+        <button class="dept-act" data-dept-rename="${d.id}">Rename</button>
+        <button class="dept-act danger" data-dept-delete="${d.id}">Delete</button>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('[data-dept-rename]').forEach(btn => {
+      btn.addEventListener('click', () => startRenameDepartment(btn.dataset.deptRename));
+    });
+    list.querySelectorAll('[data-dept-delete]').forEach(btn => {
+      btn.addEventListener('click', () => deleteDepartment(btn.dataset.deptDelete));
+    });
+  }
+
+  function startRenameDepartment(id) {
+    const dept = departments.find(d => String(d.id) === String(id));
+    if (!dept) return;
+    const row = document.querySelector(`[data-dept-row="${id}"]`);
+    if (!row) return;
+    row.innerHTML = `
+      <input class="dept-row-input" type="text" value="${escHtml(dept.name || '')}" />
+      <button class="dept-act primary" data-save>Save</button>
+      <button class="dept-act" data-cancel>Cancel</button>
+    `;
+    const input = row.querySelector('.dept-row-input');
+    input.focus();
+    input.select();
+
+    const commit = async () => {
+      const newName = input.value.trim();
+      if (!newName) { toast('Name cannot be empty.', 'error'); return; }
+      if (newName === dept.name) { renderDepartmentSettings(); return; }
+      try {
+        const res = await fetch(`${API}/departments/${id}`, {
+          method: 'PATCH', headers: headers(), body: JSON.stringify({ name: newName }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || 'Rename failed.');
+        dept.name = newName;
+        toast('Department renamed.');
+        renderSidebarDepartments();
+        populateEmployeeFilters();
+        renderDepartmentSettings();
+      } catch (err) {
+        toast(err.message || 'Rename failed.', 'error');
+        renderDepartmentSettings();
+      }
+    };
+
+    row.querySelector('[data-save]').addEventListener('click', commit);
+    row.querySelector('[data-cancel]').addEventListener('click', () => renderDepartmentSettings());
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { e.preventDefault(); renderDepartmentSettings(); }
+    });
+  }
+
+  async function deleteDepartment(id) {
+    const dept = departments.find(d => String(d.id) === String(id));
+    const label = dept ? (dept.name || 'this department') : 'this department';
+    if (!confirm(`Delete "${label}"? Team members and tasks in it will be unassigned (not deleted).`)) return;
+    try {
+      const res = await fetch(`${API}/departments/${id}`, { method: 'DELETE', headers: headers() });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Delete failed.');
+      }
+      departments = departments.filter(d => String(d.id) !== String(id));
+      // If the deleted department was the active sidebar filter, reset it
+      if (String(deptFilter) === String(id)) deptFilter = '';
+      toast('Department deleted.');
+      renderSidebarDepartments();
+      populateEmployeeFilters();
+      renderDepartmentSettings();
+      // Refresh tasks/employees so unassigned items reflect immediately
+      loadData();
+    } catch (err) {
+      toast(err.message || 'Delete failed.', 'error');
+    }
+  }
+
+  document.getElementById('btnAddDeptSettings').addEventListener('click', openDeptModal);
 
   /* ── Reminder Settings ── */
   async function loadReminderSettings() {
@@ -3114,7 +3674,7 @@
     if (_anyPanelOpen()) return;
 
     const k = (e.key || '').toLowerCase();
-    if (k === 'n') { e.preventDefault(); modal.classList.add('open'); return; }
+    if (k === 'n') { e.preventDefault(); openTaskModal(); return; }
     if (k === 'h') { e.preventDefault(); navigateTo('dashboard'); return; }
     if (k === 't') { e.preventDefault(); navigateTo('tasks'); return; }
     if (k === 'a') { e.preventDefault(); navigateTo('archive'); return; }

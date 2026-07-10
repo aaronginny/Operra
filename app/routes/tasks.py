@@ -216,11 +216,17 @@ async def billing_status(
 @router.get("", response_model=list[TaskResponse])
 async def list_tasks(
     status: str | None = Query(None),
+    department_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """List tasks with optional filters."""
-    return await get_tasks(db, company_id=current_user.company_id, status=status)
+    """List tasks with optional filters (status and/or department)."""
+    return await get_tasks(
+        db,
+        company_id=current_user.company_id,
+        status=status,
+        department_id=department_id,
+    )
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
