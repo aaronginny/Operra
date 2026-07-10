@@ -372,6 +372,22 @@ _MIGRATIONS = [
             REFERENCES departments(id) ON DELETE SET NULL DEFAULT NULL;
         """,
     ),
+    # 031 — OTP verification removed: new users are verified immediately.
+    #        Flip the column default and backfill any existing unverified
+    #        rows (old signups that never finished the OTP flow).
+    (
+        "users.is_verified_default_true",
+        """
+        ALTER TABLE users
+        ALTER COLUMN is_verified SET DEFAULT TRUE;
+        """,
+    ),
+    (
+        "users.is_verified_backfill_no_otp",
+        """
+        UPDATE users SET is_verified = TRUE WHERE is_verified = FALSE;
+        """,
+    ),
 ]
 
 

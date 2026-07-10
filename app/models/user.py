@@ -28,6 +28,6 @@ class User(Base):
     whatsapp_number: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     otp_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
     otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
