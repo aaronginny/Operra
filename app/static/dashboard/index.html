@@ -26,30 +26,49 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PhantomPilot" />
   <link rel="apple-touch-icon" href="/static/icon-192.png" />
-  <meta name="theme-color" content="#1A1525" />
+  <meta name="theme-color" content="#FFFFFF" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #1A1525;
-      --sidebar: #13101E;
-      --panel: #221D33;
-      --panel-2: #2A2340;
-      --hover: #2A2340;
-      --border: #2E2848;
-      --border-2: #3A335A;
-      --text: #E8E0FF;
-      --text-2: #9B92C4;
-      --text-3: #635D8A;
-      --accent: #9B59F5;
-      --accent-hover: #8445E8;
-      --accent-soft: rgba(155,89,245,0.12);
+      /* ── Light theme — main content area ── */
+      --bg: #FFFFFF;
+      --sidebar: #0B0B14;
+      --panel: #FFFFFF;
+      --panel-2: #F7F7F8;
+      --hover: #F2F2F4;
+      --border: #E6E6EA;
+      --border-2: #DADAE0;
+      --text: #131316;
+      --text-2: #55555F;
+      --text-3: #8A8A94;
+      --accent: #D42C2C;
+      --accent-hover: #B92323;
+      --accent-soft: rgba(212,44,44,0.10);
+      --gold: #C9A84C;
       --cyan: #3ECFCF;
       --ok: #34D399;
       --warn: #FBBF24;
-      --danger: #F87171;
+      --danger: #EF5B5B;
       --font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* ── Dark palette re-scoped to the sidebar only ──
+       Custom properties inherit through the DOM, so redefining them
+       here makes every descendant rule (.nav-item, .brand-name, .me-av,
+       .side-search …) that reads var(--text)/var(--bg)/etc. resolve to
+       sidebar-appropriate dark values automatically. */
+    .sidebar {
+      --bg: #14141E;          /* search-input fill inside the dark sidebar */
+      --panel: #1A1A26;       /* sidebar-foot card */
+      --panel-2: #1A1A26;
+      --hover: #20202E;
+      --border: #262633;
+      --border-2: #32323F;
+      --text: #F4F4F6;
+      --text-2: #A6A6B2;
+      --text-3: #6E6E7C;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -87,7 +106,7 @@
       width: 32px; height: 32px; object-fit: contain;
     }
     .brand-name {
-      font-size: 15px; font-weight: 700; color: var(--text);
+      font-size: 15px; font-weight: 700; color: var(--gold);
       letter-spacing: -0.01em;
     }
 
@@ -180,7 +199,7 @@
     }
     .me-av {
       width: 30px; height: 30px; border-radius: 50%; flex: 0 0 30px;
-      background: linear-gradient(135deg, var(--accent), #6B3FCE);
+      background: linear-gradient(135deg, var(--accent), #8E1A1A);
       display: grid; place-items: center; color: #fff;
       font-weight: 700; font-size: 12px;
     }
@@ -263,7 +282,7 @@
     .topbar-icon-btn:hover { color: var(--text); border-color: var(--border-2); }
     .topbar-avatar {
       width: 32px; height: 32px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), #6B3FCE);
+      background: linear-gradient(135deg, var(--accent), #8E1A1A);
       display: grid; place-items: center; color: #fff;
       font-weight: 700; font-size: 12px; cursor: pointer;
     }
@@ -362,7 +381,7 @@
     .kbd-label { font-size: 13px; color: var(--text); }
     .kbd-key {
       font-family: 'SF Mono', Menlo, monospace; font-size: 12px; font-weight: 600;
-      background: #2a2a3a; color: #ccc; border: 1px solid #3a3a4a;
+      background: var(--panel-2); color: var(--text-2); border: 1px solid var(--border-2);
       padding: 3px 8px; border-radius: 4px; min-width: 24px; text-align: center;
     }
     .kbd-fab {
@@ -403,7 +422,7 @@
     }
     .stat-card:hover {
       border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent-soft), 0 4px 24px rgba(155,89,245,0.15);
+      box-shadow: 0 0 0 1px var(--accent-soft), 0 4px 24px rgba(212,44,44,0.12);
       transform: translateY(-2px);
     }
     .stat-icon {
@@ -612,7 +631,7 @@
       background: var(--panel); border: 1px solid var(--border);
       color: var(--text); border-radius: 7px;
       cursor: pointer; appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239B92C4' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238A8A94' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat; background-position: right 10px center;
       transition: border-color 0.15s;
     }
@@ -900,12 +919,12 @@
     .emp-card:hover {
       border-color: var(--accent);
       transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(155,89,245,0.18);
+      box-shadow: 0 6px 24px rgba(212,44,44,0.15);
     }
     .emp-card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .emp-av-lg {
       width: 44px; height: 44px; border-radius: 50%; flex: 0 0 44px;
-      background: linear-gradient(135deg, var(--accent), #6B3FCE);
+      background: linear-gradient(135deg, var(--accent), #8E1A1A);
       display: grid; place-items: center; overflow: hidden;
       color: #fff; font-weight: 700; font-size: 15px;
       position: relative;
