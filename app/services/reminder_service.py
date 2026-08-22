@@ -176,6 +176,39 @@ async def _send_morning_pulse(db) -> None:
         await send_whatsapp_message(employee.phone_number, msg)
         logger.info("Morning pulse sent to %s (%d tasks)", employee.name, task_count)
 
+    await _send_real_estate_pulses(db)
+
+
+async def _send_real_estate_pulses(db) -> None:
+    """Send the broker pulse to every real-estate company.
+
+    Runs on the same 9 AM tick as the employee pulse above but is a separate
+    message to a different audience: the employee pulse nudges an assignee
+    about their tasks, this one gives the broker their overnight deal flow
+    (new leads, matches found, pipeline counts).
+
+    Companies whose vertical is not "real_estate" are filtered out in SQL, so
+    a generic account is never even considered. One company's failure must not
+    stop the others, so each is wrapped individually.
+    """
+    from app.models.company import Company
+    from app.services.real_estate_notifications import send_broker_pulse
+
+    stmt = select(Company.id).where(Company.vertical == "real_estate")
+    company_ids = list((await db.execute(stmt)).scalars().all())
+    if not company_ids:
+        return
+
+    for company_id in company_ids:
+        # Respect the same per-company pulse toggle the employee pulse honours.
+        if not _company_pulse_enabled(company_id):
+            logger.debug("Broker pulse skipped for company=%s (disabled in settings)", company_id)
+            continue
+        try:
+            await send_broker_pulse(db, company_id)
+        except Exception:
+            logger.exception("Broker pulse failed for company=%s", company_id)
+
 
 async def _check_and_remind() -> None:
     """Single tick: query active tasks and send tiered follow-ups."""

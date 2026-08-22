@@ -33,6 +33,7 @@ from app.models.seller import Seller
 from app.schemas.auth_schema import CurrentUser
 from app.services import real_estate_constants as rc
 from app.services.matching_service import run_matching_for_company
+from app.services.real_estate_notifications import notify_new_matches
 
 logger = logging.getLogger(__name__)
 
@@ -660,8 +661,21 @@ async def delete_listing(
 # ── Matches ──────────────────────────────────────────────────
 
 async def _run_matching_and_notify(db: AsyncSession, company_id: int) -> list[Match]:
-    """Re-run the engine and return the newly found matches."""
+    """Re-run the engine and fire a WhatsApp alert for each newly found match.
+
+    Notification failures are logged and swallowed: the matches are already
+    saved, and a broker's data must not be lost because Meta was unreachable
+    or the 24-hour messaging window had closed.
+    """
     new_matches, _ = await run_matching_for_company(db, company_id)
+    if new_matches:
+        try:
+            await notify_new_matches(db, company_id, new_matches)
+        except Exception:
+            logger.exception(
+                "New-match notification failed for company=%s (matches still saved)",
+                company_id,
+            )
     return new_matches
 
 

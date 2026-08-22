@@ -21,6 +21,7 @@ from app.models.enquiry import (
 )
 from app.schemas.auth_schema import CurrentUser
 from app.services.messaging_service import send_whatsapp_message
+from app.services.real_estate_notifications import notify_enquiry_stage_change
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,16 @@ async def advance_stage(
                     "Stage notification FAILED: enquiry=%s stage=%s employee=%s",
                     enquiry_id, next_stage.value, employee.name,
                 )
+
+    # Real-estate brokers additionally get a pipeline alert. This is a no-op
+    # for generic companies, so the behaviour above is unchanged for them.
+    try:
+        await notify_enquiry_stage_change(db, enquiry, next_stage.value)
+    except Exception:
+        logger.exception(
+            "Broker stage alert failed: enquiry=%s (stage change still applied)",
+            enquiry_id,
+        )
 
     resp = await _enrich_response(db, enquiry)
     resp["whatsapp_sent"] = whatsapp_sent
