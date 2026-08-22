@@ -23,9 +23,10 @@ from sqlalchemy import func as sa_func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_real_estate_company
+from app.dependencies import get_current_user, require_real_estate_company
 from app.models.buyer import Buyer
 from app.models.commission import Commission
+from app.models.company import Company
 from app.models.enquiry import Enquiry
 from app.models.listing import Listing
 from app.models.match import Match
@@ -274,6 +275,26 @@ class CommissionResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Vertical status ──────────────────────────────────────────
+
+@router.get("/status")
+async def real_estate_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Report whether this company has the real-estate vertical enabled.
+
+    Deliberately the ONE route in this module gated on plain get_current_user
+    rather than require_real_estate_company: the dashboard has to be able to
+    ask "should I render the real-estate nav?" and get an answer instead of the
+    404 every other route here returns. It exposes nothing but the caller's own
+    vertical flag.
+    """
+    company = await db.get(Company, current_user.company_id)
+    vertical = company.vertical if company else "generic"
+    return {"vertical": vertical, "enabled": vertical == "real_estate"}
 
 
 # ── Reference data ───────────────────────────────────────────
