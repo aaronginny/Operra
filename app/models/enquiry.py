@@ -60,6 +60,17 @@ class Enquiry(Base):
     assigned_employee_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("employees.id"), nullable=True
     )
+    # -- Real-estate vertical links (NULL for generic companies) ----------
+    # An enquiry in the real-estate vertical is raised against a lead we
+    # already hold. Both are nullable and independent: a buyer-side enquiry
+    # sets buyer_id, a seller-side one sets seller_id, and an enquiry created
+    # off a match sets both. Generic companies never populate either.
+    buyer_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("buyers.id"), nullable=True, index=True
+    )
+    seller_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("sellers.id"), nullable=True, index=True
+    )
     # JSON string: [{"stage": "follow_up", "at": "2026-04-10T12:00:00"}, ...]
     stage_history: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(

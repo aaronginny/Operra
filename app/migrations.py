@@ -405,6 +405,172 @@ _MIGRATIONS = [
         ON users (lower(email));
         """,
     ),
+    # ---------------------------------------------------------------------
+    # 033 -- Real-estate vertical (DealKnot merge).
+    #
+    # Everything below is inert for existing accounts: `companies.vertical`
+    # defaults to 'generic', and every real-estate route, nav item and
+    # notification is gated on vertical = 'real_estate'. The new tables simply
+    # stay empty for generic companies.
+    # ---------------------------------------------------------------------
+    (
+        "033_companies.vertical",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS vertical VARCHAR(30) NOT NULL DEFAULT 'generic';
+        """,
+    ),
+    (
+        "033_buyers.table",
+        """
+        CREATE TABLE IF NOT EXISTS buyers (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            radius_km NUMERIC(5,2) NOT NULL DEFAULT 5,
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_buyers.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_buyers_company_id ON buyers (company_id);",
+    ),
+    (
+        "033_sellers.table",
+        """
+        CREATE TABLE IF NOT EXISTS sellers (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_sellers.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_sellers_company_id ON sellers (company_id);",
+    ),
+    (
+        "033_listings.table",
+        """
+        CREATE TABLE IF NOT EXISTS listings (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            seller_id INTEGER REFERENCES sellers(id) ON DELETE SET NULL,
+            title VARCHAR(255) NOT NULL,
+            area VARCHAR(255) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            bedrooms INTEGER,
+            bathrooms INTEGER,
+            area_sqft NUMERIC(12,2),
+            status VARCHAR(20) NOT NULL DEFAULT 'available',
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_listings.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_listings_company_id ON listings (company_id);",
+    ),
+    (
+        "033_matches.table",
+        """
+        CREATE TABLE IF NOT EXISTS matches (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            buyer_id INTEGER NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+            seller_id INTEGER NOT NULL REFERENCES sellers(id) ON DELETE CASCADE,
+            match_type VARCHAR(10) NOT NULL DEFAULT 'exact',
+            distance_km NUMERIC(6,2) NOT NULL DEFAULT 0,
+            price_match_kind VARCHAR(10) NOT NULL DEFAULT 'exact',
+            score INTEGER NOT NULL DEFAULT 0,
+            matched_buyer_area VARCHAR(255),
+            matched_seller_area VARCHAR(255),
+            connected BOOLEAN NOT NULL DEFAULT FALSE,
+            notified_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_matches_company_buyer_seller UNIQUE (company_id, buyer_id, seller_id)
+        );
+        """,
+    ),
+    (
+        "033_matches.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_matches_company_id ON matches (company_id);",
+    ),
+    (
+        "033_commissions.table",
+        """
+        CREATE TABLE IF NOT EXISTS commissions (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            enquiry_id INTEGER REFERENCES enquiries(id) ON DELETE SET NULL,
+            deal_value NUMERIC(18,2) NOT NULL DEFAULT 0,
+            commission_percent NUMERIC(6,3) NOT NULL DEFAULT 0,
+            commission_amount NUMERIC(18,2) NOT NULL DEFAULT 0,
+            split_percent NUMERIC(6,3) NOT NULL DEFAULT 100,
+            source VARCHAR(20) NOT NULL DEFAULT 'both_sides',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            expected_date TIMESTAMP WITH TIME ZONE,
+            received_date TIMESTAMP WITH TIME ZONE,
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_commissions.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_commissions_company_id ON commissions (company_id);",
+    ),
+    # Link the existing enquiries pipeline to real-estate leads. Both stay NULL
+    # for generic companies, so the existing Enquiries board is unaffected.
+    (
+        "033_enquiries.buyer_id",
+        """
+        ALTER TABLE enquiries
+        ADD COLUMN IF NOT EXISTS buyer_id INTEGER
+            REFERENCES buyers(id) ON DELETE SET NULL DEFAULT NULL;
+        """,
+    ),
+    (
+        "033_enquiries.seller_id",
+        """
+        ALTER TABLE enquiries
+        ADD COLUMN IF NOT EXISTS seller_id INTEGER
+            REFERENCES sellers(id) ON DELETE SET NULL DEFAULT NULL;
+        """,
+    ),
 ]
 
 
@@ -442,6 +608,136 @@ _SQLITE_MIGRATIONS = [
     (
         "sqlite.users.email_lower_unique_index",
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower ON users (lower(email));",
+    ),
+    # -- Real-estate vertical (migration 033) mirrored for existing SQLite dev
+    #    DBs. Fresh SQLite DBs get all of this from create_all via the ORM
+    #    models; these statements only matter for a dev DB created earlier.
+    #    The ALTERs have no IF NOT EXISTS in SQLite -- run_migrations() swallows
+    #    the duplicate-column error on re-run, which is the existing convention.
+    (
+        "sqlite.companies.vertical",
+        "ALTER TABLE companies ADD COLUMN vertical VARCHAR(30) NOT NULL DEFAULT 'generic';",
+    ),
+    (
+        "sqlite.buyers.table",
+        """
+        CREATE TABLE IF NOT EXISTS buyers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            radius_km NUMERIC(5,2) NOT NULL DEFAULT 5,
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.sellers.table",
+        """
+        CREATE TABLE IF NOT EXISTS sellers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.listings.table",
+        """
+        CREATE TABLE IF NOT EXISTS listings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            seller_id INTEGER REFERENCES sellers(id),
+            title VARCHAR(255) NOT NULL,
+            area VARCHAR(255) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            bedrooms INTEGER,
+            bathrooms INTEGER,
+            area_sqft NUMERIC(12,2),
+            status VARCHAR(20) NOT NULL DEFAULT 'available',
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.matches.table",
+        """
+        CREATE TABLE IF NOT EXISTS matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            buyer_id INTEGER NOT NULL REFERENCES buyers(id),
+            seller_id INTEGER NOT NULL REFERENCES sellers(id),
+            match_type VARCHAR(10) NOT NULL DEFAULT 'exact',
+            distance_km NUMERIC(6,2) NOT NULL DEFAULT 0,
+            price_match_kind VARCHAR(10) NOT NULL DEFAULT 'exact',
+            score INTEGER NOT NULL DEFAULT 0,
+            matched_buyer_area VARCHAR(255),
+            matched_seller_area VARCHAR(255),
+            connected BOOLEAN NOT NULL DEFAULT 0,
+            notified_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_matches_company_buyer_seller UNIQUE (company_id, buyer_id, seller_id)
+        );
+        """,
+    ),
+    (
+        "sqlite.commissions.table",
+        """
+        CREATE TABLE IF NOT EXISTS commissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            enquiry_id INTEGER REFERENCES enquiries(id),
+            deal_value NUMERIC(18,2) NOT NULL DEFAULT 0,
+            commission_percent NUMERIC(6,3) NOT NULL DEFAULT 0,
+            commission_amount NUMERIC(18,2) NOT NULL DEFAULT 0,
+            split_percent NUMERIC(6,3) NOT NULL DEFAULT 100,
+            source VARCHAR(20) NOT NULL DEFAULT 'both_sides',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            expected_date TIMESTAMP,
+            received_date TIMESTAMP,
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.enquiries.buyer_id",
+        "ALTER TABLE enquiries ADD COLUMN buyer_id INTEGER REFERENCES buyers(id);",
+    ),
+    (
+        "sqlite.enquiries.seller_id",
+        "ALTER TABLE enquiries ADD COLUMN seller_id INTEGER REFERENCES sellers(id);",
     ),
 ]
 

@@ -17,6 +17,18 @@ class Company(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    # -- Product vertical --------------------------------------
+    # "generic"     -- the default PhantomPilot task/enquiry product.
+    # "real_estate" -- additionally unlocks the broker CRM (buyers, sellers,
+    #                  listings, matching engine, commissions).
+    # Every real-estate route, nav item and notification is gated on this
+    # column, so an existing "generic" account sees no change whatsoever.
+    # Both new and existing companies default to "generic" -- opting in is
+    # always explicit.
+    vertical: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default="generic"
+    )
+
     # ── Tiered Billing ────────────────────────────────────────
     # subscription_level: "free" | "basic" | "premium"
     subscription_level: Mapped[str] = mapped_column(
