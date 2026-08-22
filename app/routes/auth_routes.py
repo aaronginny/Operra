@@ -32,6 +32,20 @@ def _normalize_whatsapp(number: str | None) -> str | None:
     return cleaned or None
 
 
+def _normalize_email(email: str | None) -> str | None:
+    """Canonicalize an email for both storage and lookup: strip + lowercase.
+
+    Email equality in Postgres is case-sensitive, so a login typed with
+    different casing than signup (e.g. mobile auto-capitalization) would miss
+    the row. Storing *and* querying one canonical lowercased form is what makes
+    lookups case-insensitive — it must be applied on every read and every write
+    or the two halves won't agree.
+    """
+    if email is None:
+        return None
+    return email.strip().lower() or None
+
+
 def _is_founder(email: str) -> bool:
     """Return True if this email is the configured founder."""
     founder = settings.founder_email
@@ -41,10 +55,11 @@ def _is_founder(email: str) -> bool:
 @router.post("/signup")
 async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     """Create a new company + admin user account and issue a JWT immediately."""
-    logger.info("[PhantomPilot] Signup attempt for: %s", payload.email)
+    email = _normalize_email(payload.email)
+    logger.info("[PhantomPilot] Signup attempt for: %s", email)
 
-    # Check if user exists
-    stmt = select(User).where(User.email == payload.email)
+    # Check if user exists (case-insensitive: emails are stored lowercased)
+    stmt = select(User).where(User.email == email)
     result = await db.execute(stmt)
     existing_user = result.scalars().first()
     if existing_user:
@@ -61,7 +76,7 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     # Create user — verified immediately, no OTP step
     user = User(
         name=payload.name,
-        email=payload.email,
+        email=email,
         password_hash=get_password_hash(payload.password),
         company_id=company.id,
         role=UserRole.ceo,
@@ -72,7 +87,7 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     await db.flush()
     await db.refresh(user)
 
-    logger.info("[PhantomPilot] Signup OK for: %s  |  company_id=%s", payload.email, company.id)
+    logger.info("[PhantomPilot] Signup OK for: %s  |  company_id=%s", email, company.id)
 
     token = create_access_token({
         "sub": user.email,
@@ -87,18 +102,21 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 @router.post("/login")
 async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     """Authenticate on email + password and return a JWT token."""
-    logger.info("[PhantomPilot] Login attempt for: %s", payload.email)
+    email = _normalize_email(payload.email)
+    logger.info("[PhantomPilot] Login attempt for: %s", email)
 
-    stmt = select(User).where(User.email == payload.email)
+    # Match case-insensitively: emails are stored lowercased, so the lookup
+    # value must be lowercased too or a differently-cased login misses the row.
+    stmt = select(User).where(User.email == email)
     result = await db.execute(stmt)
     user = result.scalars().first()
 
     if not user or not user.password_hash:
-        logger.warning("[PhantomPilot] Login FAILED for: %s (user not found)", payload.email)
+        logger.warning("[PhantomPilot] Login FAILED for: %s (user not found)", email)
         return {"success": False, "error": "Incorrect email or password"}
 
     if not verify_password(payload.password, user.password_hash):
-        logger.warning("[PhantomPilot] Login FAILED for: %s (bad password)", payload.email)
+        logger.warning("[PhantomPilot] Login FAILED for: %s (bad password)", email)
         return {"success": False, "error": "Incorrect email or password"}
 
     token = create_access_token({

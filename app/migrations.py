@@ -388,6 +388,23 @@ _MIGRATIONS = [
         UPDATE users SET is_verified = TRUE WHERE is_verified = FALSE;
         """,
     ),
+    # 032 — case-insensitive unique index on email. Backstops the app-level
+    #        lowercasing in auth_routes so two accounts can't differ only by
+    #        letter case. This does NOT normalize existing rows — run
+    #        `normalize_emails.py --apply` first on any DB that may hold
+    #        mixed-case duplicates. If a case-variant duplicate still exists the
+    #        CREATE fails and is logged/skipped (run_migrations swallows it),
+    #        and it will succeed automatically on the next startup once the data
+    #        is clean. Deliberately not paired with a blind
+    #        `UPDATE ... SET email = lower(email)`: colliding rows must be
+    #        surfaced for a human, never silently merged.
+    (
+        "032_users_email_lower_unique_index",
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower
+        ON users (lower(email));
+        """,
+    ),
 ]
 
 
@@ -418,6 +435,13 @@ _SQLITE_MIGRATIONS = [
     (
         "sqlite.tasks.department_id",
         "ALTER TABLE tasks ADD COLUMN department_id INTEGER REFERENCES departments(id);",
+    ),
+    # Mirror of migration 032 for existing SQLite dev DBs (fresh ones get this
+    # index from the User model's __table_args__ via create_all). SQLite has
+    # supported expression indexes since 3.9.0.
+    (
+        "sqlite.users.email_lower_unique_index",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower ON users (lower(email));",
     ),
 ]
 
