@@ -612,6 +612,7 @@ _MIGRATIONS = [
             budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
             property_type VARCHAR(40) NOT NULL DEFAULT '',
             off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
+            payment_preference VARCHAR(15) NOT NULL DEFAULT 'either',
             timeline VARCHAR(120) NOT NULL DEFAULT '',
             notes TEXT,
             created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -629,6 +630,20 @@ _MIGRATIONS = [
         "034_investor_criteria.company_emirate_idx",
         "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
         "ON investor_criteria (company_id, emirate);",
+    ),
+    # ---------------------------------------------------------------------
+    # 035 -- investor_criteria.payment_preference (cash / payment_plan /
+    #        either). Added after 034 was written, so it needs its own ALTER:
+    #        on a database where 034 already created the table, the amended
+    #        CREATE TABLE above is a no-op and would silently skip the column.
+    # ---------------------------------------------------------------------
+    (
+        "035_investor_criteria.payment_preference",
+        """
+        ALTER TABLE investor_criteria
+        ADD COLUMN IF NOT EXISTS payment_preference VARCHAR(15)
+            NOT NULL DEFAULT 'either';
+        """,
     ),
 ]
 
@@ -823,6 +838,7 @@ _SQLITE_MIGRATIONS = [
             budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
             property_type VARCHAR(40) NOT NULL DEFAULT '',
             off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
+            payment_preference VARCHAR(15) NOT NULL DEFAULT 'either',
             timeline VARCHAR(120) NOT NULL DEFAULT '',
             notes TEXT,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -838,6 +854,14 @@ _SQLITE_MIGRATIONS = [
         "sqlite.investor_criteria.company_emirate_idx",
         "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
         "ON investor_criteria (company_id, emirate);",
+    ),
+    # Mirror of migration 035. SQLite has no ADD COLUMN IF NOT EXISTS; the
+    # duplicate-column error is swallowed by run_migrations on re-run, which is
+    # this file's established convention.
+    (
+        "sqlite.investor_criteria.payment_preference",
+        "ALTER TABLE investor_criteria ADD COLUMN payment_preference "
+        "VARCHAR(15) NOT NULL DEFAULT 'either';",
     ),
 ]
 

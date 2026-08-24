@@ -30,6 +30,14 @@ EMIRATES = ("Dubai", "Abu Dhabi", "RAK", "Sharjah", "Ajman", "Fujairah", "UAQ", 
 # What stage of build the investor will buy at.
 OFF_PLAN_OR_READY = ("off_plan", "ready", "both")
 
+# How the investor wants to pay.
+#   cash         -- buys outright; imposes no requirement on the launch
+#   payment_plan -- needs instalment terms; a launch with none is not a match
+#   either       -- no preference
+# A structured field on purpose: it is reason-worthy, so per the project rule
+# it is a column, never something inferred from notes or timeline free text.
+PAYMENT_PREFERENCE = ("cash", "payment_plan", "either")
+
 
 class InvestorCriteria(Base):
     __tablename__ = "investor_criteria"
@@ -61,6 +69,11 @@ class InvestorCriteria(Base):
 
     off_plan_or_ready: Mapped[str] = mapped_column(
         String(10), nullable=False, server_default="both"
+    )
+
+    # cash / payment_plan / either. See PAYMENT_PREFERENCE above.
+    payment_preference: Mapped[str] = mapped_column(
+        String(15), nullable=False, server_default="either"
     )
 
     # Free text the advisor writes for themselves: "Q4 2026", "after he sells

@@ -6,6 +6,11 @@ these by forwarding to a real person. So:
 
   * Emirate is the top-level filter and runs first. An investor who wants Abu
     Dhabi is never shown a Dubai launch, whatever else lines up.
+  * Area exclusion is strict and settled policy, not a placeholder: an investor
+    who named areas and does not get one of them is excluded outright. A wrong
+    "match" costs this client more than a missed near-miss does, because they
+    act on it by forwarding to a real person. Do not soften this into partial
+    or scored matching.
   * Every criterion the investor actually stated must hold. Criteria they left
     blank are treated as "no preference", not as a wildcard to squeeze a match
     through.
@@ -157,6 +162,17 @@ def evaluate(criteria: InvestorCriteria, launch: ParsedLaunch) -> InvestorMatch 
         if not _unit_matches(wanted_unit, launch.unit_types):
             return None
 
+    # ── 6. Payment preference ────────────────────────────────
+    # Only "payment_plan" constrains the launch: an investor who needs
+    # instalments cannot use a launch that offers none, and a launch that
+    # doesn't state its terms is too vague to judge — a non-match, not a guess,
+    # consistent with how every other stated criterion is handled here.
+    # "cash" and "either" impose nothing: a cash buyer can take a launch with
+    # or without a plan.
+    payment_pref = (criteria.payment_preference or "either").lower()
+    if payment_pref == "payment_plan" and not launch.payment_plan:
+        return None
+
     # ── Reasons, in the order they read best ─────────────────
     if matched_area:
         reasons.append(f"wanted {matched_area}")
@@ -171,6 +187,14 @@ def evaluate(criteria: InvestorCriteria, launch: ParsedLaunch) -> InvestorMatch 
         reasons.append(wanted_unit)
     if stage != "both":
         reasons.append(stage.replace("_", "-"))
+    # "payment plan buyer" is only claimed when the preference was actually
+    # tested against stated terms; "cash buyer" is informative rather than a
+    # filter, and is surfaced because the advisor needs it when deciding how to
+    # pitch. Both come from the structured column — never from free text.
+    if payment_pref == "payment_plan":
+        reasons.append("payment plan buyer")
+    elif payment_pref == "cash":
+        reasons.append("cash buyer")
 
     return InvestorMatch(label=criteria.label, reasons=reasons)
 

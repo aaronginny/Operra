@@ -27,6 +27,7 @@ from app.dependencies import require_launch_matcher_company
 from app.models.investor_criteria import (
     EMIRATES,
     OFF_PLAN_OR_READY,
+    PAYMENT_PREFERENCE,
     InvestorCriteria,
 )
 from app.schemas.auth_schema import CurrentUser
@@ -119,6 +120,7 @@ class InvestorCriteriaCreate(_NoExtraFields):
     budget_max: float = 0
     property_type: str = Field(default="", max_length=MAX_PROPERTY_TYPE)
     off_plan_or_ready: str = "both"
+    payment_preference: str = "either"
     timeline: str = Field(default="", max_length=MAX_TIMELINE)
     notes: str | None = None
 
@@ -131,6 +133,7 @@ class InvestorCriteriaUpdate(_NoExtraFields):
     budget_max: float | None = None
     property_type: str | None = Field(default=None, max_length=MAX_PROPERTY_TYPE)
     off_plan_or_ready: str | None = None
+    payment_preference: str | None = None
     timeline: str | None = Field(default=None, max_length=MAX_TIMELINE)
     notes: str | None = None
 
@@ -145,6 +148,7 @@ class InvestorCriteriaResponse(BaseModel):
     budget_max: float
     property_type: str
     off_plan_or_ready: str
+    payment_preference: str
     timeline: str
     notes: str | None = None
 
@@ -161,6 +165,7 @@ async def get_constants(
     return {
         "emirates": list(EMIRATES),
         "off_plan_or_ready": list(OFF_PLAN_OR_READY),
+        "payment_preference": list(PAYMENT_PREFERENCE),
     }
 
 
@@ -208,6 +213,7 @@ async def create_investor(
         budget_max=payload.budget_max,
         property_type=(payload.property_type or "").strip(),
         off_plan_or_ready=_valid(payload.off_plan_or_ready, OFF_PLAN_OR_READY, "both"),
+        payment_preference=_valid(payload.payment_preference, PAYMENT_PREFERENCE, "either"),
         timeline=(payload.timeline or "").strip(),
         notes=payload.notes,
     )
@@ -256,6 +262,10 @@ async def update_investor(
     if data.get("off_plan_or_ready") is not None:
         record.off_plan_or_ready = _valid(
             data["off_plan_or_ready"], OFF_PLAN_OR_READY, record.off_plan_or_ready
+        )
+    if data.get("payment_preference") is not None:
+        record.payment_preference = _valid(
+            data["payment_preference"], PAYMENT_PREFERENCE, record.payment_preference
         )
     if "notes" in data:
         record.notes = data["notes"]

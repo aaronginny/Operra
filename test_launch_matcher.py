@@ -191,6 +191,14 @@ INVESTORS = [
     # Dubai, budget ceiling just below it (edge case, must NOT match).
     {"label": "Investor 41", "emirate": "Dubai", "budget_min": 900_000,
      "budget_max": 1_399_999, "off_plan_or_ready": "both"},
+    # Needs instalments — matches a launch with terms, excluded from one without.
+    {"label": "Investor 50", "emirate": "Dubai", "budget_min": 1_000_000,
+     "budget_max": 2_000_000, "off_plan_or_ready": "both",
+     "payment_preference": "payment_plan"},
+    # Buys outright — never constrained by payment terms either way.
+    {"label": "Investor 51", "emirate": "Dubai", "budget_min": 1_000_000,
+     "budget_max": 2_000_000, "off_plan_or_ready": "both",
+     "payment_preference": "cash"},
 ]
 
 HARTLAND_LAUNCH = (
@@ -265,6 +273,17 @@ async def test_no_pii_guardrail(client: httpx.AsyncClient, ctx: dict) -> None:
               if "@" in r.label or any(ch.isdigit() for ch in r.label.replace("Investor ", ""))]
     check("A5. no PII-bearing row was persisted by any attempt",
           not leaked, f"leaked {leaked}")
+
+    # The new structured field is a closed vocabulary, not free text, so it
+    # cannot become somewhere to park a name.
+    r = await client.post("/launch-matcher/investors", headers=h, json={
+        "label": "Investor PP", "emirate": "Dubai", "budget_min": 1, "budget_max": 2,
+        "payment_preference": "Ahmed Al Maktoum 0501234567"})
+    stored = r.json().get("payment_preference") if r.status_code == 201 else None
+    check("A7. payment_preference falls back to a safe value, never free text",
+          r.status_code == 201 and stored == "either", f"{r.status_code} stored={stored}")
+    if r.status_code == 201:
+        await client.delete(f"/launch-matcher/investors/{r.json()['id']}", headers=h)
 
     # A normal label still works — the guardrail must not block real use.
     r = await client.post("/launch-matcher/investors", headers=h, json={
@@ -398,6 +417,70 @@ async def test_no_match_is_honest(client: httpx.AsyncClient, ctx: dict) -> None:
     check("D7. and offers no matches while blocked", not outcome3.matched, reply3[:120])
 
     print("\n     No-match reply preview:")
+    for line in reply.split("\n"):
+        print(f"       {line}")
+
+
+# ── C2. Payment preference ───────────────────────────────────
+
+async def test_payment_preference(client: httpx.AsyncClient, ctx: dict) -> None:
+    print("\n-- C2. payment_preference (structured field, not notes) --")
+    company_id = ctx["advisor_company_id"]
+
+    # HARTLAND_LAUNCH states "60/40", so it has payment plan terms.
+    async with SessionLocal() as db:
+        reply, outcome = await build_reply(
+            db, company_id, InboundMessage(sender=ADVISOR_PHONE, text=HARTLAND_LAUNCH))
+    by_label = {m.label: m for m in outcome.matches}
+
+    check("C2.1. a payment-plan buyer matches a launch with stated terms",
+          "Investor 50" in by_label, str(list(by_label)))
+    check("C2.2. and is surfaced as 'payment plan buyer'",
+          "Investor 50" in by_label
+          and "payment plan buyer" in by_label["Investor 50"].reasons,
+          str(by_label.get("Investor 50").reasons if "Investor 50" in by_label else None))
+    check("C2.3. a cash buyer also matches (payment terms don't constrain them)",
+          "Investor 51" in by_label, str(list(by_label)))
+    check("C2.4. and is surfaced as 'cash buyer'",
+          "Investor 51" in by_label
+          and "cash buyer" in by_label["Investor 51"].reasons,
+          str(by_label.get("Investor 51").reasons if "Investor 51" in by_label else None))
+    check("C2.5. an 'either' investor gets no payment reason (nothing was tested)",
+          "Investor 4" in by_label
+          and not any("buyer" in r for r in by_label["Investor 4"].reasons),
+          str(by_label.get("Investor 4").reasons if "Investor 4" in by_label else None))
+
+    # A launch with no stated payment terms: the plan buyer must drop out.
+    no_terms = "Emaar | Dubai Hills - Dubai\n1BR from AED 1.5M\nEOI Friday"
+    async with SessionLocal() as db:
+        reply2, outcome2 = await build_reply(
+            db, company_id, InboundMessage(sender=ADVISOR_PHONE, text=no_terms))
+    labels2 = [m.label for m in outcome2.matches]
+    check("C2.6. launch parsed with no payment plan",
+          outcome2.launch.payment_plan is None, str(outcome2.launch.payment_plan))
+    check("C2.7. payment-plan buyer excluded when terms are not stated",
+          "Investor 50" not in labels2, str(labels2))
+    check("C2.8. cash buyer still matches a launch with no stated terms",
+          "Investor 51" in labels2, str(labels2))
+
+    # The field must round-trip through the API.
+    h = auth(ctx["advisor_token"])
+    r = await client.get("/launch-matcher/investors", headers=h)
+    rows = {row["label"]: row for row in r.json()}
+    check("C2.9. payment_preference round-trips through the API",
+          rows.get("Investor 50", {}).get("payment_preference") == "payment_plan",
+          str(rows.get("Investor 50", {}).get("payment_preference")))
+    check("C2.10. it defaults to 'either' when unspecified",
+          rows.get("Investor 4", {}).get("payment_preference") == "either",
+          str(rows.get("Investor 4", {}).get("payment_preference")))
+
+    r = await client.get("/launch-matcher/constants", headers=h)
+    check("C2.11. constants expose the choices for the setup screen",
+          r.status_code == 200
+          and r.json().get("payment_preference") == ["cash", "payment_plan", "either"],
+          str(r.json() if r.status_code == 200 else r.status_code))
+
+    print("\n     Reply with payment reasons:")
     for line in reply.split("\n"):
         print(f"       {line}")
 
@@ -587,6 +670,7 @@ async def main() -> None:
         await seed_investors(client, ctx)
         await test_isolation(client, ctx)
         await test_matching(client, ctx)
+        await test_payment_preference(client, ctx)
         await test_no_match_is_honest(client, ctx)
         await test_whatsapp_flow(client, ctx)
         await test_no_pii_written_by_inbound(client, ctx)
