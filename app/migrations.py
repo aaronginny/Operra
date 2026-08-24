@@ -585,6 +585,51 @@ _MIGRATIONS = [
         "033_enquiries.seller_idx",
         "CREATE INDEX IF NOT EXISTS ix_enquiries_seller_id ON enquiries (seller_id);",
     ),
+    # ---------------------------------------------------------------------
+    # 034 -- Launch Matcher (vertical = "launch_matcher").
+    #
+    # One table, deliberately. Investor criteria are stored; forwarded launch
+    # messages are NOT -- they are parsed in memory, answered, and discarded,
+    # so no forwarded text can ever be persisted.
+    #
+    # There is no name, phone or email column here and there must never be
+    # one: an investor is identified only by the advisor's own `label`.
+    #
+    # Inert for every existing account: companies.vertical defaults to
+    # 'generic', and "launch_matcher" is mutually exclusive with the broker
+    # CRM's "real_estate", so neither vertical's routes can see the other.
+    # ---------------------------------------------------------------------
+    (
+        "034_investor_criteria.table",
+        """
+        CREATE TABLE IF NOT EXISTS investor_criteria (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            label VARCHAR(80) NOT NULL,
+            emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            property_type VARCHAR(40) NOT NULL DEFAULT '',
+            off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
+            timeline VARCHAR(120) NOT NULL DEFAULT '',
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "034_investor_criteria.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_id "
+        "ON investor_criteria (company_id);",
+    ),
+    # Emirate is the top-level match filter, so every matching run narrows on
+    # (company_id, emirate) first. Indexed as a pair for that access path.
+    (
+        "034_investor_criteria.company_emirate_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
+        "ON investor_criteria (company_id, emirate);",
+    ),
 ]
 
 
@@ -760,6 +805,39 @@ _SQLITE_MIGRATIONS = [
     (
         "sqlite.enquiries.seller_idx",
         "CREATE INDEX IF NOT EXISTS ix_enquiries_seller_id ON enquiries (seller_id);",
+    ),
+    # -- Launch Matcher (migration 034) mirrored for existing SQLite dev DBs.
+    #    Fresh SQLite DBs get the table from create_all via the ORM model; the
+    #    indexes are repeated here because an upgraded DB that already has the
+    #    table would not otherwise receive them.
+    (
+        "sqlite.investor_criteria.table",
+        """
+        CREATE TABLE IF NOT EXISTS investor_criteria (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            label VARCHAR(80) NOT NULL,
+            emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            property_type VARCHAR(40) NOT NULL DEFAULT '',
+            off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
+            timeline VARCHAR(120) NOT NULL DEFAULT '',
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.investor_criteria.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_id "
+        "ON investor_criteria (company_id);",
+    ),
+    (
+        "sqlite.investor_criteria.company_emirate_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
+        "ON investor_criteria (company_id, emirate);",
     ),
 ]
 
