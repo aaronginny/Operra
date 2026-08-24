@@ -9,20 +9,28 @@ notification content can still be asserted.
 Follows the convention of the other test scripts in this repo: a plain asyncio
 script with its own engine, run directly (no pytest).
 
-    python test_real_estate.py
+    python test_real_estate.py                       # SQLite (default)
+    TEST_DATABASE_URL=postgresql+asyncpg://... python test_real_estate.py
 """
 
 import asyncio
 import os
 import sys
 
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./_test_real_estate.db")
+# Defaults to a throwaway SQLite file so the suite runs with no setup. Set
+# TEST_DATABASE_URL to run the exact same assertions against Postgres, which
+# differs from SQLite in ways that matter here: NUMERIC comes back as Decimal
+# rather than float, foreign keys are actually enforced, and unique indexes
+# are checked rather than ignored.
+TEST_DB_PATH = "_test_real_estate.db"
+DEFAULT_SQLITE_URL = f"sqlite+aiosqlite:///./{TEST_DB_PATH}"
+TEST_DB_URL = os.environ.get("TEST_DATABASE_URL") or DEFAULT_SQLITE_URL
+IS_SQLITE = TEST_DB_URL.startswith("sqlite")
+
+os.environ["DATABASE_URL"] = TEST_DB_URL
 
 import httpx  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
-
-TEST_DB_PATH = "_test_real_estate.db"
-TEST_DB_URL = f"sqlite+aiosqlite:///./{TEST_DB_PATH}"
 
 # Point the app's db module at the test engine BEFORE anything imports it.
 import app.database as _db_module  # noqa: E402
@@ -90,8 +98,17 @@ async def override_get_db():
 
 
 async def setup_db() -> dict:
-    if os.path.exists(TEST_DB_PATH):
-        os.remove(TEST_DB_PATH)
+    if IS_SQLITE:
+        if os.path.exists(TEST_DB_PATH):
+            os.remove(TEST_DB_PATH)
+    else:
+        # Postgres: drop the schema rather than the file, so a re-run starts
+        # from the same blank slate a fresh SQLite file gives us. Issued as two
+        # statements because asyncpg prepares each one and refuses a compound.
+        from sqlalchemy import text as _text
+        async with engine.begin() as conn:
+            await conn.execute(_text("DROP SCHEMA public CASCADE"))
+            await conn.execute(_text("CREATE SCHEMA public"))
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await run_migrations(engine)
@@ -400,11 +417,121 @@ async def test_morning_pulse(ctx: dict) -> None:
           recipients == {"+919000000002"}, str(recipients))
 
 
+
+# ── F. SQLite / Postgres divergence ──────────────────────────
+# SQLite does not enforce foreign keys, ignores VARCHAR(n) widths, and hands
+# back NUMERIC as float. Postgres does the opposite on all three, so these
+# paths can pass in dev and fail in production. Everything here runs on both
+# backends and must behave identically.
+
+async def test_backend_divergence(client: httpx.AsyncClient, ctx: dict) -> None:
+    print("\n-- F. Cross-backend behaviour (FKs, VARCHAR, NUMERIC) --")
+    h = auth(ctx["broker_token"])
+
+    # Build a small self-contained graph: seller <- listing, seller/buyer <- enquiry,
+    # and the match the engine derives from the pair.
+    r = await client.post("/real-estate/sellers", headers=h, json={
+        "name": "Divergence Owner", "areas": "Perambur", "property_type": "apt_resale",
+        "division": "sales", "currency": "INR", "price": 4200000})
+    seller_id = r.json()["id"]
+    r = await client.post("/real-estate/buyers", headers=h, json={
+        "name": "Divergence Buyer", "areas": "Perambur", "property_type": "apt_resale",
+        "division": "sales", "currency": "INR",
+        "budget_min": 4000000, "budget_max": 4500000, "radius_km": 5})
+    buyer_id = r.json()["id"]
+    r = await client.post("/real-estate/listings", headers=h, json={
+        "title": "Divergence Flat", "area": "Perambur", "seller_id": seller_id,
+        "price": 4200000, "currency": "INR"})
+    listing_id = r.json()["id"]
+    r = await client.post("/enquiries", headers=h, json={
+        "client_name": "Divergence Buyer", "buyer_id": buyer_id, "seller_id": seller_id})
+    enquiry_id = r.json()["id"]
+
+    r = await client.get("/real-estate/matches", headers=h)
+    pair_matches = [m for m in r.json() if m["seller_id"] == seller_id]
+    check("F1. the pair produced a match before deletion",
+          len(pair_matches) == 1, str(len(pair_matches)))
+
+    # Deleting a seller that a listing, an enquiry and a match all reference.
+    # On Postgres a dangling reference would raise; on SQLite it would pass
+    # silently, so this only proves anything when run on both.
+    r = await client.delete(f"/real-estate/sellers/{seller_id}", headers=h)
+    check("F2. deleting a referenced seller does not violate a foreign key",
+          r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+
+    r = await client.get("/real-estate/listings", headers=h)
+    listing = [x for x in r.json() if x["id"] == listing_id]
+    check("F3. its listing survives, unlinked rather than deleted",
+          bool(listing) and listing[0]["seller_id"] is None, str(listing[:1]))
+
+    r = await client.get("/enquiries", headers=h)
+    enquiry = [x for x in r.json() if x["id"] == enquiry_id]
+    check("F4. its enquiry survives with the seller link cleared",
+          bool(enquiry) and enquiry[0]["seller_id"] is None, str(enquiry[:1]))
+
+    r = await client.get("/real-estate/matches", headers=h)
+    check("F5. matches referencing the seller are gone",
+          not [m for m in r.json() if m["seller_id"] == seller_id], "match still present")
+
+    r = await client.delete(f"/real-estate/buyers/{buyer_id}", headers=h)
+    check("F6. deleting a referenced buyer does not violate a foreign key",
+          r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+    r = await client.get("/enquiries", headers=h)
+    enquiry = [x for x in r.json() if x["id"] == enquiry_id]
+    check("F7. its enquiry survives with the buyer link cleared",
+          bool(enquiry) and enquiry[0]["buyer_id"] is None, str(enquiry[:1]))
+
+    # A commission outlives the enquiry it was booked against.
+    r = await client.post("/real-estate/commissions", headers=h, json={
+        "enquiry_id": enquiry_id, "deal_value": 4200000, "commission_percent": 2,
+        "currency": "INR", "status": "Pending"})
+    commission_id = r.json()["id"]
+    r = await client.delete(f"/enquiries/{enquiry_id}", headers=h)
+    check("F8. deleting an enquiry a commission points at succeeds",
+          r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+    r = await client.get("/real-estate/commissions", headers=h)
+    check("F9. the commission survives it",
+          any(x["id"] == commission_id for x in r.json()), r.text[:200])
+
+    # NUMERIC: Postgres returns Decimal, SQLite float. Both must serialise.
+    r = await client.get("/real-estate/summary", headers=h)
+    check("F10. summary sums NUMERIC columns without a type error",
+          r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+    if r.status_code == 200:
+        total = r.json().get("commission_received_total")
+        check("F11. the NUMERIC total serialises as a JSON number",
+              isinstance(total, (int, float)), f"{type(total).__name__}={total}")
+
+    # VARCHAR(n): enforced by Postgres, ignored by SQLite. Over-length input
+    # must be rejected cleanly on both rather than 500ing on one.
+    r = await client.post("/real-estate/buyers", headers=h, json={
+        "name": "Too Long Areas", "areas": ", ".join(["Velachery"] * 80),
+        "property_type": "apt_resale", "division": "sales", "currency": "INR",
+        "budget_min": 1, "budget_max": 2, "radius_km": 5})
+    check("F12. an over-length area list is rejected, not a 500",
+          r.status_code in (400, 422), f"{r.status_code} {r.text[:160]}")
+
+    r = await client.post("/real-estate/buyers", headers=h, json={
+        "name": "L" * 400, "areas": "Velachery", "property_type": "apt_resale",
+        "division": "sales", "currency": "INR",
+        "budget_min": 1, "budget_max": 2, "radius_km": 5})
+    check("F13. an over-length name is rejected, not a 500",
+          r.status_code in (400, 422), f"{r.status_code} {r.text[:160]}")
+
+    r = await client.post("/real-estate/buyers", headers=h, json={
+        "name": "Boundary Buyer", "areas": "V" * 500, "property_type": "apt_resale",
+        "division": "sales", "currency": "INR",
+        "budget_min": 1, "budget_max": 2, "radius_km": 5})
+    check("F14. an area list exactly at the limit is still accepted",
+          r.status_code == 201, f"{r.status_code} {r.text[:160]}")
+
+
 # ── Runner ───────────────────────────────────────────────────
 
 async def main() -> None:
     print("=" * 64)
     print("  Real-estate vertical — end-to-end verification")
+    print(f"  backend: {'SQLite' if IS_SQLITE else 'PostgreSQL'}")
     print("=" * 64)
 
     install_whatsapp_stub()
@@ -418,9 +545,10 @@ async def main() -> None:
         await test_proximity_and_exclusions(client, ctx)
         await test_enquiry_and_commission(client, ctx)
         await test_morning_pulse(ctx)
+        await test_backend_divergence(client, ctx)
 
     await engine.dispose()
-    if os.path.exists(TEST_DB_PATH):
+    if IS_SQLITE and os.path.exists(TEST_DB_PATH):
         os.remove(TEST_DB_PATH)
 
     passed = sum(1 for r in results if r[0] == PASS)

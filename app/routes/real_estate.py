@@ -18,7 +18,7 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func as sa_func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,19 +58,42 @@ def _clamp_radius(value) -> float:
         return 5.0
 
 
+# Mirrors of the VARCHAR widths in app/models/. Postgres enforces these and
+# SQLite does not, so they are declared on the request schemas below to keep the
+# two backends behaving the same way instead of only failing in production.
+MAX_NAME = 255
+MAX_PHONE = 30
+MAX_DIAL = 10
+MAX_AREAS = 500
+MAX_TITLE = 255
+MAX_AREA = 255
+MAX_REFERRED_BY = 255
+
+
 def _norm_areas(areas: str | None) -> str:
-    """Normalise a comma-separated area list: trim parts, drop empties."""
-    return ", ".join(a.strip() for a in (areas or "").split(",") if a.strip())
+    """Normalise a comma-separated area list: trim parts, drop empties.
+
+    Parts are rejoined with ", ", which can make the result slightly longer
+    than what was submitted, so the width is re-checked here rather than
+    trusting the schema's max_length alone.
+    """
+    normalised = ", ".join(a.strip() for a in (areas or "").split(",") if a.strip())
+    if len(normalised) > MAX_AREAS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Area list is too long ({len(normalised)} characters, limit {MAX_AREAS}).",
+        )
+    return normalised
 
 
 # ── Schemas ──────────────────────────────────────────────────
 
 class BuyerCreate(BaseModel):
-    name: str
-    phone: str | None = None
-    dial: str = "+91"
+    name: str = Field(max_length=MAX_NAME)
+    phone: str | None = Field(default=None, max_length=MAX_PHONE)
+    dial: str = Field(default="+91", max_length=MAX_DIAL)
     country: str = "IN"
-    areas: str = ""
+    areas: str = Field(default="", max_length=MAX_AREAS)
     property_type: str = "apt_resale"
     division: str = "sales"
     currency: str = "INR"
@@ -79,16 +102,16 @@ class BuyerCreate(BaseModel):
     period: str = "monthly"
     radius_km: float = 5
     label: str = "active"
-    referred_by: str | None = None
+    referred_by: str | None = Field(default=None, max_length=MAX_REFERRED_BY)
     notes: str | None = None
 
 
 class BuyerUpdate(BaseModel):
-    name: str | None = None
-    phone: str | None = None
-    dial: str | None = None
+    name: str | None = Field(default=None, max_length=MAX_NAME)
+    phone: str | None = Field(default=None, max_length=MAX_PHONE)
+    dial: str | None = Field(default=None, max_length=MAX_DIAL)
     country: str | None = None
-    areas: str | None = None
+    areas: str | None = Field(default=None, max_length=MAX_AREAS)
     property_type: str | None = None
     division: str | None = None
     currency: str | None = None
@@ -97,7 +120,7 @@ class BuyerUpdate(BaseModel):
     period: str | None = None
     radius_km: float | None = None
     label: str | None = None
-    referred_by: str | None = None
+    referred_by: str | None = Field(default=None, max_length=MAX_REFERRED_BY)
     notes: str | None = None
 
 
@@ -125,34 +148,34 @@ class BuyerResponse(BaseModel):
 
 
 class SellerCreate(BaseModel):
-    name: str
-    phone: str | None = None
-    dial: str = "+91"
+    name: str = Field(max_length=MAX_NAME)
+    phone: str | None = Field(default=None, max_length=MAX_PHONE)
+    dial: str = Field(default="+91", max_length=MAX_DIAL)
     country: str = "IN"
-    areas: str = ""
+    areas: str = Field(default="", max_length=MAX_AREAS)
     property_type: str = "apt_resale"
     division: str = "sales"
     currency: str = "INR"
     price: float = 0
     period: str = "monthly"
     label: str = "active"
-    referred_by: str | None = None
+    referred_by: str | None = Field(default=None, max_length=MAX_REFERRED_BY)
     notes: str | None = None
 
 
 class SellerUpdate(BaseModel):
-    name: str | None = None
-    phone: str | None = None
-    dial: str | None = None
+    name: str | None = Field(default=None, max_length=MAX_NAME)
+    phone: str | None = Field(default=None, max_length=MAX_PHONE)
+    dial: str | None = Field(default=None, max_length=MAX_DIAL)
     country: str | None = None
-    areas: str | None = None
+    areas: str | None = Field(default=None, max_length=MAX_AREAS)
     property_type: str | None = None
     division: str | None = None
     currency: str | None = None
     price: float | None = None
     period: str | None = None
     label: str | None = None
-    referred_by: str | None = None
+    referred_by: str | None = Field(default=None, max_length=MAX_REFERRED_BY)
     notes: str | None = None
 
 
@@ -178,9 +201,9 @@ class SellerResponse(BaseModel):
 
 
 class ListingCreate(BaseModel):
-    title: str
+    title: str = Field(max_length=MAX_TITLE)
     seller_id: int | None = None
-    area: str = ""
+    area: str = Field(default="", max_length=MAX_AREA)
     property_type: str = "apt_resale"
     division: str = "sales"
     price: float = 0
@@ -194,9 +217,9 @@ class ListingCreate(BaseModel):
 
 
 class ListingUpdate(BaseModel):
-    title: str | None = None
+    title: str | None = Field(default=None, max_length=MAX_TITLE)
     seller_id: int | None = None
-    area: str | None = None
+    area: str | None = Field(default=None, max_length=MAX_AREA)
     property_type: str | None = None
     division: str | None = None
     price: float | None = None
