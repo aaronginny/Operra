@@ -19,10 +19,10 @@ class Listing(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("companies.id"), nullable=False, index=True
+        Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     seller_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("sellers.id"), nullable=True, index=True
+        Integer, ForeignKey("sellers.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)

@@ -65,11 +65,17 @@ class Enquiry(Base):
     # already hold. Both are nullable and independent: a buyer-side enquiry
     # sets buyer_id, a seller-side one sets seller_id, and an enquiry created
     # off a match sets both. Generic companies never populate either.
+    #
+    # ondelete must stay in step with migration 033 in app/migrations.py.
+    # `enquiries` predates this vertical, so an existing database gets these
+    # two columns from that ALTER while a fresh one gets them from create_all
+    # here -- if the two disagree, the same code ends up with different FK
+    # behaviour depending on how the database was built.
     buyer_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("buyers.id"), nullable=True, index=True
+        Integer, ForeignKey("buyers.id", ondelete="SET NULL"), nullable=True, index=True
     )
     seller_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("sellers.id"), nullable=True, index=True
+        Integer, ForeignKey("sellers.id", ondelete="SET NULL"), nullable=True, index=True
     )
     # JSON string: [{"stage": "follow_up", "at": "2026-04-10T12:00:00"}, ...]
     stage_history: Mapped[str | None] = mapped_column(Text, nullable=True)

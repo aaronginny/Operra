@@ -37,13 +37,13 @@ class Match(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("companies.id"), nullable=False, index=True
+        Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     buyer_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("buyers.id"), nullable=False, index=True
+        Integer, ForeignKey("buyers.id", ondelete="CASCADE"), nullable=False, index=True
     )
     seller_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("sellers.id"), nullable=False, index=True
+        Integer, ForeignKey("sellers.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # How the *areas* matched: "exact" (same area string) or "proximity"

@@ -17,7 +17,7 @@ class Seller(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("companies.id"), nullable=False, index=True
+        Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)

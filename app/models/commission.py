@@ -18,10 +18,10 @@ class Commission(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("companies.id"), nullable=False, index=True
+        Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     enquiry_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("enquiries.id"), nullable=True, index=True
+        Integer, ForeignKey("enquiries.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     deal_value: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, server_default="0")

@@ -571,6 +571,20 @@ _MIGRATIONS = [
             REFERENCES sellers(id) ON DELETE SET NULL DEFAULT NULL;
         """,
     ),
+    # The two ALTERs above add the columns but not their indexes. On a fresh
+    # database create_all builds `enquiries` from the model, which declares
+    # index=True, so the indexes come for free -- but on an existing database
+    # (which is every real deployment) create_all skips the table entirely and
+    # the columns would land unindexed. These statements are what keeps an
+    # upgraded schema identical to a freshly created one.
+    (
+        "033_enquiries.buyer_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_buyer_id ON enquiries (buyer_id);",
+    ),
+    (
+        "033_enquiries.seller_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_seller_id ON enquiries (seller_id);",
+    ),
 ]
 
 
@@ -738,6 +752,14 @@ _SQLITE_MIGRATIONS = [
     (
         "sqlite.enquiries.seller_id",
         "ALTER TABLE enquiries ADD COLUMN seller_id INTEGER REFERENCES sellers(id);",
+    ),
+    (
+        "sqlite.enquiries.buyer_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_buyer_id ON enquiries (buyer_id);",
+    ),
+    (
+        "sqlite.enquiries.seller_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_seller_id ON enquiries (seller_id);",
     ),
 ]
 
