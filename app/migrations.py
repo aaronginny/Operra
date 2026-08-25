@@ -881,15 +881,29 @@ _SQLITE_MIGRATIONS = [
 
 
 async def run_migrations(engine: AsyncEngine) -> None:
-    """Run all pending column migrations on startup."""
+    """Run all pending column migrations on startup.
+
+    Each migration gets its OWN transaction. On Postgres, a single failed
+    statement leaves the surrounding transaction aborted — every later
+    statement in that same transaction then fails with
+    InFailedSQLTransactionError regardless of whether it would have succeeded
+    on its own, until a ROLLBACK. A single shared transaction around the whole
+    loop therefore turns one expected, harmless failure (e.g. an idempotent
+    ALTER TYPE against an enum value that already exists, or one that predates
+    a column existing at all) into every subsequent migration being silently
+    skipped — defeating the try/except's actual intent, which is that each
+    migration is independently safe to attempt. SQLite does not surface this
+    failure mode the same way, which is why it stayed invisible until tested
+    against Postgres.
+    """
     is_sqlite = engine.dialect.name == "sqlite"
     migrations = _SQLITE_MIGRATIONS if is_sqlite else _MIGRATIONS
 
-    async with engine.begin() as conn:
-        for name, sql in migrations:
-            try:
+    for name, sql in migrations:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(sql.strip()))
-                logger.info("Migration OK: %s", name)
-            except Exception as exc:
-                # Log but don't crash — column may already exist on this driver
-                logger.warning("Migration skipped (%s): %s", name, exc)
+            logger.info("Migration OK: %s", name)
+        except Exception as exc:
+            # Log but don't crash — column may already exist on this driver
+            logger.warning("Migration skipped (%s): %s", name, exc)
