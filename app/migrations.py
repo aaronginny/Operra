@@ -608,8 +608,8 @@ _MIGRATIONS = [
             label VARCHAR(80) NOT NULL,
             emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
             areas VARCHAR(500) NOT NULL DEFAULT '',
-            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
-            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT '0',
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT '0',
             property_type VARCHAR(40) NOT NULL DEFAULT '',
             off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
             payment_preference VARCHAR(15) NOT NULL DEFAULT 'either',
@@ -630,6 +630,15 @@ _MIGRATIONS = [
         "034_investor_criteria.company_emirate_idx",
         "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
         "ON investor_criteria (company_id, emirate);",
+    ),
+    # The ORM declares index=True on the primary key (the convention every
+    # model in this repo follows), so create_all builds this index. A database
+    # where the table came from the migration's DDL instead would not have it,
+    # and the two paths must not diverge.
+    (
+        "034_investor_criteria.id_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_id "
+        "ON investor_criteria (id);",
     ),
     # ---------------------------------------------------------------------
     # 035 -- investor_criteria.payment_preference (cash / payment_plan /
@@ -834,8 +843,8 @@ _SQLITE_MIGRATIONS = [
             label VARCHAR(80) NOT NULL,
             emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
             areas VARCHAR(500) NOT NULL DEFAULT '',
-            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
-            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT '0',
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT '0',
             property_type VARCHAR(40) NOT NULL DEFAULT '',
             off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
             payment_preference VARCHAR(15) NOT NULL DEFAULT 'either',
@@ -854,6 +863,11 @@ _SQLITE_MIGRATIONS = [
         "sqlite.investor_criteria.company_emirate_idx",
         "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
         "ON investor_criteria (company_id, emirate);",
+    ),
+    (
+        "sqlite.investor_criteria.id_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_id "
+        "ON investor_criteria (id);",
     ),
     # Mirror of migration 035. SQLite has no ADD COLUMN IF NOT EXISTS; the
     # duplicate-column error is swallowed by run_migrations on re-run, which is
