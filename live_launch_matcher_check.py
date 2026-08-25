@@ -8,11 +8,28 @@ What it proves, in order, and it stops at the first thing that genuinely fails:
   1. the configured token actually authenticates against the phone number
   2. a realistic launch text parses and matches seeded criteria, including a
      payment_preference match
-  3. a real WhatsApp reply is accepted by Meta (message id returned)
-  4. the message is actually DELIVERED — confirmed from webhook status
+  3. WhatsApp's 24-hour session window is open for the recipient
+  4. a real WhatsApp reply is accepted by Meta (message id returned)
+  5. the message is actually DELIVERED — confirmed from webhook status
      callbacks, not from the send call's 200
-  5. the run leaves zero rows in message_logs and persists nothing from the
+  6. the run leaves zero rows in message_logs and persists nothing from the
      message outside investor_criteria
+
+On (3): this is not optional politeness, it is what the product actually does.
+Phase 1 is user-initiated by design — the advisor forwards a launch, that
+inbound message opens the window, and the bot replies inside it. There is no
+business-initiated send anywhere in the feature.
+
+Sending cold is therefore a scenario the product never performs, and WhatsApp
+forbids it. Worse, Meta does not reliably say so: outside the window it will
+often accept the call and return a message id, then silently drop the message.
+An earlier version of this script did exactly that and reported success while
+nothing arrived. Hence the gate below refuses to send rather than trusting a
+200 to mean anything.
+
+Meta exposes no API for "when did this user last message us", so the window
+must be established the same way delivery is — from webhook evidence
+(--inbound-from) or an explicit operator assertion (--inbound-confirmed).
 
 On (4): Meta reports delivery only by POSTing a status callback to the
 configured webhook. There is no "GET message status" endpoint. So delivery is
@@ -26,9 +43,13 @@ Without one of those this script reports SENT-BUT-UNCONFIRMED and exits
 non-zero, because "Meta returned 200" is not delivery.
 
 Usage:
-    python live_launch_matcher_check.py --to +9715XXXXXXX
-    python live_launch_matcher_check.py --to +9715XXXXXXX --statuses-from statuses.log
-    python live_launch_matcher_check.py --to +9715XXXXXXX --confirm-receipt
+    # after messaging the business number from the test handset:
+    python live_launch_matcher_check.py --to +9715XXXXXXX \
+        --inbound-confirmed --confirm-receipt
+
+    # fully evidence-driven, with the app running behind a webhook:
+    python live_launch_matcher_check.py --to +9715XXXXXXX \
+        --inbound-from inbound.log --statuses-from statuses.log
 """
 
 import argparse
@@ -120,6 +141,66 @@ async def seed(advisor_phone: str) -> int:
         return company.id
 
 
+# WhatsApp only allows free-form text within 24 hours of the user's own last
+# inbound message. Meta publishes no endpoint to query that window, so it is
+# established from the same kind of evidence delivery is.
+SESSION_WINDOW_HOURS = 24
+
+
+def _digits(value: str) -> str:
+    return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
+def read_last_inbound(path: str, sender: str) -> float | None:
+    """Age in hours of the most recent inbound message from `sender`.
+
+    Reads a log the running app appends inbound events to, one JSON object per
+    line, e.g. {"from": "919150016161", "at": "2026-08-25T09:14:00Z"}. Numbers
+    are compared digits-only so +91..., 91... and 0091... all match. Returns
+    None when the file is absent or holds nothing from that sender.
+    """
+    if not path or not os.path.exists(path):
+        return None
+
+    import datetime as _dt
+
+    want = _digits(sender)
+    newest = None
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            who = _digits(str(entry.get("from") or entry.get("sender") or ""))
+            if not who or not (who.endswith(want) or want.endswith(who)):
+                continue
+            stamp = entry.get("at") or entry.get("timestamp")
+            if stamp is None:
+                continue
+            try:
+                # Accept ISO-8601 or a unix epoch, which is what Meta sends.
+                if isinstance(stamp, (int, float)) or str(stamp).isdigit():
+                    when = _dt.datetime.fromtimestamp(float(stamp), _dt.timezone.utc)
+                else:
+                    when = _dt.datetime.fromisoformat(
+                        str(stamp).replace("Z", "+00:00"))
+                    if when.tzinfo is None:
+                        when = when.replace(tzinfo=_dt.timezone.utc)
+            except (ValueError, OSError):
+                continue
+            if newest is None or when > newest:
+                newest = when
+
+    if newest is None:
+        return None
+    age = _dt.datetime.now(_dt.timezone.utc) - newest
+    return age.total_seconds() / 3600.0
+
+
 def read_statuses(path: str, message_id: str) -> str | None:
     """Look for a delivery status for this message id in the statuses file."""
     if not path or not os.path.exists(path):
@@ -151,6 +232,12 @@ async def main() -> None:
                     help="seconds to wait for a delivery status (default 60)")
     ap.add_argument("--confirm-receipt", action="store_true",
                     help="operator confirms the message arrived on the handset")
+    ap.add_argument("--inbound-from", default="",
+                    help="file the app appends inbound message events to, used "
+                         "to prove the 24-hour session window is open")
+    ap.add_argument("--inbound-confirmed", action="store_true",
+                    help="operator confirms they have JUST messaged the business "
+                         "number from the recipient handset, opening the window")
     args = ap.parse_args()
 
     print("=" * 66)
@@ -205,11 +292,50 @@ async def main() -> None:
     for line in reply.split("\n"):
         print(f"       {line}")
 
-    # ── 3. Real send ─────────────────────────────────────────
-    print("\n-- 3. Real WhatsApp send --")
+    # ── 3. Session window must be open before we send ────────
+    print("\n-- 3. Session window --")
+    window_ok = False
+    if args.inbound_from:
+        age = read_last_inbound(args.inbound_from, args.to)
+        if age is None:
+            step("3.1 an inbound message from the recipient is on record", False,
+                 f"nothing from {args.to} found in {args.inbound_from}")
+        else:
+            window_ok = age < SESSION_WINDOW_HOURS
+            step(f"3.1 last inbound was {age:.1f}h ago (limit "
+                 f"{SESSION_WINDOW_HOURS}h)", window_ok,
+                 "the 24-hour window has closed — the recipient must message "
+                 "the business number again")
+    elif args.inbound_confirmed:
+        window_ok = True
+        step("3.1 operator confirms the recipient has just messaged us", True,
+             "asserted via --inbound-confirmed")
+    else:
+        step("3.1 session window is open", False,
+             "no --inbound-from and no --inbound-confirmed. WhatsApp only "
+             "allows free-form text within 24h of the recipient's own last "
+             "message, and Meta may accept-then-silently-drop outside it, so "
+             "this refuses to send rather than report a meaningless 200")
+
+    if not window_ok:
+        print("\n  Refusing to send outside the session window. Message the "
+              "business number\n  from the recipient handset, then re-run with "
+              "--inbound-confirmed.")
+        print("\n" + "=" * 66)
+        print(f"  LIVE CHECK FAILED — {len(failures)} step(s):")
+        for f in failures:
+            print(f"    - {f}")
+        print("=" * 66)
+        await engine.dispose()
+        if os.path.exists(TEST_DB_PATH):
+            os.remove(TEST_DB_PATH)
+        sys.exit(1)
+
+    # ── 4. Real send ─────────────────────────────────────────
+    print("\n-- 4. Real WhatsApp send --")
     provider = MetaCloudProvider()
     result = await provider.send_text(args.to, reply)
-    if not step("3.1 Meta accepted the send", result.ok, result.error or ""):
+    if not step("4.1 Meta accepted the send", result.ok, result.error or ""):
         print("\n  Send rejected; delivery cannot follow. Stopping.")
         sys.exit(1)
 
@@ -226,11 +352,11 @@ async def main() -> None:
     )
     probe = resp.json()
     message_id = (probe.get("messages") or [{}])[0].get("id")
-    step("3.2 probe message accepted, id returned", bool(message_id),
+    step("4.2 probe message accepted, id returned", bool(message_id),
          json.dumps(probe)[:200])
 
-    # ── 4. Delivery, not just acceptance ─────────────────────
-    print("\n-- 4. Delivery confirmation --")
+    # ── 5. Delivery, not just acceptance ─────────────────────
+    print("\n-- 5. Delivery confirmation --")
     delivered = False
     if args.statuses_from and message_id:
         print(f"       watching {args.statuses_from} for up to {args.wait}s ...")
@@ -242,28 +368,28 @@ async def main() -> None:
                 break
             await asyncio.sleep(3)
         delivered = status in ("delivered", "read")
-        step(f"4.1 Meta reported delivery (status={status})", delivered,
+        step(f"5.1 Meta reported delivery (status={status})", delivered,
              "no delivered/read status seen within the wait window")
     elif args.confirm_receipt:
         delivered = True
-        step("4.1 receipt confirmed by the operator", True,
+        step("5.1 receipt confirmed by the operator", True,
              "confirmed via --confirm-receipt")
     else:
-        step("4.1 delivery confirmed", False,
+        step("5.1 delivery confirmed", False,
              "no --statuses-from and no --confirm-receipt; Meta's 200 is NOT "
              "delivery, so this is SENT-BUT-UNCONFIRMED")
 
-    # ── 5. Nothing persisted ─────────────────────────────────
-    print("\n-- 5. No PII persisted --")
+    # ── 6. Nothing persisted ─────────────────────────────────
+    print("\n-- 6. No PII persisted --")
     async with SessionLocal() as db:
         logs = (await db.execute(select(MessageLog))).scalars().all()
         rows = (await db.execute(select(InvestorCriteria))).scalars().all()
-    step("5.1 message_logs is empty", len(logs) == 0, f"{len(logs)} rows")
+    step("6.1 message_logs is empty", len(logs) == 0, f"{len(logs)} rows")
 
     blob = " ".join(f"{r.label} {r.areas} {r.property_type} {r.timeline} "
                     f"{r.notes or ''} {r.payment_preference}" for r in rows)
     leaked = [n for n in PII_NEEDLES if n.lower() in blob.lower()]
-    step("5.2 nothing from the message footer reached investor_criteria",
+    step("6.2 nothing from the message footer reached investor_criteria",
          not leaked, f"leaked {leaked}")
 
     tables = sorted(Base.metadata.tables)
@@ -276,7 +402,7 @@ async def main() -> None:
                 __import__("sqlalchemy").text(f"SELECT COUNT(*) FROM {name}"))).scalar()
             if count:
                 populated.append(f"{name}={count}")
-    step("5.3 no other table gained rows", not populated, "; ".join(populated))
+    step("6.3 no other table gained rows", not populated, "; ".join(populated))
 
     await engine.dispose()
     if os.path.exists(TEST_DB_PATH):
