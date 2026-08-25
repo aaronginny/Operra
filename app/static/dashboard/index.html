@@ -1311,6 +1311,50 @@
     .re-form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 560px) { .re-form-2col { grid-template-columns: 1fr; } }
     .modal.re-modal { max-width: 560px; max-height: 88vh; overflow-y: auto; }
+
+    /* ═════ LAUNCH MATCHER (vertical = "launch_matcher" only) ═════
+       Builds on the re-* card/chip/form classes above — same tokens, same
+       white/red/gold theme. Only the genuinely different pieces live here. */
+    .lm-preview {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;
+    }
+    .lm-preview-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .lm-preview-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .lm-preview-hint {
+      font-size: 11.5px; color: var(--text-3); font-weight: 500;
+    }
+    .lm-preview textarea {
+      width: 100%; min-height: 84px; resize: vertical;
+      padding: 10px 12px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-family: var(--font); font-size: 12.5px;
+      line-height: 1.55; outline: none; transition: border-color .15s;
+    }
+    .lm-preview textarea:focus { border-color: var(--accent); }
+    /* The reply is quoted back verbatim, so monospace and preserved
+       whitespace — the advisor is checking what WhatsApp will actually say. */
+    .lm-reply {
+      margin-top: 12px; padding: 12px 14px;
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent); border-radius: 8px;
+      font-size: 12.5px; line-height: 1.6; color: var(--text);
+      white-space: pre-wrap; word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .lm-parsed {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+    }
+    .lm-note {
+      font-size: 12px; color: var(--text-2); font-weight: 500;
+      line-height: 1.6; margin-bottom: 18px;
+      padding: 11px 14px; border-radius: 9px;
+      background: rgba(201,168,76,0.10); border: 1px solid rgba(201,168,76,0.35);
+    }
+    .lm-note b { color: var(--text); font-weight: 700; }
   </style>
 </head>
 <body>
@@ -1399,6 +1443,20 @@
     <button class="nav-item" data-nav="commissions">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
       Commissions
+    </button>
+  </div>
+
+
+  <!-- Launch Matcher nav: ships hidden, revealed only by initLaunchMatcher()
+       when GET /launch-matcher/constants returns 200. That route is already
+       vertical-gated and 404s for every other tenant, so it doubles as the
+       probe. Hidden is the fail-safe default. -->
+  <div class="nav-group" id="lmNavGroup" style="display:none">
+    <div class="nav-label">Launch Matcher</div>
+    <button class="nav-item" data-nav="investors">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+      Investors
+      <span class="badge-n" id="sidebarInvestorBadge" style="display:none">0</span>
     </button>
   </div>
 
@@ -1662,6 +1720,36 @@
       </div>
       <div class="re-summary" id="commissionSummary"></div>
       <div id="commissionsBody">
+        <div class="placeholder-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ LAUNCH MATCHER: INVESTORS (one-time setup) ══ -->
+    <div class="page-section" id="page-investors">
+      <div class="page-header">
+        <div class="page-title">Investors</div>
+        <button class="btn-add" id="btnAddInvestor"><span class="plus">+</span> Add investor</button>
+      </div>
+
+      <div class="lm-note">
+        Criteria only — <b>never names, phone numbers or email addresses</b>.
+        Identify each investor with your own label, like &ldquo;Investor 4&rdquo;.
+        Matching filters by emirate first, then everything else.
+      </div>
+
+      <div class="lm-preview">
+        <div class="lm-preview-head">
+          <div>
+            <div class="lm-preview-title">Test a launch message</div>
+            <div class="lm-preview-hint">Paste a launch broadcast to see who it would match. Nothing is sent.</div>
+          </div>
+          <button class="re-btn-sm primary" id="btnPreviewLaunch">Test match</button>
+        </div>
+        <textarea id="lmPreviewText" placeholder="Sobha Hartland II - Dubai&#10;1BR from AED 1.4M | 60/40 payment plan | EOI Thursday"></textarea>
+        <div id="lmPreviewOut"></div>
+      </div>
+
+      <div id="investorsBody">
         <div class="placeholder-page"><div class="spinner"></div></div>
       </div>
     </div>
@@ -2261,6 +2349,74 @@
     <div class="modal-actions">
       <button class="btn-cancel" id="commCancel">Cancel</button>
       <button class="btn-submit" id="commSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LAUNCH MATCHER MODAL ══ -->
+<div class="modal-overlay" id="investorModalOverlay">
+  <div class="modal re-modal">
+    <div class="modal-title" id="investorModalTitle">Add investor</div>
+
+    <div class="form-group">
+      <label>Label — your own shorthand, never a real name</label>
+      <input class="form-input" id="invLabel" type="text" placeholder="Investor 4" />
+    </div>
+
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Emirate — filtered first</label>
+        <select class="form-input" id="invEmirate"></select>
+      </div>
+      <div class="form-group">
+        <label>Unit type (optional)</label>
+        <input class="form-input" id="invPropertyType" type="text" placeholder="2BR" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Areas (optional, comma separated)</label>
+      <input class="form-input" id="invAreas" type="text" placeholder="Hartland, Meydan" />
+      <div class="settings-hint" style="margin-top:5px;">
+        Leave empty for no area preference. If you list areas, a launch outside them will not match.
+      </div>
+    </div>
+
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Budget min (AED)</label>
+        <input class="form-input" id="invBudgetMin" type="number" min="0" placeholder="1200000" />
+      </div>
+      <div class="form-group">
+        <label>Budget max (AED)</label>
+        <input class="form-input" id="invBudgetMax" type="number" min="0" placeholder="1600000" />
+      </div>
+    </div>
+
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Off-plan or ready</label>
+        <select class="form-input" id="invStage"></select>
+      </div>
+      <div class="form-group">
+        <label>Payment preference</label>
+        <select class="form-input" id="invPayment"></select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Timeline (optional)</label>
+      <input class="form-input" id="invTimeline" type="text" placeholder="Q4 2026" />
+    </div>
+
+    <div class="form-group">
+      <label>Notes (optional) — your own shorthand, not used for matching</label>
+      <input class="form-input" id="invNotes" type="text" placeholder="Optional" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="invCancel">Cancel</button>
+      <button class="btn-submit" id="invSave">Save</button>
     </div>
   </div>
 </div>
@@ -3205,6 +3361,7 @@
       archive: 'Archive',
       leads: 'Buyers & Sellers', listings: 'Listings',
       matches: 'Matches', commissions: 'Commissions',
+      investors: 'Investors',
     };
     document.getElementById('breadcrumbText').textContent = labels[page] || 'Dashboard';
 
@@ -3219,6 +3376,9 @@
     // Real-estate pages — guarded so navigation is a no-op when the vertical
     // is off (those nav items aren't rendered then, but a stale hash or a
     // keyboard shortcut must not blow up a generic dashboard).
+    if (lmState.enabled && page === 'investors') {
+      lmLoad().then(renderInvestors);
+    }
     if (reState.enabled) {
       if (page === 'leads' || page === 'listings' || page === 'matches' || page === 'commissions') {
         reLoadAll().then(() => {
@@ -4094,6 +4254,8 @@
       if (m.classList.contains('open')) { m.classList.remove('open'); return; }
       const em = document.getElementById('empModalOverlay');
       if (em && em.classList.contains('open')) { em.classList.remove('open'); return; }
+      const im = document.getElementById('investorModalOverlay');
+      if (im && im.classList.contains('open')) { im.classList.remove('open'); return; }
       return;
     }
 
@@ -4772,9 +4934,308 @@
     }
   }
 
+
+  /* ══════════════════════════════════════════════════════════
+     LAUNCH MATCHER  (only active when vertical = "launch_matcher")
+
+     One-time setup for investor criteria. The daily flow is entirely
+     WhatsApp — the advisor never needs this screen to match a launch; it is
+     here to enter and correct criteria, and to dry-run a message.
+
+     Dormant for every other tenant: lmState.enabled stays false, the nav group
+     stays hidden, and beyond a single probe no /launch-matcher request is made.
+     ══════════════════════════════════════════════════════════ */
+
+  const lmState = {
+    enabled: false,
+    constants: null,
+    investors: [],
+    editing: null,
+  };
+
+  const LM_PAYMENT_LABEL = {
+    cash: 'Cash buyer',
+    payment_plan: 'Payment plan',
+    either: 'Either',
+  };
+  const LM_STAGE_LABEL = {
+    off_plan: 'Off-plan',
+    ready: 'Ready',
+    both: 'Off-plan or ready',
+  };
+
+  function lmMoney(n) {
+    const v = Number(n);
+    if (!v) return null;
+    if (v >= 1000000) return (v / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+    if (v >= 1000) return Math.round(v / 1000) + 'K';
+    return String(v);
+  }
+
+  function lmBudgetText(inv) {
+    const lo = lmMoney(inv.budget_min), hi = lmMoney(inv.budget_max);
+    if (lo && hi) return `${lo} – ${hi}`;
+    if (hi) return `up to ${hi}`;
+    if (lo) return `${lo}+`;
+    return 'Any budget';
+  }
+
+  async function lmLoad() {
+    if (!lmState.enabled) return;
+    try {
+      const res = await fetch(`${API}/launch-matcher/investors`, { headers: headers() });
+      lmState.investors = res.ok ? await res.json() : [];
+      const badge = document.getElementById('sidebarInvestorBadge');
+      if (badge) {
+        badge.textContent = lmState.investors.length;
+        badge.style.display = lmState.investors.length ? '' : 'none';
+      }
+    } catch (e) {
+      toast('Could not load investors.', 'error');
+    }
+  }
+
+  function renderInvestors() {
+    const body = document.getElementById('investorsBody');
+    if (!body) return;
+
+    if (!lmState.investors.length) {
+      body.innerHTML = `<div class="re-empty">
+        <div class="re-empty-title">No investors yet</div>
+        <p>Add each investor's criteria — emirate, budget, and what they'll buy.
+           Use a label like "Investor 4"; never a real name.</p>
+      </div>`;
+      return;
+    }
+
+    // Grouped by emirate, because emirate is the top-level match filter and
+    // that's how the advisor reasons about their book.
+    const groups = {};
+    lmState.investors.forEach(inv => {
+      (groups[inv.emirate] = groups[inv.emirate] || []).push(inv);
+    });
+
+    body.innerHTML = Object.keys(groups).sort().map(emirate => `
+      <div class="dept-group">
+        <div class="dept-group-head">
+          <div class="dept-group-title">${escHtml(emirate)}</div>
+          <span class="dept-group-count">${groups[emirate].length}</span>
+        </div>
+        <div class="re-grid">
+          ${groups[emirate].map(inv => {
+            const areas = (inv.areas || '').trim();
+            return `<div class="re-card">
+              <div class="re-card-head">
+                <div>
+                  <div class="re-card-name">${escHtml(inv.label)}</div>
+                  <div class="re-card-sub">${escHtml(lmBudgetText(inv))}</div>
+                </div>
+                <span class="re-chip ${inv.payment_preference === 'payment_plan' ? 'gold' : 'muted'}">
+                  ${escHtml(LM_PAYMENT_LABEL[inv.payment_preference] || inv.payment_preference)}
+                </span>
+              </div>
+              <div class="re-card-row">
+                <span class="re-k">AREAS</span> ${escHtml(areas || 'Any area')}
+              </div>
+              <div class="re-card-row">
+                <span class="re-chip muted">${escHtml(LM_STAGE_LABEL[inv.off_plan_or_ready] || inv.off_plan_or_ready)}</span>
+                ${inv.property_type ? `<span class="re-chip cyan">${escHtml(inv.property_type)}</span>` : ''}
+              </div>
+              ${inv.timeline ? `<div class="re-card-row"><span class="re-k">WHEN</span> ${escHtml(inv.timeline)}</div>` : ''}
+              ${inv.notes ? `<div class="re-card-row"><span class="re-k">NOTE</span> ${escHtml(inv.notes)}</div>` : ''}
+              <div class="re-actions">
+                <button class="re-btn-sm" onclick="lmEdit(${inv.id})">Edit</button>
+                <button class="re-btn-sm danger" onclick="lmDelete(${inv.id})">Delete</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  /* ── Modal ── */
+  function lmFillSelect(el, values, labels, selected) {
+    if (!el) return;
+    el.innerHTML = values.map(v =>
+      `<option value="${escHtml(v)}" ${v === selected ? 'selected' : ''}>${escHtml((labels && labels[v]) || v)}</option>`
+    ).join('');
+  }
+
+  function lmOpenModal(existing) {
+    lmState.editing = existing || null;
+    document.getElementById('investorModalTitle').textContent =
+      existing ? 'Edit investor' : 'Add investor';
+
+    const c = lmState.constants || {};
+    lmFillSelect(document.getElementById('invEmirate'), c.emirates || ['Dubai'],
+      null, existing ? existing.emirate : 'Dubai');
+    lmFillSelect(document.getElementById('invStage'), c.off_plan_or_ready || ['both'],
+      LM_STAGE_LABEL, existing ? existing.off_plan_or_ready : 'both');
+    lmFillSelect(document.getElementById('invPayment'), c.payment_preference || ['either'],
+      LM_PAYMENT_LABEL, existing ? existing.payment_preference : 'either');
+
+    document.getElementById('invLabel').value = existing ? existing.label : '';
+    document.getElementById('invAreas').value = existing ? (existing.areas || '') : '';
+    document.getElementById('invPropertyType').value = existing ? (existing.property_type || '') : '';
+    document.getElementById('invBudgetMin').value = existing && existing.budget_min ? existing.budget_min : '';
+    document.getElementById('invBudgetMax').value = existing && existing.budget_max ? existing.budget_max : '';
+    document.getElementById('invTimeline').value = existing ? (existing.timeline || '') : '';
+    document.getElementById('invNotes').value = existing ? (existing.notes || '') : '';
+
+    document.getElementById('investorModalOverlay').classList.add('open');
+  }
+
+  function lmCloseModal() {
+    document.getElementById('investorModalOverlay').classList.remove('open');
+    lmState.editing = null;
+  }
+
+  async function lmSave() {
+    const label = document.getElementById('invLabel').value.trim();
+    if (!label) { toast('Label is required.', 'error'); return; }
+
+    const payload = {
+      label,
+      emirate: document.getElementById('invEmirate').value,
+      areas: document.getElementById('invAreas').value.trim(),
+      property_type: document.getElementById('invPropertyType').value.trim(),
+      off_plan_or_ready: document.getElementById('invStage').value,
+      payment_preference: document.getElementById('invPayment').value,
+      timeline: document.getElementById('invTimeline').value.trim(),
+      notes: document.getElementById('invNotes').value.trim() || null,
+      budget_min: Number(document.getElementById('invBudgetMin').value) || 0,
+      budget_max: Number(document.getElementById('invBudgetMax').value) || 0,
+    };
+    if (payload.budget_max && payload.budget_max < payload.budget_min) {
+      toast('Max budget must be at least the min.', 'error'); return;
+    }
+
+    const editing = lmState.editing;
+    const btn = document.getElementById('invSave');
+    btn.disabled = true;
+    try {
+      const res = await fetch(
+        `${API}/launch-matcher/investors${editing ? '/' + editing.id : ''}`,
+        { method: editing ? 'PATCH' : 'POST', headers: headers(), body: JSON.stringify(payload) }
+      );
+      if (!res.ok) {
+        // The API refuses contact details in these fields; surface its reason
+        // verbatim rather than a generic failure, so the rule teaches itself.
+        let msg = 'Could not save.';
+        try {
+          const err = await res.json();
+          if (err && err.detail) msg = typeof err.detail === 'string'
+            ? err.detail
+            : (err.detail[0] && err.detail[0].msg) || msg;
+        } catch (_) {}
+        toast(msg, 'error');
+        return;
+      }
+      lmCloseModal();
+      await lmLoad();
+      renderInvestors();
+      toast(editing ? 'Investor updated.' : 'Investor added.');
+    } catch (e) {
+      toast('Could not save.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function lmEdit(id) {
+    const inv = lmState.investors.find(x => x.id === id);
+    if (inv) lmOpenModal(inv);
+  }
+
+  async function lmDelete(id) {
+    const inv = lmState.investors.find(x => x.id === id);
+    if (!confirm(`Delete ${inv ? inv.label : 'this investor'}?`)) return;
+    try {
+      const res = await fetch(`${API}/launch-matcher/investors/${id}`, {
+        method: 'DELETE', headers: headers(),
+      });
+      if (!res.ok) throw new Error();
+      await lmLoad();
+      renderInvestors();
+      toast('Deleted.');
+    } catch (e) { toast('Could not delete.', 'error'); }
+  }
+
+  /* ── Dry run ── */
+  async function lmPreview() {
+    const text = document.getElementById('lmPreviewText').value.trim();
+    const out = document.getElementById('lmPreviewOut');
+    if (!text) { toast('Paste a launch message first.', 'error'); return; }
+
+    const btn = document.getElementById('btnPreviewLaunch');
+    btn.disabled = true;
+    out.innerHTML = '<div class="lm-reply">Matching…</div>';
+    try {
+      const res = await fetch(`${API}/launch-matcher/preview`, {
+        method: 'POST', headers: headers(), body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+
+      // The reply is shown exactly as WhatsApp would send it — this screen
+      // exists so the advisor can trust that before a real launch arrives.
+      let html = `<div class="lm-reply">${escHtml(data.reply)}</div>`;
+      const p = data.parsed;
+      if (p) {
+        const chips = [
+          p.emirate && `${p.emirate}`,
+          p.area,
+          p.developer,
+          (p.unit_types || []).join(', '),
+          p.price_min ? (p.price_max ? `${lmMoney(p.price_min)}–${lmMoney(p.price_max)}`
+                                     : `from ${lmMoney(p.price_min)}`) : null,
+          p.payment_plan,
+          p.launch_date && `EOI ${p.launch_date}`,
+          p.completion_status,
+        ].filter(Boolean);
+        html += `<div class="lm-parsed">` +
+          chips.map(c => `<span class="re-chip muted">${escHtml(c)}</span>`).join('') +
+          `</div>`;
+      }
+      out.innerHTML = html;
+    } catch (e) {
+      out.innerHTML = '<div class="lm-reply">Could not test that message.</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function lmBindEvents() {
+    document.getElementById('btnAddInvestor').addEventListener('click', () => lmOpenModal(null));
+    document.getElementById('invCancel').addEventListener('click', lmCloseModal);
+    document.getElementById('invSave').addEventListener('click', lmSave);
+    document.getElementById('btnPreviewLaunch').addEventListener('click', lmPreview);
+  }
+
+  /* ── Entry point ──
+     GET /launch-matcher/constants is already vertical-gated and 404s for every
+     other tenant, so it doubles as the probe — no extra endpoint needed. Any
+     failure leaves the dashboard exactly as it is today. */
+  async function initLaunchMatcher() {
+    try {
+      const res = await fetch(`${API}/launch-matcher/constants`, { headers: headers() });
+      if (!res.ok) return;
+
+      lmState.constants = await res.json();
+      lmState.enabled = true;
+      document.getElementById('lmNavGroup').style.display = '';
+      lmBindEvents();
+      await lmLoad();
+      renderInvestors();
+    } catch (e) {
+      /* Vertical stays off — the dashboard is unaffected. */
+    }
+  }
+
   /* ── Boot ── */
   loadData();
   initRealEstate();
+  initLaunchMatcher();
   updateNotifCount();
   setInterval(loadData, 30000);
 </script>
