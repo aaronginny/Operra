@@ -632,6 +632,22 @@ async def process_incoming_message(
     if not text.strip():
         return {"status": "no_text"}
 
+    # ── Launch Matcher dispatch ───────────────────────────────────
+    # Runs before everything below, including the MessageLog write. A
+    # launch-matcher company's messages are forwarded developer broadcasts
+    # whose footers routinely carry another agent's name and number; logging
+    # sender + raw_text for them would put that in a table on this feature's
+    # path, which its no-PII rule forbids. So the check happens first and the
+    # handler returns rather than falling through.
+    #
+    # Returns None for every other tenant, leaving the existing pipeline below
+    # byte-for-byte unchanged.
+    from app.services.launch_matcher.handler import try_handle_launch_matcher
+
+    launch_result = await try_handle_launch_matcher(db, sender, text)
+    if launch_result is not None:
+        return launch_result
+
     # ── TEST MODE: CEO can simulate employee messages ─────────────
     # Prefix "EMPLOYEE:" (any case) strips CEO detection and processes
     # the rest as if it came from a regular employee (same sender number).

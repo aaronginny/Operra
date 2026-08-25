@@ -1185,6 +1185,176 @@
       .task-row > .due-cell { display: none; }
       .side-panel { width: 100vw; }
     }
+
+    /* ═════ REAL ESTATE (vertical = "real_estate" only) ═════
+       Built from the same tokens as the rest of the dashboard — --accent (red)
+       for primary actions and exact matches, --gold for scores and money,
+       --panel/--border for surfaces. No new palette. */
+    .re-tabs {
+      display: inline-flex; gap: 4px; padding: 4px;
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 9px; margin-bottom: 18px;
+    }
+    .re-tab {
+      font-family: var(--font); font-size: 12.5px; font-weight: 600;
+      padding: 7px 16px; border-radius: 6px; border: none;
+      background: transparent; color: var(--text-2); cursor: pointer;
+      transition: all .15s;
+    }
+    .re-tab:hover { color: var(--text); }
+    .re-tab.active { background: var(--accent); color: #fff; }
+
+    .re-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      opacity: 0; animation: rise .35s .1s ease-out forwards;
+    }
+    .re-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px; transition: all .2s;
+    }
+    .re-card:hover {
+      border-color: var(--accent); transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(212,44,44,0.15);
+    }
+    .re-card-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 10px; margin-bottom: 10px;
+    }
+    .re-card-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .re-card-sub { font-size: 11.5px; color: var(--text-3); font-weight: 500; margin-top: 2px; }
+    .re-card-row {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12.5px; color: var(--text-2); font-weight: 500; margin-top: 6px;
+    }
+    .re-card-row .re-k { color: var(--text-3); font-size: 11px; font-weight: 600; }
+    .re-money { font-size: 13.5px; font-weight: 700; color: var(--text); }
+
+    .re-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 700; padding: 3px 9px;
+      border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+      white-space: nowrap;
+    }
+    .re-chip.gold   { background: rgba(201,168,76,0.14); color: #9A7F2E; }
+    .re-chip.muted  { background: var(--hover); color: var(--text-3); }
+    .re-chip.ok     { background: rgba(52,211,153,0.14); color: #128B62; }
+    .re-chip.warn   { background: rgba(251,191,36,0.16); color: #96690B; }
+    .re-chip.cyan   { background: rgba(62,207,207,0.14); color: #17888A; }
+
+    .re-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .re-btn-sm {
+      font-family: var(--font); font-size: 11.5px; font-weight: 600;
+      padding: 6px 12px; border-radius: 6px; cursor: pointer;
+      border: 1px solid var(--border-2); background: transparent;
+      color: var(--text-2); transition: all .15s;
+    }
+    .re-btn-sm:hover { color: var(--text); background: var(--hover); }
+    .re-btn-sm.danger:hover { color: var(--danger); border-color: var(--danger); }
+    .re-btn-sm.primary {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+    .re-btn-sm.primary:hover { background: var(--accent-hover); }
+
+    /* Match cards — buyer on the left, seller on the right, score in the middle */
+    .re-match {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 12px;
+      transition: all .2s;
+    }
+    .re-match:hover { border-color: var(--accent); }
+    .re-match.connected { border-color: rgba(52,211,153,0.5); }
+    .re-match-top {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .re-match-side { flex: 1 1 200px; min-width: 0; }
+    .re-match-role {
+      font-size: 10px; font-weight: 700; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .re-match-who { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 3px; }
+    .re-match-meta { font-size: 12px; color: var(--text-2); font-weight: 500; margin-top: 3px; }
+    .re-match-link {
+      display: grid; place-items: center; flex: 0 0 auto; padding: 0 4px;
+      color: var(--text-3);
+    }
+    .re-score {
+      display: grid; place-items: center; flex: 0 0 auto;
+      width: 46px; height: 46px; border-radius: 50%;
+      background: rgba(201,168,76,0.14); color: #9A7F2E;
+      font-size: 15px; font-weight: 800;
+    }
+    .re-match-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+
+    /* Summary strip */
+    .re-summary {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px; margin-bottom: 20px;
+    }
+    .re-sum-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 11px; padding: 14px 16px;
+    }
+    .re-sum-val { font-size: 21px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+    .re-sum-label {
+      font-size: 11px; font-weight: 600; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .05em; margin-top: 3px;
+    }
+
+    .re-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 240px; color: var(--text-3); gap: 8px; text-align: center;
+    }
+    .re-empty .re-empty-title { font-size: 14px; font-weight: 600; color: var(--text-2); }
+    .re-empty p { font-size: 12.5px; font-weight: 500; max-width: 340px; line-height: 1.6; }
+
+    .re-form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 560px) { .re-form-2col { grid-template-columns: 1fr; } }
+    .modal.re-modal { max-width: 560px; max-height: 88vh; overflow-y: auto; }
+
+    /* ═════ LAUNCH MATCHER (vertical = "launch_matcher" only) ═════
+       Builds on the re-* card/chip/form classes above — same tokens, same
+       white/red/gold theme. Only the genuinely different pieces live here. */
+    .lm-preview {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;
+    }
+    .lm-preview-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .lm-preview-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .lm-preview-hint {
+      font-size: 11.5px; color: var(--text-3); font-weight: 500;
+    }
+    .lm-preview textarea {
+      width: 100%; min-height: 84px; resize: vertical;
+      padding: 10px 12px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-family: var(--font); font-size: 12.5px;
+      line-height: 1.55; outline: none; transition: border-color .15s;
+    }
+    .lm-preview textarea:focus { border-color: var(--accent); }
+    /* The reply is quoted back verbatim, so monospace and preserved
+       whitespace — the advisor is checking what WhatsApp will actually say. */
+    .lm-reply {
+      margin-top: 12px; padding: 12px 14px;
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent); border-radius: 8px;
+      font-size: 12.5px; line-height: 1.6; color: var(--text);
+      white-space: pre-wrap; word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .lm-parsed {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+    }
+    .lm-note {
+      font-size: 12px; color: var(--text-2); font-weight: 500;
+      line-height: 1.6; margin-bottom: 18px;
+      padding: 11px 14px; border-radius: 9px;
+      background: rgba(201,168,76,0.10); border: 1px solid rgba(201,168,76,0.35);
+    }
+    .lm-note b { color: var(--text); font-weight: 700; }
   </style>
 </head>
 <body>
@@ -1247,6 +1417,46 @@
     <button class="nav-item" data-nav="settings">
       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1-.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
       Settings
+    </button>
+  </div>
+
+
+  <!-- Real-estate nav: ships hidden and is revealed only by initRealEstate()
+       when GET /real-estate/status reports the vertical is enabled. Hidden is
+       the fail-safe default, so a generic company never sees it — not even for
+       a frame, and not if the probe fails. -->
+  <div class="nav-group" id="reNavGroup" style="display:none">
+    <div class="nav-label">Real Estate</div>
+    <button class="nav-item" data-nav="leads">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>
+      Buyers &amp; Sellers
+    </button>
+    <button class="nav-item" data-nav="listings">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
+      Listings
+    </button>
+    <button class="nav-item" data-nav="matches">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7"/></svg>
+      Matches
+      <span class="badge-n" id="sidebarMatchBadge" style="display:none">0</span>
+    </button>
+    <button class="nav-item" data-nav="commissions">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Commissions
+    </button>
+  </div>
+
+
+  <!-- Launch Matcher nav: ships hidden, revealed only by initLaunchMatcher()
+       when GET /launch-matcher/constants returns 200. That route is already
+       vertical-gated and 404s for every other tenant, so it doubles as the
+       probe. Hidden is the fail-safe default. -->
+  <div class="nav-group" id="lmNavGroup" style="display:none">
+    <div class="nav-label">Launch Matcher</div>
+    <button class="nav-item" data-nav="investors">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+      Investors
+      <span class="badge-n" id="sidebarInvestorBadge" style="display:none">0</span>
     </button>
   </div>
 
@@ -1462,6 +1672,85 @@
           </div>
           <div class="kanban-cards" id="colPayment"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ══ REAL ESTATE: BUYERS & SELLERS ══ -->
+    <div class="page-section" id="page-leads">
+      <div class="page-header">
+        <div class="page-title">Buyers &amp; Sellers</div>
+        <button class="btn-add" id="btnAddLead"><span class="plus">+</span> Add buyer</button>
+      </div>
+      <div class="re-tabs">
+        <button class="re-tab active" data-leadtab="buyers">Buyers</button>
+        <button class="re-tab" data-leadtab="sellers">Sellers</button>
+      </div>
+      <div id="leadsBody">
+        <div class="placeholder-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ REAL ESTATE: LISTINGS ══ -->
+    <div class="page-section" id="page-listings">
+      <div class="page-header">
+        <div class="page-title">Listings</div>
+        <button class="btn-add" id="btnAddListing"><span class="plus">+</span> Add listing</button>
+      </div>
+      <div id="listingsBody">
+        <div class="placeholder-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ REAL ESTATE: MATCHES ══ -->
+    <div class="page-section" id="page-matches">
+      <div class="page-header">
+        <div class="page-title">Matches</div>
+        <button class="btn-add" id="btnRunMatches"><span class="plus">↻</span> Run matching</button>
+      </div>
+      <div id="matchesBody">
+        <div class="placeholder-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ REAL ESTATE: COMMISSIONS ══ -->
+    <div class="page-section" id="page-commissions">
+      <div class="page-header">
+        <div class="page-title">Commissions</div>
+        <button class="btn-add" id="btnAddCommission"><span class="plus">+</span> Add commission</button>
+      </div>
+      <div class="re-summary" id="commissionSummary"></div>
+      <div id="commissionsBody">
+        <div class="placeholder-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ LAUNCH MATCHER: INVESTORS (one-time setup) ══ -->
+    <div class="page-section" id="page-investors">
+      <div class="page-header">
+        <div class="page-title">Investors</div>
+        <button class="btn-add" id="btnAddInvestor"><span class="plus">+</span> Add investor</button>
+      </div>
+
+      <div class="lm-note">
+        Criteria only — <b>never names, phone numbers or email addresses</b>.
+        Identify each investor with your own label, like &ldquo;Investor 4&rdquo;.
+        Matching filters by emirate first, then everything else.
+      </div>
+
+      <div class="lm-preview">
+        <div class="lm-preview-head">
+          <div>
+            <div class="lm-preview-title">Test a launch message</div>
+            <div class="lm-preview-hint">Paste a launch broadcast to see who it would match. Nothing is sent.</div>
+          </div>
+          <button class="re-btn-sm primary" id="btnPreviewLaunch">Test match</button>
+        </div>
+        <textarea id="lmPreviewText" placeholder="Sobha Hartland II - Dubai&#10;1BR from AED 1.4M | 60/40 payment plan | EOI Thursday"></textarea>
+        <div id="lmPreviewOut"></div>
+      </div>
+
+      <div id="investorsBody">
+        <div class="placeholder-page"><div class="spinner"></div></div>
       </div>
     </div>
 
@@ -1871,6 +2160,266 @@
   </div>
 </div>
 <button class="kbd-fab" id="kbdFab" aria-label="Keyboard shortcuts" title="Shortcuts (?)">?</button>
+
+<!-- ══ REAL ESTATE MODALS ══ -->
+<div class="modal-overlay" id="leadModalOverlay">
+  <div class="modal re-modal">
+    <div class="modal-title" id="leadModalTitle">Add buyer</div>
+    <div class="form-group">
+      <label>Name</label>
+      <input class="form-input" id="leadName" type="text" placeholder="Full name" />
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Phone</label>
+        <input class="form-input" id="leadPhone" type="text" placeholder="9876543210" />
+      </div>
+      <div class="form-group">
+        <label>Referred by</label>
+        <input class="form-input" id="leadReferredBy" type="text" placeholder="Optional" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Areas — comma separated</label>
+      <input class="form-input" id="leadAreas" type="text" placeholder="Velachery, Anna Nagar" />
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Division</label>
+        <select class="form-input" id="leadDivision"></select>
+      </div>
+      <div class="form-group">
+        <label>Property type</label>
+        <select class="form-input" id="leadType"></select>
+      </div>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Currency</label>
+        <select class="form-input" id="leadCurrency"></select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select class="form-input" id="leadLabel"></select>
+      </div>
+    </div>
+    <div class="re-form-2col" id="leadBudgetRow">
+      <div class="form-group">
+        <label>Budget min</label>
+        <input class="form-input" id="leadBudgetMin" type="number" min="0" placeholder="5000000" />
+      </div>
+      <div class="form-group">
+        <label>Budget max</label>
+        <input class="form-input" id="leadBudgetMax" type="number" min="0" placeholder="8000000" />
+      </div>
+    </div>
+    <div class="form-group" id="leadPriceRow" style="display:none">
+      <label>Asking price</label>
+      <input class="form-input" id="leadPrice" type="number" min="0" placeholder="6500000" />
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group" id="leadRadiusRow">
+        <label>Match radius (km)</label>
+        <input class="form-input" id="leadRadius" type="number" min="1" max="50" value="5" />
+      </div>
+      <div class="form-group" id="leadPeriodRow" style="display:none">
+        <label>Rent period</label>
+        <select class="form-input" id="leadPeriod">
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <input class="form-input" id="leadNotes" type="text" placeholder="Optional" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="leadCancel">Cancel</button>
+      <button class="btn-submit" id="leadSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="listingModalOverlay">
+  <div class="modal re-modal">
+    <div class="modal-title">Add listing</div>
+    <div class="form-group">
+      <label>Title</label>
+      <input class="form-input" id="listingTitle" type="text" placeholder="3BHK apartment, sea view" />
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Area</label>
+        <input class="form-input" id="listingArea" type="text" placeholder="Velachery" />
+      </div>
+      <div class="form-group">
+        <label>Owner (seller)</label>
+        <select class="form-input" id="listingSeller"></select>
+      </div>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Division</label>
+        <select class="form-input" id="listingDivision"></select>
+      </div>
+      <div class="form-group">
+        <label>Property type</label>
+        <select class="form-input" id="listingType"></select>
+      </div>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Price</label>
+        <input class="form-input" id="listingPrice" type="number" min="0" placeholder="6500000" />
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select class="form-input" id="listingCurrency"></select>
+      </div>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Bedrooms</label>
+        <input class="form-input" id="listingBeds" type="number" min="0" placeholder="3" />
+      </div>
+      <div class="form-group">
+        <label>Bathrooms</label>
+        <input class="form-input" id="listingBaths" type="number" min="0" placeholder="2" />
+      </div>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Built-up area (sqft)</label>
+        <input class="form-input" id="listingSqft" type="number" min="0" placeholder="1200" />
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select class="form-input" id="listingStatus"></select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="listingCancel">Cancel</button>
+      <button class="btn-submit" id="listingSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="commissionModalOverlay">
+  <div class="modal re-modal">
+    <div class="modal-title">Add commission</div>
+    <div class="form-group">
+      <label>Linked enquiry</label>
+      <select class="form-input" id="commEnquiry"></select>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Deal value</label>
+        <input class="form-input" id="commDealValue" type="number" min="0" placeholder="6500000" />
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select class="form-input" id="commCurrency"></select>
+      </div>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Commission %</label>
+        <input class="form-input" id="commPercent" type="number" min="0" step="0.01" placeholder="2" />
+      </div>
+      <div class="form-group">
+        <label>Your split % (100 = no split)</label>
+        <input class="form-input" id="commSplit" type="number" min="0" max="100" step="0.01" value="100" />
+      </div>
+    </div>
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Source</label>
+        <select class="form-input" id="commSource"></select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select class="form-input" id="commStatus"></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <input class="form-input" id="commNotes" type="text" placeholder="Optional" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="commCancel">Cancel</button>
+      <button class="btn-submit" id="commSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LAUNCH MATCHER MODAL ══ -->
+<div class="modal-overlay" id="investorModalOverlay">
+  <div class="modal re-modal">
+    <div class="modal-title" id="investorModalTitle">Add investor</div>
+
+    <div class="form-group">
+      <label>Label — your own shorthand, never a real name</label>
+      <input class="form-input" id="invLabel" type="text" placeholder="Investor 4" />
+    </div>
+
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Emirate — filtered first</label>
+        <select class="form-input" id="invEmirate"></select>
+      </div>
+      <div class="form-group">
+        <label>Unit type (optional)</label>
+        <input class="form-input" id="invPropertyType" type="text" placeholder="2BR" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Areas (optional, comma separated)</label>
+      <input class="form-input" id="invAreas" type="text" placeholder="Hartland, Meydan" />
+      <div class="settings-hint" style="margin-top:5px;">
+        Leave empty for no area preference. If you list areas, a launch outside them will not match.
+      </div>
+    </div>
+
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Budget min (AED)</label>
+        <input class="form-input" id="invBudgetMin" type="number" min="0" placeholder="1200000" />
+      </div>
+      <div class="form-group">
+        <label>Budget max (AED)</label>
+        <input class="form-input" id="invBudgetMax" type="number" min="0" placeholder="1600000" />
+      </div>
+    </div>
+
+    <div class="re-form-2col">
+      <div class="form-group">
+        <label>Off-plan or ready</label>
+        <select class="form-input" id="invStage"></select>
+      </div>
+      <div class="form-group">
+        <label>Payment preference</label>
+        <select class="form-input" id="invPayment"></select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Timeline (optional)</label>
+      <input class="form-input" id="invTimeline" type="text" placeholder="Q4 2026" />
+    </div>
+
+    <div class="form-group">
+      <label>Notes (optional) — your own shorthand, not used for matching</label>
+      <input class="form-input" id="invNotes" type="text" placeholder="Optional" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="invCancel">Cancel</button>
+      <button class="btn-submit" id="invSave">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- TOAST -->
 <div class="toast-container" id="toastContainer"></div>
@@ -2810,6 +3359,9 @@
       dashboard: 'Dashboard', tasks: 'Tasks', employees: 'Employees',
       enquiries: 'Enquiries', settings: 'Settings', inbox: 'Inbox',
       archive: 'Archive',
+      leads: 'Buyers & Sellers', listings: 'Listings',
+      matches: 'Matches', commissions: 'Commissions',
+      investors: 'Investors',
     };
     document.getElementById('breadcrumbText').textContent = labels[page] || 'Dashboard';
 
@@ -2820,6 +3372,22 @@
       loadInbox();
       // Auto-mark all read when opening inbox
       markAllRead();
+    }
+    // Real-estate pages — guarded so navigation is a no-op when the vertical
+    // is off (those nav items aren't rendered then, but a stale hash or a
+    // keyboard shortcut must not blow up a generic dashboard).
+    if (lmState.enabled && page === 'investors') {
+      lmLoad().then(renderInvestors);
+    }
+    if (reState.enabled) {
+      if (page === 'leads' || page === 'listings' || page === 'matches' || page === 'commissions') {
+        reLoadAll().then(() => {
+          if (page === 'leads') renderLeads();
+          if (page === 'listings') renderListings();
+          if (page === 'matches') renderMatches();
+          if (page === 'commissions') renderCommissions();
+        });
+      }
     }
   }
 
@@ -3686,6 +4254,8 @@
       if (m.classList.contains('open')) { m.classList.remove('open'); return; }
       const em = document.getElementById('empModalOverlay');
       if (em && em.classList.contains('open')) { em.classList.remove('open'); return; }
+      const im = document.getElementById('investorModalOverlay');
+      if (im && im.classList.contains('open')) { im.classList.remove('open'); return; }
       return;
     }
 
@@ -3707,8 +4277,965 @@
     }
   });
 
+
+  /* ══════════════════════════════════════════════════════════
+     REAL ESTATE  (only active when vertical = "real_estate")
+
+     Everything below is dormant for a generic company: reState.enabled stays
+     false, the nav group stays hidden, and no /real-estate/* request is ever
+     issued beyond the single status probe. Lenin's dashboard therefore makes
+     exactly one extra GET and is otherwise byte-identical to today's.
+     ══════════════════════════════════════════════════════════ */
+
+  const reState = {
+    enabled: false,
+    constants: null,
+    buyers: [],
+    sellers: [],
+    listings: [],
+    matches: [],
+    commissions: [],
+    leadTab: 'buyers',
+    editingLead: null,
+  };
+
+  /* ── Money / label formatting (mirrors DealKnot's formatMoney) ── */
+  function reCurSym(code) {
+    const c = reState.constants && reState.constants.currencies[code];
+    return c ? c.symbol : (code || '');
+  }
+
+  function reMoney(n, cur) {
+    if (n == null || isNaN(n)) return '–';
+    const sym = reCurSym(cur);
+    let scaled = Number(n), suffix = '';
+    if (cur === 'INR' && scaled >= 10000000) { scaled = scaled / 10000000; suffix = ' Cr'; }
+    else if (cur === 'INR' && scaled >= 100000) { scaled = scaled / 100000; suffix = ' L'; }
+    else if (scaled >= 1000000) { scaled = scaled / 1000000; suffix = 'M'; }
+    else if (scaled >= 1000) { scaled = scaled / 1000; suffix = 'K'; }
+    const num = scaled >= 100 ? Math.round(scaled).toString()
+      : scaled.toFixed(scaled === Math.floor(scaled) ? 0 : 1);
+    return `${sym} ${num}${suffix}`;
+  }
+
+  function reTypeLabel(id) {
+    const t = reState.constants && reState.constants.property_types.find(p => p.id === id);
+    return t ? t.short : id;
+  }
+
+  function reLabelMeta(id) {
+    const l = reState.constants && reState.constants.labels.find(x => x.id === id);
+    return l || { name: id, icon: '' };
+  }
+
+  function reLabelChipClass(id) {
+    return { hot: '', active: 'ok', warm: 'warn', cold: 'muted', closed: 'muted' }[id] || 'muted';
+  }
+
+  function reEmpty(title, body) {
+    return `<div class="re-empty">
+      <div class="re-empty-title">${escHtml(title)}</div>
+      <p>${escHtml(body)}</p>
+    </div>`;
+  }
+
+  /* ── Data loading ── */
+  async function reLoadConstants() {
+    if (reState.constants) return reState.constants;
+    const res = await fetch(`${API}/real-estate/constants`, { headers: headers() });
+    if (!res.ok) throw new Error('constants');
+    reState.constants = await res.json();
+    return reState.constants;
+  }
+
+  async function reLoadAll() {
+    if (!reState.enabled) return;
+    try {
+      const [b, sl, l, m, c] = await Promise.all([
+        fetch(`${API}/real-estate/buyers`, { headers: headers() }),
+        fetch(`${API}/real-estate/sellers`, { headers: headers() }),
+        fetch(`${API}/real-estate/listings`, { headers: headers() }),
+        fetch(`${API}/real-estate/matches`, { headers: headers() }),
+        fetch(`${API}/real-estate/commissions`, { headers: headers() }),
+      ]);
+      reState.buyers = b.ok ? await b.json() : [];
+      reState.sellers = sl.ok ? await sl.json() : [];
+      reState.listings = l.ok ? await l.json() : [];
+      reState.matches = m.ok ? await m.json() : [];
+      reState.commissions = c.ok ? await c.json() : [];
+
+      const badge = document.getElementById('sidebarMatchBadge');
+      if (badge) {
+        const open = reState.matches.filter(x => !x.connected).length;
+        badge.textContent = open;
+        badge.style.display = open ? '' : 'none';
+      }
+    } catch (e) {
+      toast('Could not load real-estate data.', 'error');
+    }
+  }
+
+  /* ── Buyers & Sellers ── */
+  function renderLeads() {
+    const body = document.getElementById('leadsBody');
+    if (!body) return;
+    const isBuyers = reState.leadTab === 'buyers';
+    const rows = isBuyers ? reState.buyers : reState.sellers;
+
+    document.getElementById('btnAddLead').innerHTML =
+      `<span class="plus">+</span> Add ${isBuyers ? 'buyer' : 'seller'}`;
+
+    if (!rows.length) {
+      body.innerHTML = reEmpty(
+        `No ${isBuyers ? 'buyers' : 'sellers'} yet`,
+        isBuyers
+          ? 'Add a buyer with their budget and preferred areas — matching runs automatically against your sellers.'
+          : 'Add a seller with their asking price and area — matching runs automatically against your buyers.'
+      );
+      return;
+    }
+
+    body.innerHTML = `<div class="re-grid">` + rows.map(r => {
+      const lbl = reLabelMeta(r.label);
+      const money = isBuyers
+        ? `${reMoney(r.budget_min, r.currency)} – ${reMoney(r.budget_max, r.currency)}`
+        : reMoney(r.price, r.currency);
+      const period = r.division === 'rentals' ? (r.period === 'yearly' ? '/yr' : '/mo') : '';
+      return `<div class="re-card">
+        <div class="re-card-head">
+          <div>
+            <div class="re-card-name">${escHtml(r.name)}</div>
+            <div class="re-card-sub">${escHtml(r.phone || 'No phone')}</div>
+          </div>
+          <span class="re-chip ${reLabelChipClass(r.label)}">${lbl.icon} ${escHtml(lbl.name)}</span>
+        </div>
+        <div class="re-card-row"><span class="re-k">AREAS</span> ${escHtml(r.areas || '—')}</div>
+        <div class="re-card-row">
+          <span class="re-k">${isBuyers ? 'BUDGET' : 'ASKING'}</span>
+          <span class="re-money">${escHtml(money)}${period}</span>
+        </div>
+        <div class="re-card-row">
+          <span class="re-chip muted">${escHtml(reTypeLabel(r.property_type))}</span>
+          ${isBuyers ? `<span class="re-chip cyan">${Number(r.radius_km)} km radius</span>` : ''}
+        </div>
+        ${r.referred_by ? `<div class="re-card-row"><span class="re-k">REF</span> ${escHtml(r.referred_by)}</div>` : ''}
+        <div class="re-actions">
+          <button class="re-btn-sm" onclick="reEditLead('${isBuyers ? 'buyers' : 'sellers'}', ${r.id})">Edit</button>
+          <button class="re-btn-sm danger" onclick="reDeleteLead('${isBuyers ? 'buyers' : 'sellers'}', ${r.id})">Delete</button>
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
+  /* ── Listings ── */
+  function renderListings() {
+    const body = document.getElementById('listingsBody');
+    if (!body) return;
+    if (!reState.listings.length) {
+      body.innerHTML = reEmpty('No listings yet',
+        'Add the properties you are marketing. A listing can be attached to one of your sellers.');
+      return;
+    }
+    const statusChip = { available: 'ok', under_offer: 'warn', sold: 'muted', withdrawn: 'muted' };
+    body.innerHTML = `<div class="re-grid">` + reState.listings.map(l => {
+      const seller = reState.sellers.find(x => x.id === l.seller_id);
+      const st = (reState.constants.listing_statuses.find(x => x.id === l.status) || {}).label || l.status;
+      const period = l.division === 'rentals' ? (l.period === 'yearly' ? '/yr' : '/mo') : '';
+      const spec = [
+        l.bedrooms != null ? `${l.bedrooms} bed` : null,
+        l.bathrooms != null ? `${l.bathrooms} bath` : null,
+        l.area_sqft != null ? `${Number(l.area_sqft)} sqft` : null,
+      ].filter(Boolean).join(' · ');
+      return `<div class="re-card">
+        <div class="re-card-head">
+          <div>
+            <div class="re-card-name">${escHtml(l.title)}</div>
+            <div class="re-card-sub">${escHtml(l.area || '—')}</div>
+          </div>
+          <span class="re-chip ${statusChip[l.status] || 'muted'}">${escHtml(st)}</span>
+        </div>
+        <div class="re-card-row">
+          <span class="re-k">PRICE</span>
+          <span class="re-money">${escHtml(reMoney(l.price, l.currency))}${period}</span>
+        </div>
+        ${spec ? `<div class="re-card-row"><span class="re-k">SPEC</span> ${escHtml(spec)}</div>` : ''}
+        <div class="re-card-row">
+          <span class="re-chip muted">${escHtml(reTypeLabel(l.property_type))}</span>
+        </div>
+        ${seller ? `<div class="re-card-row"><span class="re-k">OWNER</span> ${escHtml(seller.name)}</div>` : ''}
+        <div class="re-actions">
+          <button class="re-btn-sm danger" onclick="reDeleteListing(${l.id})">Delete</button>
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
+  /* ── Matches ── */
+  function renderMatches() {
+    const body = document.getElementById('matchesBody');
+    if (!body) return;
+    if (!reState.matches.length) {
+      body.innerHTML = reEmpty('No matches yet',
+        'Matches appear automatically when a buyer and a seller line up on division, property type, currency, area and price. Add leads on both sides to get started.');
+      return;
+    }
+    body.innerHTML = reState.matches.map(m => {
+      const areaChip = m.match_type === 'exact'
+        ? `<span class="re-chip">Exact area</span>`
+        : `<span class="re-chip cyan">${Number(m.distance_km).toFixed(1)} km away</span>`;
+      const priceChip = m.price_match_kind === 'exact'
+        ? `<span class="re-chip ok">In budget</span>`
+        : `<span class="re-chip warn">Stretch</span>`;
+      const proximityNote = m.match_type === 'proximity' && m.matched_buyer_area
+        ? `<span class="re-chip muted">${escHtml(m.matched_buyer_area)} ~ ${escHtml(m.matched_seller_area || '')}</span>`
+        : '';
+      return `<div class="re-match ${m.connected ? 'connected' : ''}">
+        <div class="re-match-top">
+          <div class="re-match-side">
+            <div class="re-match-role">Buyer</div>
+            <div class="re-match-who">${escHtml(m.buyer_name || '—')}</div>
+            <div class="re-match-meta">${escHtml(m.buyer_areas || '')}</div>
+            <div class="re-match-meta">${escHtml(reMoney(m.buyer_budget_min, m.currency))} – ${escHtml(reMoney(m.buyer_budget_max, m.currency))}</div>
+          </div>
+          <div class="re-match-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7"/></svg>
+          </div>
+          <div class="re-match-side">
+            <div class="re-match-role">Seller</div>
+            <div class="re-match-who">${escHtml(m.seller_name || '—')}</div>
+            <div class="re-match-meta">${escHtml(m.seller_areas || '')}</div>
+            <div class="re-match-meta">${escHtml(reMoney(m.seller_price, m.currency))}</div>
+          </div>
+          <div class="re-score" title="Match score">${m.score}</div>
+        </div>
+        <div class="re-match-tags">
+          ${areaChip}${priceChip}${proximityNote}
+          <span class="re-chip muted">${escHtml(reTypeLabel(m.property_type))}</span>
+          ${m.connected ? `<span class="re-chip ok">Connected</span>` : ''}
+        </div>
+        <div class="re-actions">
+          <button class="re-btn-sm ${m.connected ? '' : 'primary'}" onclick="reToggleConnect(${m.id})">
+            ${m.connected ? 'Mark not connected' : 'Mark connected'}
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function reToggleConnect(id) {
+    try {
+      const res = await fetch(`${API}/real-estate/matches/${id}/connect`, {
+        method: 'PATCH', headers: headers(),
+      });
+      if (!res.ok) throw new Error();
+      await reLoadAll();
+      renderMatches();
+    } catch (e) { toast('Could not update match.', 'error'); }
+  }
+
+  async function reRunMatching() {
+    const btn = document.getElementById('btnRunMatches');
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/real-estate/matches/run`, {
+        method: 'POST', headers: headers(),
+      });
+      if (!res.ok) throw new Error();
+      const out = await res.json();
+      await reLoadAll();
+      renderMatches();
+      toast(out.new_matches
+        ? `${out.new_matches} new match${out.new_matches === 1 ? '' : 'es'} found.`
+        : 'No new matches.');
+    } catch (e) {
+      toast('Matching run failed.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  /* ── Commissions ── */
+  function renderCommissions() {
+    const body = document.getElementById('commissionsBody');
+    const sum = document.getElementById('commissionSummary');
+    if (!body) return;
+
+    const received = reState.commissions.filter(c => c.status === 'Received');
+    const pending = reState.commissions.filter(c => c.status !== 'Received');
+    const totalOf = list => list.reduce(
+      (acc, c) => acc + (Number(c.commission_amount) * Number(c.split_percent || 100)) / 100, 0);
+    const cur = reState.commissions.length ? reState.commissions[0].currency : 'INR';
+
+    sum.innerHTML = `
+      <div class="re-sum-card">
+        <div class="re-sum-val">${escHtml(reMoney(totalOf(received), cur))}</div>
+        <div class="re-sum-label">Received</div>
+      </div>
+      <div class="re-sum-card">
+        <div class="re-sum-val">${escHtml(reMoney(totalOf(pending), cur))}</div>
+        <div class="re-sum-label">Outstanding</div>
+      </div>
+      <div class="re-sum-card">
+        <div class="re-sum-val">${reState.commissions.length}</div>
+        <div class="re-sum-label">Deals booked</div>
+      </div>`;
+
+    if (!reState.commissions.length) {
+      body.innerHTML = reEmpty('No commissions yet',
+        'Book a commission when a deal closes. Link it to the enquiry the deal came through to keep the pipeline and the money in one place.');
+      return;
+    }
+
+    const statusChip = { Received: 'ok', Partial: 'warn', Pending: 'muted' };
+    body.innerHTML = `<div class="re-grid">` + reState.commissions.map(c => {
+      const enq = (enquiries || []).find(e => e.id === c.enquiry_id);
+      const net = (Number(c.commission_amount) * Number(c.split_percent || 100)) / 100;
+      const src = (reState.constants.commission_sources.find(x => x.id === c.source) || {}).label || c.source;
+      return `<div class="re-card">
+        <div class="re-card-head">
+          <div>
+            <div class="re-card-name">${escHtml(reMoney(net, c.currency))}</div>
+            <div class="re-card-sub">${escHtml(enq ? enq.client_name : 'Unlinked deal')}</div>
+          </div>
+          <span class="re-chip ${statusChip[c.status] || 'muted'}">${escHtml(c.status)}</span>
+        </div>
+        <div class="re-card-row">
+          <span class="re-k">DEAL</span> ${escHtml(reMoney(c.deal_value, c.currency))}
+          <span class="re-chip gold">${Number(c.commission_percent)}%</span>
+        </div>
+        ${Number(c.split_percent) !== 100
+          ? `<div class="re-card-row"><span class="re-k">SPLIT</span> your share ${Number(c.split_percent)}% of ${escHtml(reMoney(c.commission_amount, c.currency))}</div>`
+          : ''}
+        <div class="re-card-row"><span class="re-chip muted">${escHtml(src)}</span></div>
+        <div class="re-actions">
+          <button class="re-btn-sm danger" onclick="reDeleteCommission(${c.id})">Delete</button>
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
+  /* ── Select population ── */
+  function reFillSelect(el, items, valueKey, labelKey, selected) {
+    if (!el) return;
+    el.innerHTML = items.map(i =>
+      `<option value="${escHtml(i[valueKey])}" ${i[valueKey] === selected ? 'selected' : ''}>${escHtml(i[labelKey])}</option>`
+    ).join('');
+  }
+
+  function reFillTypeSelect(el, division, selected) {
+    const types = reState.constants.property_types.filter(
+      t => t.divisions.includes(division) && !t.legacy);
+    reFillSelect(el, types, 'id', 'label', selected);
+  }
+
+  /* ── Lead modal ── */
+  function reOpenLeadModal(existing) {
+    const isBuyers = reState.leadTab === 'buyers';
+    reState.editingLead = existing || null;
+    document.getElementById('leadModalTitle').textContent =
+      `${existing ? 'Edit' : 'Add'} ${isBuyers ? 'buyer' : 'seller'}`;
+
+    const c = reState.constants;
+    reFillSelect(document.getElementById('leadDivision'), c.divisions, 'id', 'label',
+      existing ? existing.division : 'sales');
+    reFillSelect(document.getElementById('leadCurrency'),
+      Object.keys(c.currencies).map(k => ({ id: k, label: k })), 'id', 'label',
+      existing ? existing.currency : 'INR');
+    reFillSelect(document.getElementById('leadLabel'), c.labels, 'id', 'name',
+      existing ? existing.label : 'active');
+    reFillTypeSelect(document.getElementById('leadType'),
+      existing ? existing.division : 'sales',
+      existing ? existing.property_type : null);
+
+    document.getElementById('leadName').value = existing ? existing.name : '';
+    document.getElementById('leadPhone').value = existing ? (existing.phone || '') : '';
+    document.getElementById('leadAreas').value = existing ? existing.areas : '';
+    document.getElementById('leadReferredBy').value = existing ? (existing.referred_by || '') : '';
+    document.getElementById('leadNotes').value = existing ? (existing.notes || '') : '';
+    document.getElementById('leadBudgetMin').value = existing && isBuyers ? existing.budget_min : '';
+    document.getElementById('leadBudgetMax').value = existing && isBuyers ? existing.budget_max : '';
+    document.getElementById('leadPrice').value = existing && !isBuyers ? existing.price : '';
+    document.getElementById('leadRadius').value = existing && isBuyers ? existing.radius_km : 5;
+    document.getElementById('leadPeriod').value = existing ? existing.period : 'monthly';
+
+    document.getElementById('leadBudgetRow').style.display = isBuyers ? '' : 'none';
+    document.getElementById('leadPriceRow').style.display = isBuyers ? 'none' : '';
+    document.getElementById('leadRadiusRow').style.display = isBuyers ? '' : 'none';
+    reSyncPeriodRow();
+
+    document.getElementById('leadModalOverlay').classList.add('open');
+  }
+
+  function reSyncPeriodRow() {
+    const division = document.getElementById('leadDivision').value;
+    document.getElementById('leadPeriodRow').style.display =
+      division === 'rentals' ? '' : 'none';
+  }
+
+  async function reSaveLead() {
+    const isBuyers = reState.leadTab === 'buyers';
+    const name = document.getElementById('leadName').value.trim();
+    if (!name) { toast('Name is required.', 'error'); return; }
+
+    const payload = {
+      name,
+      phone: document.getElementById('leadPhone').value.trim() || null,
+      areas: document.getElementById('leadAreas').value.trim(),
+      division: document.getElementById('leadDivision').value,
+      property_type: document.getElementById('leadType').value,
+      currency: document.getElementById('leadCurrency').value,
+      label: document.getElementById('leadLabel').value,
+      period: document.getElementById('leadPeriod').value,
+      referred_by: document.getElementById('leadReferredBy').value.trim() || null,
+      notes: document.getElementById('leadNotes').value.trim() || null,
+    };
+    if (isBuyers) {
+      payload.budget_min = Number(document.getElementById('leadBudgetMin').value) || 0;
+      payload.budget_max = Number(document.getElementById('leadBudgetMax').value) || 0;
+      payload.radius_km = Number(document.getElementById('leadRadius').value) || 5;
+      if (payload.budget_max < payload.budget_min) {
+        toast('Max budget must be at least the min.', 'error'); return;
+      }
+    } else {
+      payload.price = Number(document.getElementById('leadPrice').value) || 0;
+    }
+
+    const resource = isBuyers ? 'buyers' : 'sellers';
+    const editing = reState.editingLead;
+    const btn = document.getElementById('leadSave');
+    btn.disabled = true;
+    try {
+      const res = await fetch(
+        `${API}/real-estate/${resource}${editing ? '/' + editing.id : ''}`,
+        {
+          method: editing ? 'PATCH' : 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error();
+      document.getElementById('leadModalOverlay').classList.remove('open');
+      const before = reState.matches.length;
+      await reLoadAll();
+      renderLeads();
+      renderMatches();
+      const found = reState.matches.length - before;
+      toast(found > 0
+        ? `Saved — ${found} new match${found === 1 ? '' : 'es'} found.`
+        : 'Saved.');
+    } catch (e) {
+      toast('Could not save.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function reEditLead(resource, id) {
+    const list = resource === 'buyers' ? reState.buyers : reState.sellers;
+    const row = list.find(x => x.id === id);
+    if (row) reOpenLeadModal(row);
+  }
+
+  async function reDeleteLead(resource, id) {
+    if (!confirm('Delete this record? Any matches involving it will be removed too.')) return;
+    try {
+      const res = await fetch(`${API}/real-estate/${resource}/${id}`, {
+        method: 'DELETE', headers: headers(),
+      });
+      if (!res.ok) throw new Error();
+      await reLoadAll();
+      renderLeads();
+      renderMatches();
+      toast('Deleted.');
+    } catch (e) { toast('Could not delete.', 'error'); }
+  }
+
+  /* ── Listing modal ── */
+  function reOpenListingModal() {
+    const c = reState.constants;
+    reFillSelect(document.getElementById('listingDivision'), c.divisions, 'id', 'label', 'sales');
+    reFillSelect(document.getElementById('listingCurrency'),
+      Object.keys(c.currencies).map(k => ({ id: k, label: k })), 'id', 'label', 'INR');
+    reFillSelect(document.getElementById('listingStatus'), c.listing_statuses, 'id', 'label', 'available');
+    reFillTypeSelect(document.getElementById('listingType'), 'sales', null);
+    const sellerSel = document.getElementById('listingSeller');
+    sellerSel.innerHTML = '<option value="">No owner linked</option>' +
+      reState.sellers.map(s => `<option value="${s.id}">${escHtml(s.name)}</option>`).join('');
+    ['listingTitle', 'listingArea', 'listingPrice', 'listingBeds', 'listingBaths', 'listingSqft']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('listingModalOverlay').classList.add('open');
+  }
+
+  async function reSaveListing() {
+    const title = document.getElementById('listingTitle').value.trim();
+    if (!title) { toast('Title is required.', 'error'); return; }
+    const num = id => {
+      const v = document.getElementById(id).value;
+      return v === '' ? null : Number(v);
+    };
+    const sellerVal = document.getElementById('listingSeller').value;
+    const payload = {
+      title,
+      area: document.getElementById('listingArea').value.trim(),
+      seller_id: sellerVal ? Number(sellerVal) : null,
+      division: document.getElementById('listingDivision').value,
+      property_type: document.getElementById('listingType').value,
+      currency: document.getElementById('listingCurrency').value,
+      status: document.getElementById('listingStatus').value,
+      price: num('listingPrice') || 0,
+      bedrooms: num('listingBeds'),
+      bathrooms: num('listingBaths'),
+      area_sqft: num('listingSqft'),
+    };
+    const btn = document.getElementById('listingSave');
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/real-estate/listings`, {
+        method: 'POST', headers: headers(), body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error();
+      document.getElementById('listingModalOverlay').classList.remove('open');
+      await reLoadAll();
+      renderListings();
+      toast('Listing added.');
+    } catch (e) {
+      toast('Could not save listing.', 'error');
+    } finally { btn.disabled = false; }
+  }
+
+  async function reDeleteListing(id) {
+    if (!confirm('Delete this listing?')) return;
+    try {
+      const res = await fetch(`${API}/real-estate/listings/${id}`, {
+        method: 'DELETE', headers: headers(),
+      });
+      if (!res.ok) throw new Error();
+      await reLoadAll();
+      renderListings();
+      toast('Deleted.');
+    } catch (e) { toast('Could not delete.', 'error'); }
+  }
+
+  /* ── Commission modal ── */
+  function reOpenCommissionModal() {
+    const c = reState.constants;
+    reFillSelect(document.getElementById('commSource'), c.commission_sources, 'id', 'label', 'both_sides');
+    reFillSelect(document.getElementById('commStatus'),
+      c.commission_statuses.map(x => ({ id: x, label: x })), 'id', 'label', 'Pending');
+    reFillSelect(document.getElementById('commCurrency'),
+      Object.keys(c.currencies).map(k => ({ id: k, label: k })), 'id', 'label', 'INR');
+    const enqSel = document.getElementById('commEnquiry');
+    enqSel.innerHTML = '<option value="">Not linked to an enquiry</option>' +
+      (enquiries || []).map(e => `<option value="${e.id}">${escHtml(e.client_name)}</option>`).join('');
+    ['commDealValue', 'commPercent', 'commNotes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('commSplit').value = 100;
+    document.getElementById('commissionModalOverlay').classList.add('open');
+  }
+
+  async function reSaveCommission() {
+    const enqVal = document.getElementById('commEnquiry').value;
+    const payload = {
+      enquiry_id: enqVal ? Number(enqVal) : null,
+      deal_value: Number(document.getElementById('commDealValue').value) || 0,
+      commission_percent: Number(document.getElementById('commPercent').value) || 0,
+      split_percent: Number(document.getElementById('commSplit').value) || 100,
+      source: document.getElementById('commSource').value,
+      status: document.getElementById('commStatus').value,
+      currency: document.getElementById('commCurrency').value,
+      notes: document.getElementById('commNotes').value.trim() || null,
+    };
+    const btn = document.getElementById('commSave');
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/real-estate/commissions`, {
+        method: 'POST', headers: headers(), body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error();
+      document.getElementById('commissionModalOverlay').classList.remove('open');
+      await reLoadAll();
+      renderCommissions();
+      toast('Commission booked.');
+    } catch (e) {
+      toast('Could not save commission.', 'error');
+    } finally { btn.disabled = false; }
+  }
+
+  async function reDeleteCommission(id) {
+    if (!confirm('Delete this commission?')) return;
+    try {
+      const res = await fetch(`${API}/real-estate/commissions/${id}`, {
+        method: 'DELETE', headers: headers(),
+      });
+      if (!res.ok) throw new Error();
+      await reLoadAll();
+      renderCommissions();
+      toast('Deleted.');
+    } catch (e) { toast('Could not delete.', 'error'); }
+  }
+
+  /* ── Wiring ── */
+  function reBindEvents() {
+    document.querySelectorAll('.re-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.re-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        reState.leadTab = btn.dataset.leadtab;
+        renderLeads();
+      });
+    });
+
+    document.getElementById('btnAddLead').addEventListener('click', () => reOpenLeadModal(null));
+    document.getElementById('leadCancel').addEventListener('click', () =>
+      document.getElementById('leadModalOverlay').classList.remove('open'));
+    document.getElementById('leadSave').addEventListener('click', reSaveLead);
+    document.getElementById('leadDivision').addEventListener('change', e => {
+      reFillTypeSelect(document.getElementById('leadType'), e.target.value, null);
+      reSyncPeriodRow();
+    });
+
+    document.getElementById('btnAddListing').addEventListener('click', reOpenListingModal);
+    document.getElementById('listingCancel').addEventListener('click', () =>
+      document.getElementById('listingModalOverlay').classList.remove('open'));
+    document.getElementById('listingSave').addEventListener('click', reSaveListing);
+    document.getElementById('listingDivision').addEventListener('change', e =>
+      reFillTypeSelect(document.getElementById('listingType'), e.target.value, null));
+
+    document.getElementById('btnRunMatches').addEventListener('click', reRunMatching);
+
+    document.getElementById('btnAddCommission').addEventListener('click', reOpenCommissionModal);
+    document.getElementById('commCancel').addEventListener('click', () =>
+      document.getElementById('commissionModalOverlay').classList.remove('open'));
+    document.getElementById('commSave').addEventListener('click', reSaveCommission);
+  }
+
+  /* ── Entry point ──
+     Probes the vertical, and only on "real_estate" reveals the nav and loads
+     anything. Any failure leaves the dashboard exactly as it is today. */
+  async function initRealEstate() {
+    try {
+      const res = await fetch(`${API}/real-estate/status`, { headers: headers() });
+      if (!res.ok) return;
+      const status = await res.json();
+      if (!status.enabled) return;
+
+      reState.enabled = true;
+      await reLoadConstants();
+      document.getElementById('reNavGroup').style.display = '';
+      reBindEvents();
+      await reLoadAll();
+      renderLeads();
+      renderListings();
+      renderMatches();
+      renderCommissions();
+    } catch (e) {
+      /* Vertical stays off — the generic dashboard is unaffected. */
+    }
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     LAUNCH MATCHER  (only active when vertical = "launch_matcher")
+
+     One-time setup for investor criteria. The daily flow is entirely
+     WhatsApp — the advisor never needs this screen to match a launch; it is
+     here to enter and correct criteria, and to dry-run a message.
+
+     Dormant for every other tenant: lmState.enabled stays false, the nav group
+     stays hidden, and beyond a single probe no /launch-matcher request is made.
+     ══════════════════════════════════════════════════════════ */
+
+  const lmState = {
+    enabled: false,
+    constants: null,
+    investors: [],
+    editing: null,
+  };
+
+  const LM_PAYMENT_LABEL = {
+    cash: 'Cash buyer',
+    payment_plan: 'Payment plan',
+    either: 'Either',
+  };
+  const LM_STAGE_LABEL = {
+    off_plan: 'Off-plan',
+    ready: 'Ready',
+    both: 'Off-plan or ready',
+  };
+
+  function lmMoney(n) {
+    const v = Number(n);
+    if (!v) return null;
+    if (v >= 1000000) return (v / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+    if (v >= 1000) return Math.round(v / 1000) + 'K';
+    return String(v);
+  }
+
+  function lmBudgetText(inv) {
+    const lo = lmMoney(inv.budget_min), hi = lmMoney(inv.budget_max);
+    if (lo && hi) return `${lo} – ${hi}`;
+    if (hi) return `up to ${hi}`;
+    if (lo) return `${lo}+`;
+    return 'Any budget';
+  }
+
+  async function lmLoad() {
+    if (!lmState.enabled) return;
+    try {
+      const res = await fetch(`${API}/launch-matcher/investors`, { headers: headers() });
+      lmState.investors = res.ok ? await res.json() : [];
+      const badge = document.getElementById('sidebarInvestorBadge');
+      if (badge) {
+        badge.textContent = lmState.investors.length;
+        badge.style.display = lmState.investors.length ? '' : 'none';
+      }
+    } catch (e) {
+      toast('Could not load investors.', 'error');
+    }
+  }
+
+  function renderInvestors() {
+    const body = document.getElementById('investorsBody');
+    if (!body) return;
+
+    if (!lmState.investors.length) {
+      body.innerHTML = `<div class="re-empty">
+        <div class="re-empty-title">No investors yet</div>
+        <p>Add each investor's criteria — emirate, budget, and what they'll buy.
+           Use a label like "Investor 4"; never a real name.</p>
+      </div>`;
+      return;
+    }
+
+    // Grouped by emirate, because emirate is the top-level match filter and
+    // that's how the advisor reasons about their book.
+    const groups = {};
+    lmState.investors.forEach(inv => {
+      (groups[inv.emirate] = groups[inv.emirate] || []).push(inv);
+    });
+
+    body.innerHTML = Object.keys(groups).sort().map(emirate => `
+      <div class="dept-group">
+        <div class="dept-group-head">
+          <div class="dept-group-title">${escHtml(emirate)}</div>
+          <span class="dept-group-count">${groups[emirate].length}</span>
+        </div>
+        <div class="re-grid">
+          ${groups[emirate].map(inv => {
+            const areas = (inv.areas || '').trim();
+            return `<div class="re-card">
+              <div class="re-card-head">
+                <div>
+                  <div class="re-card-name">${escHtml(inv.label)}</div>
+                  <div class="re-card-sub">${escHtml(lmBudgetText(inv))}</div>
+                </div>
+                <span class="re-chip ${inv.payment_preference === 'payment_plan' ? 'gold' : 'muted'}">
+                  ${escHtml(LM_PAYMENT_LABEL[inv.payment_preference] || inv.payment_preference)}
+                </span>
+              </div>
+              <div class="re-card-row">
+                <span class="re-k">AREAS</span> ${escHtml(areas || 'Any area')}
+              </div>
+              <div class="re-card-row">
+                <span class="re-chip muted">${escHtml(LM_STAGE_LABEL[inv.off_plan_or_ready] || inv.off_plan_or_ready)}</span>
+                ${inv.property_type ? `<span class="re-chip cyan">${escHtml(inv.property_type)}</span>` : ''}
+              </div>
+              ${inv.timeline ? `<div class="re-card-row"><span class="re-k">WHEN</span> ${escHtml(inv.timeline)}</div>` : ''}
+              ${inv.notes ? `<div class="re-card-row"><span class="re-k">NOTE</span> ${escHtml(inv.notes)}</div>` : ''}
+              <div class="re-actions">
+                <button class="re-btn-sm" onclick="lmEdit(${inv.id})">Edit</button>
+                <button class="re-btn-sm danger" onclick="lmDelete(${inv.id})">Delete</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  /* ── Modal ── */
+  function lmFillSelect(el, values, labels, selected) {
+    if (!el) return;
+    el.innerHTML = values.map(v =>
+      `<option value="${escHtml(v)}" ${v === selected ? 'selected' : ''}>${escHtml((labels && labels[v]) || v)}</option>`
+    ).join('');
+  }
+
+  function lmOpenModal(existing) {
+    lmState.editing = existing || null;
+    document.getElementById('investorModalTitle').textContent =
+      existing ? 'Edit investor' : 'Add investor';
+
+    const c = lmState.constants || {};
+    lmFillSelect(document.getElementById('invEmirate'), c.emirates || ['Dubai'],
+      null, existing ? existing.emirate : 'Dubai');
+    lmFillSelect(document.getElementById('invStage'), c.off_plan_or_ready || ['both'],
+      LM_STAGE_LABEL, existing ? existing.off_plan_or_ready : 'both');
+    lmFillSelect(document.getElementById('invPayment'), c.payment_preference || ['either'],
+      LM_PAYMENT_LABEL, existing ? existing.payment_preference : 'either');
+
+    document.getElementById('invLabel').value = existing ? existing.label : '';
+    document.getElementById('invAreas').value = existing ? (existing.areas || '') : '';
+    document.getElementById('invPropertyType').value = existing ? (existing.property_type || '') : '';
+    document.getElementById('invBudgetMin').value = existing && existing.budget_min ? existing.budget_min : '';
+    document.getElementById('invBudgetMax').value = existing && existing.budget_max ? existing.budget_max : '';
+    document.getElementById('invTimeline').value = existing ? (existing.timeline || '') : '';
+    document.getElementById('invNotes').value = existing ? (existing.notes || '') : '';
+
+    document.getElementById('investorModalOverlay').classList.add('open');
+  }
+
+  function lmCloseModal() {
+    document.getElementById('investorModalOverlay').classList.remove('open');
+    lmState.editing = null;
+  }
+
+  async function lmSave() {
+    const label = document.getElementById('invLabel').value.trim();
+    if (!label) { toast('Label is required.', 'error'); return; }
+
+    const payload = {
+      label,
+      emirate: document.getElementById('invEmirate').value,
+      areas: document.getElementById('invAreas').value.trim(),
+      property_type: document.getElementById('invPropertyType').value.trim(),
+      off_plan_or_ready: document.getElementById('invStage').value,
+      payment_preference: document.getElementById('invPayment').value,
+      timeline: document.getElementById('invTimeline').value.trim(),
+      notes: document.getElementById('invNotes').value.trim() || null,
+      budget_min: Number(document.getElementById('invBudgetMin').value) || 0,
+      budget_max: Number(document.getElementById('invBudgetMax').value) || 0,
+    };
+    if (payload.budget_max && payload.budget_max < payload.budget_min) {
+      toast('Max budget must be at least the min.', 'error'); return;
+    }
+
+    const editing = lmState.editing;
+    const btn = document.getElementById('invSave');
+    btn.disabled = true;
+    try {
+      const res = await fetch(
+        `${API}/launch-matcher/investors${editing ? '/' + editing.id : ''}`,
+        { method: editing ? 'PATCH' : 'POST', headers: headers(), body: JSON.stringify(payload) }
+      );
+      if (!res.ok) {
+        // The API refuses contact details in these fields; surface its reason
+        // verbatim rather than a generic failure, so the rule teaches itself.
+        let msg = 'Could not save.';
+        try {
+          const err = await res.json();
+          if (err && err.detail) msg = typeof err.detail === 'string'
+            ? err.detail
+            : (err.detail[0] && err.detail[0].msg) || msg;
+        } catch (_) {}
+        toast(msg, 'error');
+        return;
+      }
+      lmCloseModal();
+      await lmLoad();
+      renderInvestors();
+      toast(editing ? 'Investor updated.' : 'Investor added.');
+    } catch (e) {
+      toast('Could not save.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function lmEdit(id) {
+    const inv = lmState.investors.find(x => x.id === id);
+    if (inv) lmOpenModal(inv);
+  }
+
+  async function lmDelete(id) {
+    const inv = lmState.investors.find(x => x.id === id);
+    if (!confirm(`Delete ${inv ? inv.label : 'this investor'}?`)) return;
+    try {
+      const res = await fetch(`${API}/launch-matcher/investors/${id}`, {
+        method: 'DELETE', headers: headers(),
+      });
+      if (!res.ok) throw new Error();
+      await lmLoad();
+      renderInvestors();
+      toast('Deleted.');
+    } catch (e) { toast('Could not delete.', 'error'); }
+  }
+
+  /* ── Dry run ── */
+  async function lmPreview() {
+    const text = document.getElementById('lmPreviewText').value.trim();
+    const out = document.getElementById('lmPreviewOut');
+    if (!text) { toast('Paste a launch message first.', 'error'); return; }
+
+    const btn = document.getElementById('btnPreviewLaunch');
+    btn.disabled = true;
+    out.innerHTML = '<div class="lm-reply">Matching…</div>';
+    try {
+      const res = await fetch(`${API}/launch-matcher/preview`, {
+        method: 'POST', headers: headers(), body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+
+      // The reply is shown exactly as WhatsApp would send it — this screen
+      // exists so the advisor can trust that before a real launch arrives.
+      let html = `<div class="lm-reply">${escHtml(data.reply)}</div>`;
+      const p = data.parsed;
+      if (p) {
+        const chips = [
+          p.emirate && `${p.emirate}`,
+          p.area,
+          p.developer,
+          (p.unit_types || []).join(', '),
+          p.price_min ? (p.price_max ? `${lmMoney(p.price_min)}–${lmMoney(p.price_max)}`
+                                     : `from ${lmMoney(p.price_min)}`) : null,
+          p.payment_plan,
+          p.launch_date && `EOI ${p.launch_date}`,
+          p.completion_status,
+        ].filter(Boolean);
+        html += `<div class="lm-parsed">` +
+          chips.map(c => `<span class="re-chip muted">${escHtml(c)}</span>`).join('') +
+          `</div>`;
+      }
+      out.innerHTML = html;
+    } catch (e) {
+      out.innerHTML = '<div class="lm-reply">Could not test that message.</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function lmBindEvents() {
+    document.getElementById('btnAddInvestor').addEventListener('click', () => lmOpenModal(null));
+    document.getElementById('invCancel').addEventListener('click', lmCloseModal);
+    document.getElementById('invSave').addEventListener('click', lmSave);
+    document.getElementById('btnPreviewLaunch').addEventListener('click', lmPreview);
+  }
+
+  /* ── Entry point ──
+     GET /launch-matcher/constants is already vertical-gated and 404s for every
+     other tenant, so it doubles as the probe — no extra endpoint needed. Any
+     failure leaves the dashboard exactly as it is today. */
+  async function initLaunchMatcher() {
+    try {
+      const res = await fetch(`${API}/launch-matcher/constants`, { headers: headers() });
+      if (!res.ok) return;
+
+      lmState.constants = await res.json();
+      lmState.enabled = true;
+      document.getElementById('lmNavGroup').style.display = '';
+      lmBindEvents();
+      await lmLoad();
+      renderInvestors();
+    } catch (e) {
+      /* Vertical stays off — the dashboard is unaffected. */
+    }
+  }
+
   /* ── Boot ── */
   loadData();
+  initRealEstate();
+  initLaunchMatcher();
   updateNotifCount();
   setInterval(loadData, 30000);
 </script>

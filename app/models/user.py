@@ -3,7 +3,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -16,6 +16,14 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        # Case-insensitive uniqueness on email. Emails are stored lowercased
+        # (see auth_routes._normalize_email), so lower(email) matches each row
+        # 1:1 — this index is the safety net that stops two accounts differing
+        # only by letter case from ever being created, even if some future code
+        # path forgets to normalize. NULL emails are exempt (multiple allowed).
+        Index("ux_users_email_lower", text("lower(email)"), unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(

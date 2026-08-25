@@ -388,6 +388,272 @@ _MIGRATIONS = [
         UPDATE users SET is_verified = TRUE WHERE is_verified = FALSE;
         """,
     ),
+    # 032 — case-insensitive unique index on email. Backstops the app-level
+    #        lowercasing in auth_routes so two accounts can't differ only by
+    #        letter case. This does NOT normalize existing rows — run
+    #        `normalize_emails.py --apply` first on any DB that may hold
+    #        mixed-case duplicates. If a case-variant duplicate still exists the
+    #        CREATE fails and is logged/skipped (run_migrations swallows it),
+    #        and it will succeed automatically on the next startup once the data
+    #        is clean. Deliberately not paired with a blind
+    #        `UPDATE ... SET email = lower(email)`: colliding rows must be
+    #        surfaced for a human, never silently merged.
+    (
+        "032_users_email_lower_unique_index",
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower
+        ON users (lower(email));
+        """,
+    ),
+    # ---------------------------------------------------------------------
+    # 033 -- Real-estate vertical (DealKnot merge).
+    #
+    # Everything below is inert for existing accounts: `companies.vertical`
+    # defaults to 'generic', and every real-estate route, nav item and
+    # notification is gated on vertical = 'real_estate'. The new tables simply
+    # stay empty for generic companies.
+    # ---------------------------------------------------------------------
+    (
+        "033_companies.vertical",
+        """
+        ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS vertical VARCHAR(30) NOT NULL DEFAULT 'generic';
+        """,
+    ),
+    (
+        "033_buyers.table",
+        """
+        CREATE TABLE IF NOT EXISTS buyers (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            radius_km NUMERIC(5,2) NOT NULL DEFAULT 5,
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_buyers.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_buyers_company_id ON buyers (company_id);",
+    ),
+    (
+        "033_sellers.table",
+        """
+        CREATE TABLE IF NOT EXISTS sellers (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_sellers.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_sellers_company_id ON sellers (company_id);",
+    ),
+    (
+        "033_listings.table",
+        """
+        CREATE TABLE IF NOT EXISTS listings (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            seller_id INTEGER REFERENCES sellers(id) ON DELETE SET NULL,
+            title VARCHAR(255) NOT NULL,
+            area VARCHAR(255) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            bedrooms INTEGER,
+            bathrooms INTEGER,
+            area_sqft NUMERIC(12,2),
+            status VARCHAR(20) NOT NULL DEFAULT 'available',
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_listings.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_listings_company_id ON listings (company_id);",
+    ),
+    (
+        "033_matches.table",
+        """
+        CREATE TABLE IF NOT EXISTS matches (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            buyer_id INTEGER NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+            seller_id INTEGER NOT NULL REFERENCES sellers(id) ON DELETE CASCADE,
+            match_type VARCHAR(10) NOT NULL DEFAULT 'exact',
+            distance_km NUMERIC(6,2) NOT NULL DEFAULT 0,
+            price_match_kind VARCHAR(10) NOT NULL DEFAULT 'exact',
+            score INTEGER NOT NULL DEFAULT 0,
+            matched_buyer_area VARCHAR(255),
+            matched_seller_area VARCHAR(255),
+            connected BOOLEAN NOT NULL DEFAULT FALSE,
+            notified_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_matches_company_buyer_seller UNIQUE (company_id, buyer_id, seller_id)
+        );
+        """,
+    ),
+    (
+        "033_matches.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_matches_company_id ON matches (company_id);",
+    ),
+    (
+        "033_commissions.table",
+        """
+        CREATE TABLE IF NOT EXISTS commissions (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            enquiry_id INTEGER REFERENCES enquiries(id) ON DELETE SET NULL,
+            deal_value NUMERIC(18,2) NOT NULL DEFAULT 0,
+            commission_percent NUMERIC(6,3) NOT NULL DEFAULT 0,
+            commission_amount NUMERIC(18,2) NOT NULL DEFAULT 0,
+            split_percent NUMERIC(6,3) NOT NULL DEFAULT 100,
+            source VARCHAR(20) NOT NULL DEFAULT 'both_sides',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            expected_date TIMESTAMP WITH TIME ZONE,
+            received_date TIMESTAMP WITH TIME ZONE,
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "033_commissions.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_commissions_company_id ON commissions (company_id);",
+    ),
+    # Link the existing enquiries pipeline to real-estate leads. Both stay NULL
+    # for generic companies, so the existing Enquiries board is unaffected.
+    (
+        "033_enquiries.buyer_id",
+        """
+        ALTER TABLE enquiries
+        ADD COLUMN IF NOT EXISTS buyer_id INTEGER
+            REFERENCES buyers(id) ON DELETE SET NULL DEFAULT NULL;
+        """,
+    ),
+    (
+        "033_enquiries.seller_id",
+        """
+        ALTER TABLE enquiries
+        ADD COLUMN IF NOT EXISTS seller_id INTEGER
+            REFERENCES sellers(id) ON DELETE SET NULL DEFAULT NULL;
+        """,
+    ),
+    # The two ALTERs above add the columns but not their indexes. On a fresh
+    # database create_all builds `enquiries` from the model, which declares
+    # index=True, so the indexes come for free -- but on an existing database
+    # (which is every real deployment) create_all skips the table entirely and
+    # the columns would land unindexed. These statements are what keeps an
+    # upgraded schema identical to a freshly created one.
+    (
+        "033_enquiries.buyer_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_buyer_id ON enquiries (buyer_id);",
+    ),
+    (
+        "033_enquiries.seller_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_seller_id ON enquiries (seller_id);",
+    ),
+    # ---------------------------------------------------------------------
+    # 034 -- Launch Matcher (vertical = "launch_matcher").
+    #
+    # One table, deliberately. Investor criteria are stored; forwarded launch
+    # messages are NOT -- they are parsed in memory, answered, and discarded,
+    # so no forwarded text can ever be persisted.
+    #
+    # There is no name, phone or email column here and there must never be
+    # one: an investor is identified only by the advisor's own `label`.
+    #
+    # Inert for every existing account: companies.vertical defaults to
+    # 'generic', and "launch_matcher" is mutually exclusive with the broker
+    # CRM's "real_estate", so neither vertical's routes can see the other.
+    # ---------------------------------------------------------------------
+    (
+        "034_investor_criteria.table",
+        """
+        CREATE TABLE IF NOT EXISTS investor_criteria (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            label VARCHAR(80) NOT NULL,
+            emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT '0',
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT '0',
+            property_type VARCHAR(40) NOT NULL DEFAULT '',
+            off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
+            payment_preference VARCHAR(15) NOT NULL DEFAULT 'either',
+            timeline VARCHAR(120) NOT NULL DEFAULT '',
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
+    (
+        "034_investor_criteria.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_id "
+        "ON investor_criteria (company_id);",
+    ),
+    # Emirate is the top-level match filter, so every matching run narrows on
+    # (company_id, emirate) first. Indexed as a pair for that access path.
+    (
+        "034_investor_criteria.company_emirate_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
+        "ON investor_criteria (company_id, emirate);",
+    ),
+    # The ORM declares index=True on the primary key (the convention every
+    # model in this repo follows), so create_all builds this index. A database
+    # where the table came from the migration's DDL instead would not have it,
+    # and the two paths must not diverge.
+    (
+        "034_investor_criteria.id_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_id "
+        "ON investor_criteria (id);",
+    ),
+    # ---------------------------------------------------------------------
+    # 035 -- investor_criteria.payment_preference (cash / payment_plan /
+    #        either). Added after 034 was written, so it needs its own ALTER:
+    #        on a database where 034 already created the table, the amended
+    #        CREATE TABLE above is a no-op and would silently skip the column.
+    # ---------------------------------------------------------------------
+    (
+        "035_investor_criteria.payment_preference",
+        """
+        ALTER TABLE investor_criteria
+        ADD COLUMN IF NOT EXISTS payment_preference VARCHAR(15)
+            NOT NULL DEFAULT 'either';
+        """,
+    ),
 ]
 
 
@@ -419,19 +685,225 @@ _SQLITE_MIGRATIONS = [
         "sqlite.tasks.department_id",
         "ALTER TABLE tasks ADD COLUMN department_id INTEGER REFERENCES departments(id);",
     ),
+    # Mirror of migration 032 for existing SQLite dev DBs (fresh ones get this
+    # index from the User model's __table_args__ via create_all). SQLite has
+    # supported expression indexes since 3.9.0.
+    (
+        "sqlite.users.email_lower_unique_index",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower ON users (lower(email));",
+    ),
+    # -- Real-estate vertical (migration 033) mirrored for existing SQLite dev
+    #    DBs. Fresh SQLite DBs get all of this from create_all via the ORM
+    #    models; these statements only matter for a dev DB created earlier.
+    #    The ALTERs have no IF NOT EXISTS in SQLite -- run_migrations() swallows
+    #    the duplicate-column error on re-run, which is the existing convention.
+    (
+        "sqlite.companies.vertical",
+        "ALTER TABLE companies ADD COLUMN vertical VARCHAR(30) NOT NULL DEFAULT 'generic';",
+    ),
+    (
+        "sqlite.buyers.table",
+        """
+        CREATE TABLE IF NOT EXISTS buyers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT 0,
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            radius_km NUMERIC(5,2) NOT NULL DEFAULT 5,
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.sellers.table",
+        """
+        CREATE TABLE IF NOT EXISTS sellers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(30),
+            dial VARCHAR(10) NOT NULL DEFAULT '+91',
+            country VARCHAR(2) NOT NULL DEFAULT 'IN',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            label VARCHAR(10) NOT NULL DEFAULT 'active',
+            referred_by VARCHAR(255),
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.listings.table",
+        """
+        CREATE TABLE IF NOT EXISTS listings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            seller_id INTEGER REFERENCES sellers(id),
+            title VARCHAR(255) NOT NULL,
+            area VARCHAR(255) NOT NULL DEFAULT '',
+            property_type VARCHAR(30) NOT NULL DEFAULT 'apt_resale',
+            division VARCHAR(10) NOT NULL DEFAULT 'sales',
+            price NUMERIC(18,2) NOT NULL DEFAULT 0,
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            period VARCHAR(10) NOT NULL DEFAULT 'monthly',
+            bedrooms INTEGER,
+            bathrooms INTEGER,
+            area_sqft NUMERIC(12,2),
+            status VARCHAR(20) NOT NULL DEFAULT 'available',
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.matches.table",
+        """
+        CREATE TABLE IF NOT EXISTS matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            buyer_id INTEGER NOT NULL REFERENCES buyers(id),
+            seller_id INTEGER NOT NULL REFERENCES sellers(id),
+            match_type VARCHAR(10) NOT NULL DEFAULT 'exact',
+            distance_km NUMERIC(6,2) NOT NULL DEFAULT 0,
+            price_match_kind VARCHAR(10) NOT NULL DEFAULT 'exact',
+            score INTEGER NOT NULL DEFAULT 0,
+            matched_buyer_area VARCHAR(255),
+            matched_seller_area VARCHAR(255),
+            connected BOOLEAN NOT NULL DEFAULT 0,
+            notified_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_matches_company_buyer_seller UNIQUE (company_id, buyer_id, seller_id)
+        );
+        """,
+    ),
+    (
+        "sqlite.commissions.table",
+        """
+        CREATE TABLE IF NOT EXISTS commissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            enquiry_id INTEGER REFERENCES enquiries(id),
+            deal_value NUMERIC(18,2) NOT NULL DEFAULT 0,
+            commission_percent NUMERIC(6,3) NOT NULL DEFAULT 0,
+            commission_amount NUMERIC(18,2) NOT NULL DEFAULT 0,
+            split_percent NUMERIC(6,3) NOT NULL DEFAULT 100,
+            source VARCHAR(20) NOT NULL DEFAULT 'both_sides',
+            currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+            status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            expected_date TIMESTAMP,
+            received_date TIMESTAMP,
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.enquiries.buyer_id",
+        "ALTER TABLE enquiries ADD COLUMN buyer_id INTEGER REFERENCES buyers(id);",
+    ),
+    (
+        "sqlite.enquiries.seller_id",
+        "ALTER TABLE enquiries ADD COLUMN seller_id INTEGER REFERENCES sellers(id);",
+    ),
+    (
+        "sqlite.enquiries.buyer_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_buyer_id ON enquiries (buyer_id);",
+    ),
+    (
+        "sqlite.enquiries.seller_idx",
+        "CREATE INDEX IF NOT EXISTS ix_enquiries_seller_id ON enquiries (seller_id);",
+    ),
+    # -- Launch Matcher (migration 034) mirrored for existing SQLite dev DBs.
+    #    Fresh SQLite DBs get the table from create_all via the ORM model; the
+    #    indexes are repeated here because an upgraded DB that already has the
+    #    table would not otherwise receive them.
+    (
+        "sqlite.investor_criteria.table",
+        """
+        CREATE TABLE IF NOT EXISTS investor_criteria (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            label VARCHAR(80) NOT NULL,
+            emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
+            areas VARCHAR(500) NOT NULL DEFAULT '',
+            budget_min NUMERIC(18,2) NOT NULL DEFAULT '0',
+            budget_max NUMERIC(18,2) NOT NULL DEFAULT '0',
+            property_type VARCHAR(40) NOT NULL DEFAULT '',
+            off_plan_or_ready VARCHAR(10) NOT NULL DEFAULT 'both',
+            payment_preference VARCHAR(15) NOT NULL DEFAULT 'either',
+            timeline VARCHAR(120) NOT NULL DEFAULT '',
+            notes TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+    ),
+    (
+        "sqlite.investor_criteria.company_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_id "
+        "ON investor_criteria (company_id);",
+    ),
+    (
+        "sqlite.investor_criteria.company_emirate_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_company_emirate "
+        "ON investor_criteria (company_id, emirate);",
+    ),
+    (
+        "sqlite.investor_criteria.id_idx",
+        "CREATE INDEX IF NOT EXISTS ix_investor_criteria_id "
+        "ON investor_criteria (id);",
+    ),
+    # Mirror of migration 035. SQLite has no ADD COLUMN IF NOT EXISTS; the
+    # duplicate-column error is swallowed by run_migrations on re-run, which is
+    # this file's established convention.
+    (
+        "sqlite.investor_criteria.payment_preference",
+        "ALTER TABLE investor_criteria ADD COLUMN payment_preference "
+        "VARCHAR(15) NOT NULL DEFAULT 'either';",
+    ),
 ]
 
 
 async def run_migrations(engine: AsyncEngine) -> None:
-    """Run all pending column migrations on startup."""
+    """Run all pending column migrations on startup.
+
+    Each migration gets its OWN transaction. On Postgres, a single failed
+    statement leaves the surrounding transaction aborted — every later
+    statement in that same transaction then fails with
+    InFailedSQLTransactionError regardless of whether it would have succeeded
+    on its own, until a ROLLBACK. A single shared transaction around the whole
+    loop therefore turns one expected, harmless failure (e.g. an idempotent
+    ALTER TYPE against an enum value that already exists, or one that predates
+    a column existing at all) into every subsequent migration being silently
+    skipped — defeating the try/except's actual intent, which is that each
+    migration is independently safe to attempt. SQLite does not surface this
+    failure mode the same way, which is why it stayed invisible until tested
+    against Postgres.
+    """
     is_sqlite = engine.dialect.name == "sqlite"
     migrations = _SQLITE_MIGRATIONS if is_sqlite else _MIGRATIONS
 
-    async with engine.begin() as conn:
-        for name, sql in migrations:
-            try:
+    for name, sql in migrations:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(sql.strip()))
-                logger.info("Migration OK: %s", name)
-            except Exception as exc:
-                # Log but don't crash — column may already exist on this driver
-                logger.warning("Migration skipped (%s): %s", name, exc)
+            logger.info("Migration OK: %s", name)
+        except Exception as exc:
+            # Log but don't crash — column may already exist on this driver
+            logger.warning("Migration skipped (%s): %s", name, exc)

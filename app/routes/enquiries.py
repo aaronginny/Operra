@@ -21,6 +21,7 @@ from app.models.enquiry import (
 )
 from app.schemas.auth_schema import CurrentUser
 from app.services.messaging_service import send_whatsapp_message
+from app.services.real_estate_notifications import notify_enquiry_stage_change
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,9 @@ class EnquiryCreate(BaseModel):
     notes: str | None = None
     status: str = "new"
     assigned_employee_id: int | None = None
+    # Real-estate vertical only; stay None for generic companies.
+    buyer_id: int | None = None
+    seller_id: int | None = None
 
 
 class EnquiryUpdate(BaseModel):
@@ -43,6 +47,8 @@ class EnquiryUpdate(BaseModel):
     notes: str | None = None
     status: str | None = None
     assigned_employee_id: int | None = None
+    buyer_id: int | None = None
+    seller_id: int | None = None
 
 
 class EnquiryResponse(BaseModel):
@@ -55,6 +61,8 @@ class EnquiryResponse(BaseModel):
     stage: str | None = None
     assigned_employee_id: int | None = None
     assigned_employee_name: str | None = None
+    buyer_id: int | None = None
+    seller_id: int | None = None
     stage_history: str | None = None
     created_at: datetime
 
@@ -89,6 +97,8 @@ async def _enrich_response(db: AsyncSession, enquiry: Enquiry) -> dict:
         "stage": enquiry.stage,
         "assigned_employee_id": enquiry.assigned_employee_id,
         "assigned_employee_name": await _resolve_employee_name(db, enquiry.assigned_employee_id),
+        "buyer_id": enquiry.buyer_id,
+        "seller_id": enquiry.seller_id,
         "stage_history": enquiry.stage_history,
         "created_at": enquiry.created_at,
     }
@@ -127,6 +137,8 @@ async def create_enquiry(
         notes=payload.notes,
         status=EnquiryStatus(payload.status) if payload.status else EnquiryStatus.new,
         assigned_employee_id=payload.assigned_employee_id,
+        buyer_id=payload.buyer_id,
+        seller_id=payload.seller_id,
     )
     db.add(enquiry)
     await db.flush()
@@ -159,6 +171,10 @@ async def update_enquiry(
         enquiry.assigned_employee_id = payload.assigned_employee_id
         if enquiry.status == EnquiryStatus.new:
             enquiry.status = EnquiryStatus.assigned
+    if payload.buyer_id is not None:
+        enquiry.buyer_id = payload.buyer_id
+    if payload.seller_id is not None:
+        enquiry.seller_id = payload.seller_id
 
     await db.flush()
     await db.refresh(enquiry)
@@ -220,6 +236,16 @@ async def advance_stage(
                     "Stage notification FAILED: enquiry=%s stage=%s employee=%s",
                     enquiry_id, next_stage.value, employee.name,
                 )
+
+    # Real-estate brokers additionally get a pipeline alert. This is a no-op
+    # for generic companies, so the behaviour above is unchanged for them.
+    try:
+        await notify_enquiry_stage_change(db, enquiry, next_stage.value)
+    except Exception:
+        logger.exception(
+            "Broker stage alert failed: enquiry=%s (stage change still applied)",
+            enquiry_id,
+        )
 
     resp = await _enrich_response(db, enquiry)
     resp["whatsapp_sent"] = whatsapp_sent

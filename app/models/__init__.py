@@ -13,3 +13,14 @@ from app.models.task_update import TaskUpdate  # noqa: F401
 from app.models.company_settings import CompanySettings  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
 from app.models.department import Department  # noqa: F401
+
+# -- Real-estate vertical (only used by companies with vertical="real_estate") --
+from app.models.buyer import Buyer  # noqa: F401
+from app.models.seller import Seller  # noqa: F401
+from app.models.listing import Listing  # noqa: F401
+from app.models.match import Match  # noqa: F401
+from app.models.commission import Commission  # noqa: F401
+
+# -- Launch Matcher (vertical="launch_matcher"). Criteria-only, no PII; shares
+#    no tables with the real-estate broker CRM above. --
+from app.models.investor_criteria import InvestorCriteria  # noqa: F401
