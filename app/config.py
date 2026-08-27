@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     # (currently: refuse to start with empty SECRET_KEY).
     app_env: str = "development"
 
+    # ── TEMPORARY: one-off account provisioning ───────────────
+    # Shared secret guarding POST /internal/provision-accounts. Empty by
+    # default, and the endpoint refuses to do anything while it is empty, so
+    # the route is inert unless this is deliberately set.
+    #
+    # DELETE THIS FIELD, the route module, and the env var in Render once the
+    # accounts have been created. It exists only because Render's shell is
+    # gated behind a paid plan.
+    provision_secret: str = ""
+
     @field_validator("secret_key", mode="after")
     @classmethod
     def _require_secret_in_prod(cls, v: str, info) -> str:
