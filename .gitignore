@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+.provision_secret
+.creds.txt
 .venv/
 venv/
 ENV/
