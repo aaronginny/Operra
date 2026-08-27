@@ -122,9 +122,10 @@ class ProvisionRequest(BaseModel):
     admin_company: str = "PhantomPilot HQ"
     mahmoud_company: str = "Mahmoud Advisory"
     admin_phone: str | None = None
-    # Optional here, but the launch matcher resolves Mahmoud's tenant by phone
-    # on inbound WhatsApp, so his account is not usable end-to-end without it.
-    mahmoud_phone: str | None = None
+    # The launch matcher resolves Mahmoud's tenant by phone on inbound
+    # WhatsApp, so his account is not usable end-to-end without this. Defaulted
+    # to his real number so the provisioning call needs no body at all.
+    mahmoud_phone: str | None = "+971585888455"
     dry_run: bool = False
 
 
