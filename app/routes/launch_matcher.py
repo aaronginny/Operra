@@ -8,20 +8,33 @@ exclusive, so a broker-CRM company cannot reach these routes either.
 These exist for one-time setup. The daily flow is entirely WhatsApp; the
 advisor never needs to open a screen to match a launch.
 
-PII POLICY (changed, client request): this used to be the enforcement point
-for a hard "no name/phone/email" rule — a regex check on label/areas/timeline,
-on top of an `extra="forbid"` schema that refused any unrecognised field name.
-That regex check is gone. `name` is now a first-class, optional field. See
-app/models/investor_criteria.py for the full picture of what did and didn't
-change.
+PII POLICY (narrowed, client request): this table originally shipped with a
+hard "no name/phone/email anywhere" rule, enforced by a regex check on
+label/areas/property_type/timeline. That rule was fully lifted once (client
+request), then deliberately narrowed back: the client wants real names
+specifically, not phone numbers or emails scattered across every free-text
+field. So:
 
-`extra="forbid"` remains, unrelated to that policy: it is ordinary API
-hygiene (an unrecognised key is a 422, not a silently-dropped field), and
-still applies to anything that isn't an explicitly supported field on these
-schemas — `phone` and `email` included, since neither is a supported field.
+  * `name` — the one field this was actually for. No pattern rejection here;
+    typing a real name is the entire point of the field.
+  * `label`, `areas`, `property_type`, `timeline` — phone/email patterns are
+    rejected again, exactly as before this feature's PII policy was ever
+    touched. See `_reject_contact_details` below.
+  * `notes` was never restricted either way, in any version of this policy —
+    it's the advisor's own scratch space; policing it would be unreliable and
+    beside the point.
+
+See app/models/investor_criteria.py for the full history of this field's
+policy — it has now changed twice, and that file tracks why.
+
+`extra="forbid"` is unrelated to any of this and unaffected: it is ordinary
+API hygiene (an unrecognised key is a 422, not a silently-dropped field), and
+still applies to anything that isn't an explicitly supported field — `phone`
+and `email` included, since neither is a supported field name.
 """
 
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,6 +62,47 @@ MAX_PROPERTY_TYPE = 40
 MAX_TIMELINE = 120
 
 
+# ── Contact-detail guardrail — restored, deliberately NOT applied to `name` ──
+# Reinstated after a brief period (this feature's git history) where it was
+# removed everywhere. The client's actual request was "let me store a real
+# name", not "stop validating every field" — so this is scoped back down to
+# exactly the fields it originally covered, and `name` is the one deliberate
+# exception: rejecting phone/email patterns THERE would defeat the field's
+# entire purpose.
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+# 7+ digits allowing spaces/dashes/parens, with or without a country code —
+# catches "+971 50 123 4567", "0501234567", "971-50-1234567".
+_PHONE_RE = re.compile(r"(?:\+?\d[\d\s\-().]{6,}\d)")
+
+
+def _reject_contact_details(field_name: str, value: str | None) -> None:
+    """Refuse a value carrying an email address or phone number.
+
+    Applied to label/areas/property_type/timeline. Deliberately NOT applied to
+    `name` (that field exists specifically to hold a real name) or `notes`
+    (the advisor's own scratch space, never policed in any version of this
+    policy).
+    """
+    if not value:
+        return
+    if _EMAIL_RE.search(value):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{field_name} looks like it contains an email address. "
+                "That's not allowed here — use the Name field for a real name."
+            ),
+        )
+    if _PHONE_RE.search(value):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{field_name} looks like it contains a phone number. "
+                "That's not allowed here — use the Name field for a real name."
+            ),
+        )
+
+
 def _valid(value: str | None, allowed, default: str) -> str:
     return value if value in allowed else default
 
@@ -64,9 +118,11 @@ def _norm_areas(areas: str | None) -> str:
 
 
 # ── Schemas ──────────────────────────────────────────────────
-# extra="forbid" is load-bearing: it turns a stray `name`/`phone`/`email` key
-# into a 422 instead of a silently dropped field, so an attempt to store
-# identity fails loudly rather than looking like it worked.
+# extra="forbid" is load-bearing: it turns a stray `phone`/`email` key (neither
+# is a supported field) into a 422 instead of a silently dropped field, so an
+# attempt to store one fails loudly rather than looking like it worked. `name`
+# IS a supported field below — see the guardrail above for what's still
+# rejected in the other free-text fields.
 
 class _NoExtraFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -159,6 +215,12 @@ async def create_investor(
     if not label:
         raise HTTPException(status_code=400, detail="Label cannot be empty")
 
+    # `name` is deliberately exempt — see the guardrail's own docstring.
+    _reject_contact_details("Label", label)
+    _reject_contact_details("Areas", payload.areas)
+    _reject_contact_details("Property type", payload.property_type)
+    _reject_contact_details("Timeline", payload.timeline)
+
     if payload.budget_max and payload.budget_max < payload.budget_min:
         raise HTTPException(status_code=400, detail="budget_max must be >= budget_min")
 
@@ -210,16 +272,21 @@ async def update_investor(
         label = data["label"].strip()
         if not label:
             raise HTTPException(status_code=400, detail="Label cannot be empty")
+        _reject_contact_details("Label", label)
         record.label = label
     if "name" in data:
         # Presence-checked, not None-checked, like notes below: an explicit
-        # {"name": null} clears a previously-stored name back to unset.
+        # {"name": null} clears a previously-stored name back to unset. No
+        # guardrail call here — name is the deliberate exemption.
         record.name = (data["name"] or "").strip() or None
     if data.get("areas") is not None:
+        _reject_contact_details("Areas", data["areas"])
         record.areas = _norm_areas(data["areas"])
     if data.get("property_type") is not None:
+        _reject_contact_details("Property type", data["property_type"])
         record.property_type = data["property_type"].strip()
     if data.get("timeline") is not None:
+        _reject_contact_details("Timeline", data["timeline"])
         record.timeline = data["timeline"].strip()
     if data.get("emirate") is not None:
         record.emirate = _valid(data["emirate"], EMIRATES, record.emirate)
