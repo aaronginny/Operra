@@ -219,27 +219,35 @@ async def seed_investors(client: httpx.AsyncClient, ctx: dict) -> None:
 # ── A. The hard rule: no PII can be persisted ────────────────
 
 async def test_names_now_allowed(client: httpx.AsyncClient, ctx: dict) -> None:
-    """Investor identity policy, post client-requested change.
+    """Investor identity policy — narrowed scope (client request, twice).
 
-    This used to be test_no_pii_guardrail: it asserted names/phones/emails
-    were REJECTED on every one of these fields. That rejection has been
-    deliberately removed (client request) — see app/models/investor_criteria.py
-    for the policy and app/routes/launch_matcher.py for what enforced it
-    before. These checks now assert the opposite on purpose: the new
-    behaviour is intentional, not a regression to catch.
+    Timeline: the original hard rule (no name/phone/email anywhere) was fully
+    removed, then deliberately narrowed back once the actual request became
+    clear — the client wants real names, not open phone/email entry across
+    every field. So the CURRENT, intended state is:
+
+      * `name` — real names allowed, no pattern rejection (that's the field's
+        whole purpose)
+      * `label` / `areas` / `property_type` / `timeline` — phone/email
+        patterns rejected again, exactly as before any of this started
+      * `notes` — never restricted, in any version
+
+    This function was test_no_pii_guardrail (asserted rejection everywhere),
+    briefly test_names_now_allowed asserting the opposite everywhere, and is
+    now this: rejection restored on the general fields, exemption kept on
+    exactly the one field it was always meant for.
     """
-    print("\n-- A. Investor names are now allowed (policy changed) --")
+    print("\n-- A. Investor identity policy: name allowed, other fields still guarded --")
     h = auth(ctx["advisor_token"])
 
-    # Structural: `name` is now a real, intentional column.
+    # Structural: `name` is a real, intentional column; phone/email still
+    # aren't, and were never asked for.
     columns = {c.name for c in InvestorCriteria.__table__.columns}
-    check("A1. investor_criteria now HAS a name column (intentional)",
+    check("A1. investor_criteria HAS a name column (intentional)",
           "name" in columns, f"columns={columns}")
-    # Still true, and not part of what changed: no phone/email column exists,
-    # and none was asked for.
     still_absent = {"phone", "phone_number", "email", "mobile", "contact"}
     overlap = columns & still_absent
-    check("A2. still no phone/email column (only a name was requested)",
+    check("A2. still no phone/email column (only a name was ever requested)",
           not overlap, f"found {overlap}")
 
     # A real name in the dedicated field is accepted and stored verbatim.
@@ -253,34 +261,57 @@ async def test_names_now_allowed(client: httpx.AsyncClient, ctx: dict) -> None:
         check("A3b. the stored name round-trips exactly",
               r.json().get("name") == "Ahmed Al Maktoum", str(r.json().get("name")))
 
-    # A phone/email typed into label/areas/timeline is no longer rejected —
-    # the regex guardrail that used to 422 these is gone.
-    formerly_rejected = [
+    # The exemption is deliberate, not incidental: even a value that WOULD
+    # trip the phone/email regex is accepted specifically in `name`, proving
+    # the guardrail genuinely skips this field rather than just never being
+    # triggered by ordinary names.
+    r = await client.post("/launch-matcher/investors", headers=h, json={
+        "label": "Investor N2", "name": "Ahmed +971 50 123 4567",
+        "emirate": "Dubai", "budget_min": 1, "budget_max": 2})
+    check("A3c. a phone-shaped value in `name` is still accepted "
+          "(name is deliberately exempt from the guardrail)",
+          r.status_code == 201, f"got {r.status_code} {r.text[:120]}")
+    if r.status_code == 201:
+        await client.delete(f"/launch-matcher/investors/{r.json()['id']}", headers=h)
+
+    # label / areas / property_type / timeline: rejection is BACK — the
+    # narrower scope this branch settled on, restoring the original behaviour
+    # on every field except the new one.
+    rejected_again = [
         ("email in label", {"label": "ahmed@example.com"}),
         ("phone in label", {"label": "Investor P1 +971 50 123 4567"}),
         ("phone in timeline", {"label": "Investor P2", "timeline": "call 0509876543"}),
         ("email in areas", {"label": "Investor P3", "areas": "ahmed@example.com"}),
+        ("phone in property_type", {"label": "Investor P4",
+                                    "property_type": "call me on 0501234567"}),
     ]
-    created_ids = [name_investor_id] if name_investor_id else []
-    for case_name, extra in formerly_rejected:
+    for case_name, extra in rejected_again:
         body = {"emirate": "Dubai", "budget_min": 1, "budget_max": 2}
         body.update(extra)
         r = await client.post("/launch-matcher/investors", headers=h, json=body)
-        check(f"A4. {case_name} is NO LONGER rejected (201, not 422)",
-              r.status_code == 201, f"got {r.status_code} {r.text[:120]}")
-        if r.status_code == 201:
-            created_ids.append(r.json()["id"])
+        check(f"A4. {case_name} is rejected again (422, restored scope)",
+              r.status_code == 422, f"got {r.status_code} {r.text[:120]}")
 
-    # extra="forbid" is unrelated to the PII policy and still applies: an
-    # unsupported key is still a 422, exactly as for any other unknown field.
+    # The update path is guarded too, not just create — confirms the
+    # restoration covers both endpoints, matching the original scope.
+    if name_investor_id:
+        r = await client.patch(f"/launch-matcher/investors/{name_investor_id}",
+                               headers=h, json={"areas": "reach me at ahmed@example.com"})
+        check("A4b. the update path also rejects a smuggled email (422)",
+              r.status_code == 422, f"got {r.status_code} {r.text[:120]}")
+
+    # extra="forbid" is unrelated to any version of this policy and still
+    # applies: an unsupported key is still a 422, exactly as for any other
+    # unknown field.
     r = await client.post("/launch-matcher/investors", headers=h, json={
         "label": "Investor X", "emirate": "Dubai", "budget_min": 1, "budget_max": 2,
         "phone": "+971501234567"})
     check("A5. an unsupported 'phone' key is still refused (extra=forbid, "
-          "unrelated to the PII policy)", r.status_code == 422,
+          "unrelated to the label/areas/timeline guardrail)", r.status_code == 422,
           f"got {r.status_code} {r.text[:120]}")
 
-    # Update path: name can be set, changed, and cleared.
+    # Update path: name can be set, changed, and cleared — unaffected by the
+    # guardrail's restoration, since name was never subject to it.
     if name_investor_id:
         r = await client.patch(f"/launch-matcher/investors/{name_investor_id}",
                                headers=h, json={"name": None})
@@ -288,23 +319,22 @@ async def test_names_now_allowed(client: httpx.AsyncClient, ctx: dict) -> None:
               r.status_code == 200 and r.json().get("name") is None,
               f"{r.status_code} {r.json().get('name') if r.status_code == 200 else ''}")
 
-    # Cleanup.
-    for cid in created_ids:
-        await client.delete(f"/launch-matcher/investors/{cid}", headers=h)
+    if name_investor_id:
+        await client.delete(f"/launch-matcher/investors/{name_investor_id}", headers=h)
 
-    # payment_preference is still a closed vocabulary — unaffected by any of
-    # this, since it was never part of the free-text guardrail being removed.
+    # payment_preference is a closed vocabulary — unaffected by any version of
+    # this policy, since it was never the free-text guardrail's concern.
     r = await client.post("/launch-matcher/investors", headers=h, json={
         "label": "Investor PP", "emirate": "Dubai", "budget_min": 1, "budget_max": 2,
         "payment_preference": "Ahmed Al Maktoum 0501234567"})
     stored = r.json().get("payment_preference") if r.status_code == 201 else None
     check("A7. payment_preference still falls back to a safe value "
-          "(unrelated closed-vocabulary validation, not the guardrail removed)",
+          "(unrelated closed-vocabulary validation)",
           r.status_code == 201 and stored == "either", f"{r.status_code} stored={stored}")
     if r.status_code == 201:
         await client.delete(f"/launch-matcher/investors/{r.json()['id']}", headers=h)
 
-    # An ordinary label-only record still works exactly as before.
+    # An ordinary label-only record still works exactly as before either policy.
     r = await client.post("/launch-matcher/investors", headers=h, json={
         "label": "Investor 99", "emirate": "Dubai",
         "budget_min": 1_000_000, "budget_max": 2_000_000})
