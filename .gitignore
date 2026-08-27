@@ -4,6 +4,13 @@
 !.env.example
 .provision_secret
 .creds.txt
+
+# Investor bulk-import: local run state, never committed. The ledger holds
+# only phone-number hashes (see importer.py), never raw numbers or names, but
+# it's still local run state, not source. The results CSV holds names.
+.launch_matcher_import_ledger*.json
+import_results_*.csv
+
 .venv/
 venv/
 ENV/
