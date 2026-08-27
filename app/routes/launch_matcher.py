@@ -36,13 +36,14 @@ and `email` included, since neither is a supported field name.
 import logging
 import re
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_launch_matcher_company
+from app.models.contact_lookup import ContactLookup
 from app.models.investor_criteria import (
     EMIRATES,
     OFF_PLAN_OR_READY,
@@ -186,6 +187,46 @@ async def get_constants(
         "off_plan_or_ready": list(OFF_PLAN_OR_READY),
         "payment_preference": list(PAYMENT_PREFERENCE),
     }
+
+
+# ── Contact lookup — setup-screen autocomplete ──────────────────
+# contact_lookup is a separate table from investor_criteria (see that
+# model's docstring) purely to let Mahmoud search his own contact list while
+# adding an investor. This endpoint only ever reads it for that search; it is
+# never written by anything in this file (only by the bulk-import script) and
+# never read by matching or the WhatsApp reply — see test_contact_lookup.py.
+
+class ContactLookupSuggestion(BaseModel):
+    id: int
+    name: str
+    phone: str
+    emirate: str | None = None
+    area: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.get("/contact-lookup", response_model=list[ContactLookupSuggestion])
+async def search_contact_lookup(
+    q: str = Query(min_length=1, max_length=120),
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(require_launch_matcher_company),
+):
+    """Search this company's imported contacts by name-prefix or phone match,
+    for the "add investor" modal's lookup field. Selecting a result only
+    pre-fills the form client-side — this endpoint never creates or touches
+    an investor_criteria row."""
+    q = q.strip()
+    stmt = (
+        select(ContactLookup)
+        .where(
+            ContactLookup.company_id == current_user.company_id,
+            or_(ContactLookup.name.ilike(f"{q}%"), ContactLookup.phone.like(f"%{q}%")),
+        )
+        .order_by(ContactLookup.name)
+        .limit(8)
+    )
+    return (await db.execute(stmt)).scalars().all()
 
 
 # ── Investor criteria ────────────────────────────────────────

@@ -1355,6 +1355,21 @@
       background: rgba(201,168,76,0.10); border: 1px solid rgba(201,168,76,0.35);
     }
     .lm-note b { color: var(--text); font-weight: 700; }
+    .lm-lookup-results {
+      position: absolute; z-index: 20; left: 0; right: 0; top: 100%;
+      margin-top: 4px; max-height: 220px; overflow-y: auto;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 9px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .lm-lookup-item {
+      padding: 9px 12px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .lm-lookup-item:last-child { border-bottom: none; }
+    .lm-lookup-item:hover { background: var(--panel-2); }
+    .lm-lookup-name { color: var(--text); font-weight: 600; }
+    .lm-lookup-meta { color: var(--text-2); font-size: 11.5px; margin-top: 2px; }
+    .lm-lookup-empty { padding: 10px 12px; font-size: 12.5px; color: var(--text-2); }
   </style>
 </head>
 <body>
@@ -2359,6 +2374,18 @@
 <div class="modal-overlay" id="investorModalOverlay">
   <div class="modal re-modal">
     <div class="modal-title" id="investorModalTitle">Add investor</div>
+
+    <div class="form-group" id="invLookupGroup" style="position:relative;">
+      <label>Look up a contact (optional) — search your imported contacts by name or phone</label>
+      <input class="form-input" id="invLookup" type="text" autocomplete="off"
+        placeholder="Start typing a name or phone…" />
+      <div id="invLookupResults" class="lm-lookup-results" style="display:none;"></div>
+      <div class="settings-hint" style="margin-top:5px;">
+        Selecting a contact fills in the name and area below — it does not save
+        anything by itself. You still need to set budget and payment preference,
+        then press Save.
+      </div>
+    </div>
 
     <div class="re-form-2col">
       <div class="form-group">
@@ -5081,6 +5108,12 @@
     document.getElementById('investorModalTitle').textContent =
       existing ? 'Edit investor' : 'Add investor';
 
+    // The lookup only makes sense while creating a new investor from a
+    // contact — editing an existing one already has its own name/emirate.
+    document.getElementById('invLookupGroup').style.display = existing ? 'none' : '';
+    document.getElementById('invLookup').value = '';
+    lmHideLookupResults();
+
     const c = lmState.constants || {};
     lmFillSelect(document.getElementById('invEmirate'), c.emirates || ['Dubai'],
       null, existing ? existing.emirate : 'Dubai');
@@ -5104,6 +5137,62 @@
   function lmCloseModal() {
     document.getElementById('investorModalOverlay').classList.remove('open');
     lmState.editing = null;
+  }
+
+  // ── Contact lookup — search-as-you-type in the "add investor" modal ──
+  // Selecting a result only fills form fields client-side; it never calls
+  // the investors API by itself. See GET /launch-matcher/contact-lookup.
+  let lmLookupTimer = null;
+
+  function lmHideLookupResults() {
+    const box = document.getElementById('invLookupResults');
+    box.style.display = 'none';
+    box.innerHTML = '';
+  }
+
+  async function lmSearchContacts(q) {
+    q = q.trim();
+    if (q.length < 2) { lmHideLookupResults(); return; }
+    try {
+      const res = await fetch(
+        `${API}/launch-matcher/contact-lookup?q=${encodeURIComponent(q)}`,
+        { headers: headers() }
+      );
+      if (!res.ok) { lmHideLookupResults(); return; }
+      lmRenderLookupResults(await res.json());
+    } catch (e) {
+      lmHideLookupResults();
+    }
+  }
+
+  function lmRenderLookupResults(matches) {
+    const box = document.getElementById('invLookupResults');
+    if (!matches.length) {
+      box.innerHTML = '<div class="lm-lookup-empty">No matching contacts.</div>';
+      box.style.display = '';
+      return;
+    }
+    box.innerHTML = matches.map(c => {
+      const meta = [c.phone, c.emirate ? (c.area ? `${c.emirate} · ${c.area}` : c.emirate) : null]
+        .filter(Boolean).join(' — ');
+      return `<div class="lm-lookup-item" data-id="${c.id}">
+        <div class="lm-lookup-name">${escHtml(c.name)}</div>
+        <div class="lm-lookup-meta">${escHtml(meta)}</div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.lm-lookup-item').forEach((el, i) => {
+      el.addEventListener('click', () => lmApplyLookupSelection(matches[i]));
+    });
+    box.style.display = '';
+  }
+
+  function lmApplyLookupSelection(contact) {
+    document.getElementById('invLabel').value = contact.name;
+    document.getElementById('invName').value = contact.name;
+    if (contact.emirate) document.getElementById('invEmirate').value = contact.emirate;
+    if (contact.area) document.getElementById('invAreas').value = contact.area;
+    document.getElementById('invLookup').value = contact.name;
+    lmHideLookupResults();
   }
 
   async function lmSave() {
@@ -5227,6 +5316,16 @@
     document.getElementById('invCancel').addEventListener('click', lmCloseModal);
     document.getElementById('invSave').addEventListener('click', lmSave);
     document.getElementById('btnPreviewLaunch').addEventListener('click', lmPreview);
+
+    const lookupInput = document.getElementById('invLookup');
+    lookupInput.addEventListener('input', e => {
+      clearTimeout(lmLookupTimer);
+      const q = e.target.value;
+      lmLookupTimer = setTimeout(() => lmSearchContacts(q), 250);
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#invLookupGroup')) lmHideLookupResults();
+    });
   }
 
   /* ── Entry point ──
