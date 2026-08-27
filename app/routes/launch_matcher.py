@@ -8,14 +8,20 @@ exclusive, so a broker-CRM company cannot reach these routes either.
 These exist for one-time setup. The daily flow is entirely WhatsApp; the
 advisor never needs to open a screen to match a launch.
 
-PII: this is the only write path into investor_criteria, and it is built so PII
-cannot go in. See `_reject_contact_details` and the `extra="forbid"` config —
-between them, an unknown field like `name`/`phone`/`email` is refused outright
-and a contact detail smuggled into a structured field is refused on sight.
+PII POLICY (changed, client request): this used to be the enforcement point
+for a hard "no name/phone/email" rule — a regex check on label/areas/timeline,
+on top of an `extra="forbid"` schema that refused any unrecognised field name.
+That regex check is gone. `name` is now a first-class, optional field. See
+app/models/investor_criteria.py for the full picture of what did and didn't
+change.
+
+`extra="forbid"` remains, unrelated to that policy: it is ordinary API
+hygiene (an unrecognised key is a 422, not a silently-dropped field), and
+still applies to anything that isn't an explicitly supported field on these
+schemas — `phone` and `email` included, since neither is a supported field.
 """
 
 import logging
-import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,56 +43,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/launch-matcher", tags=["Launch Matcher"])
 
 MAX_LABEL = 80
+MAX_NAME = 120
 MAX_AREAS = 500
 MAX_PROPERTY_TYPE = 40
 MAX_TIMELINE = 120
-
-
-# ── The no-PII guardrail ─────────────────────────────────────
-# An email address and a phone number are both mechanically detectable, so
-# anything carrying one is refused before it reaches the database.
-#
-# A personal *name* is not mechanically detectable, and pretending otherwise
-# would give false confidence while rejecting legitimate labels. The guarantee
-# against names is structural instead, and stronger than a regex: the table has
-# no name column, the schemas below forbid unknown fields, and nothing in the
-# matching or reply path ever asks for an identity. A label is the advisor's
-# own shorthand and never leaves their own account.
-_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
-# 7+ digits allowing spaces/dashes/parens, with or without a country code —
-# catches "+971 50 123 4567", "0501234567", "971-50-1234567".
-_PHONE_RE = re.compile(r"(?:\+?\d[\d\s\-().]{6,}\d)")
-
-
-def _reject_contact_details(field_name: str, value: str | None) -> None:
-    """Refuse a value carrying an email address or phone number.
-
-    Applied to the structured fields the advisor fills in. Deliberately NOT
-    applied to `notes`: that is their own scratch space, and policing it would
-    be both unreliable and beside the point. The design simply never asks for
-    identity anywhere, and notes are never parsed, matched on, or echoed back
-    in a reply.
-    """
-    if not value:
-        return
-    if _EMAIL_RE.search(value):
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"{field_name} looks like it contains an email address. "
-                "Investor records are criteria-only — use a label such as "
-                "'Investor 4'."
-            ),
-        )
-    if _PHONE_RE.search(value):
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"{field_name} looks like it contains a phone number. "
-                "Investor records are criteria-only — use a label such as "
-                "'Investor 4'."
-            ),
-        )
 
 
 def _valid(value: str | None, allowed, default: str) -> str:
@@ -114,6 +74,7 @@ class _NoExtraFields(BaseModel):
 
 class InvestorCriteriaCreate(_NoExtraFields):
     label: str = Field(max_length=MAX_LABEL)
+    name: str | None = Field(default=None, max_length=MAX_NAME)
     emirate: str = "Dubai"
     areas: str = Field(default="", max_length=MAX_AREAS)
     budget_min: float = 0
@@ -127,6 +88,7 @@ class InvestorCriteriaCreate(_NoExtraFields):
 
 class InvestorCriteriaUpdate(_NoExtraFields):
     label: str | None = Field(default=None, max_length=MAX_LABEL)
+    name: str | None = Field(default=None, max_length=MAX_NAME)
     emirate: str | None = None
     areas: str | None = Field(default=None, max_length=MAX_AREAS)
     budget_min: float | None = None
@@ -142,6 +104,7 @@ class InvestorCriteriaResponse(BaseModel):
     id: int
     company_id: int
     label: str
+    name: str | None = None
     emirate: str
     areas: str
     budget_min: float
@@ -191,22 +154,20 @@ async def create_investor(
     db: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_launch_matcher_company),
 ):
-    """Create one criteria-only investor record."""
+    """Create one investor record."""
     label = payload.label.strip()
     if not label:
         raise HTTPException(status_code=400, detail="Label cannot be empty")
 
-    _reject_contact_details("Label", label)
-    _reject_contact_details("Areas", payload.areas)
-    _reject_contact_details("Property type", payload.property_type)
-    _reject_contact_details("Timeline", payload.timeline)
-
     if payload.budget_max and payload.budget_max < payload.budget_min:
         raise HTTPException(status_code=400, detail="budget_max must be >= budget_min")
+
+    name = payload.name.strip() if payload.name else None
 
     record = InvestorCriteria(
         company_id=current_user.company_id,
         label=label,
+        name=name or None,
         emirate=_valid(payload.emirate, EMIRATES, "Dubai"),
         areas=_norm_areas(payload.areas),
         budget_min=payload.budget_min,
@@ -220,7 +181,10 @@ async def create_investor(
     db.add(record)
     await db.flush()
     await db.refresh(record)
-    # Logged by id and label only — the label is the advisor's own shorthand.
+    # Logged by id and label only, deliberately never `name` — application
+    # logs often have broader retention and access than the database itself,
+    # so keeping the name out of them is worth doing even though the table
+    # may now hold one.
     logger.info(
         "Investor criteria created: id=%s label=%r company=%s",
         record.id, record.label, current_user.company_id,
@@ -246,16 +210,16 @@ async def update_investor(
         label = data["label"].strip()
         if not label:
             raise HTTPException(status_code=400, detail="Label cannot be empty")
-        _reject_contact_details("Label", label)
         record.label = label
+    if "name" in data:
+        # Presence-checked, not None-checked, like notes below: an explicit
+        # {"name": null} clears a previously-stored name back to unset.
+        record.name = (data["name"] or "").strip() or None
     if data.get("areas") is not None:
-        _reject_contact_details("Areas", data["areas"])
         record.areas = _norm_areas(data["areas"])
     if data.get("property_type") is not None:
-        _reject_contact_details("Property type", data["property_type"])
         record.property_type = data["property_type"].strip()
     if data.get("timeline") is not None:
-        _reject_contact_details("Timeline", data["timeline"])
         record.timeline = data["timeline"].strip()
     if data.get("emirate") is not None:
         record.emirate = _valid(data["emirate"], EMIRATES, record.emirate)
