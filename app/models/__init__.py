@@ -24,3 +24,4 @@ from app.models.commission import Commission  # noqa: F401
 # -- Launch Matcher (vertical="launch_matcher"). Criteria-only, no PII; shares
 #    no tables with the real-estate broker CRM above. --
 from app.models.investor_criteria import InvestorCriteria  # noqa: F401
+from app.models.contact_lookup import ContactLookup  # noqa: F401

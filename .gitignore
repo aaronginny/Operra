@@ -11,6 +11,10 @@
 .launch_matcher_import_ledger*.json
 import_results_*.csv
 
+# Contact-lookup bulk-import: same reasoning, and this results CSV holds
+# real names (contact_lookup stores phone too, but this file never does).
+contact_lookup_results_*.csv
+
 .venv/
 venv/
 ENV/
