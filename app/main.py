@@ -27,10 +27,6 @@ from app.routes import notifications as notifications_router
 from app.routes import department_routes as department_router
 from app.routes import real_estate as real_estate_router
 from app.routes import launch_matcher as launch_matcher_router
-# TEMPORARY — one-off account provisioning; delete this import, the
-# include_router line below, and app/routes/internal_provision.py once
-# the accounts exist.
-from app.routes import internal_provision as internal_provision_router
 from app.migrations import run_migrations
 from app.services.reminder_service import start_scheduler, stop_scheduler
 from app.services.messaging_service import subscribe_waba_webhook
@@ -116,7 +112,6 @@ app.include_router(notifications_router.router)
 app.include_router(department_router.router)
 app.include_router(real_estate_router.router)
 app.include_router(launch_matcher_router.router)
-app.include_router(internal_provision_router.router)  # TEMPORARY — delete after provisioning
 
 # ── Static files & root redirect ──────────────────────────────
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
