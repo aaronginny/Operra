@@ -8,8 +8,9 @@ When nothing matches, the reply says so plainly. It never pads the list with
 near-misses — the advisor acts on this by forwarding to a real person, so a
 false positive costs them credibility.
 
-Only investor labels appear here. No names, phones, or emails, by construction:
-the matcher has none to give.
+Identity display is entirely the matcher's call: format_reply just prints
+`match.summary`, which is the investor's real name when the advisor has
+stored one, else their label — see InvestorMatch.display in matcher.py.
 """
 
 from __future__ import annotations

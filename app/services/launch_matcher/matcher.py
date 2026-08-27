@@ -21,7 +21,11 @@ these by forwarding to a real person. So:
 Every reason returned corresponds to a criterion that genuinely matched, so
 the advisor can trust the "why" as much as the "who".
 
-No name, phone, or email is read or produced here. Investors are labels.
+An investor's real name is used here when the advisor has stored one (client
+request; see app/models/investor_criteria.py for the full policy change) —
+InvestorMatch.summary prefers `name` over `label` for display. Nothing else
+about matching reads it: the emirate/budget/area/unit-type/payment logic below
+is unchanged and never touches name or label.
 """
 
 from __future__ import annotations
@@ -44,12 +48,19 @@ class InvestorMatch:
     """One investor whose criteria the launch satisfies."""
 
     label: str
+    name: str | None = None
     reasons: list[str] = field(default_factory=list)
 
     @property
+    def display(self) -> str:
+        """The investor's real name when stored, else their label."""
+        return self.name or self.label
+
+    @property
     def summary(self) -> str:
-        """'Investor 4 — Dubai, 1.2–1.6M, off-plan'."""
-        return f"{self.label} — {', '.join(self.reasons)}" if self.reasons else self.label
+        """'Ahmed Al Maktoum — Dubai, 1.2–1.6M, off-plan', or 'Investor 4 — ...'
+        when no name is on file."""
+        return f"{self.display} — {', '.join(self.reasons)}" if self.reasons else self.display
 
 
 @dataclass
@@ -196,7 +207,7 @@ def evaluate(criteria: InvestorCriteria, launch: ParsedLaunch) -> InvestorMatch 
     elif payment_pref == "cash":
         reasons.append("cash buyer")
 
-    return InvestorMatch(label=criteria.label, reasons=reasons)
+    return InvestorMatch(label=criteria.label, name=criteria.name, reasons=reasons)
 
 
 async def match_launch(

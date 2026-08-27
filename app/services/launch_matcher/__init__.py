@@ -1,4 +1,4 @@
-"""Launch Matcher — WhatsApp-native, criteria-only investor matching.
+"""Launch Matcher — WhatsApp-native investor matching.
 
 The advisor forwards a project launch broadcast to our number; we parse it,
 match it against their own stored investor criteria, and reply with the
@@ -23,8 +23,11 @@ without touching the others:
   * `formatter` matches -> the WhatsApp reply body.
   * `providers` the only module that knows WhatsApp exists.
 
-PII: nothing in this package writes a name, phone number, or email anywhere.
-Investors are labels. Forwarded launch text is parsed in memory and never
-persisted, so a broker's details embedded in a forwarded broadcast cannot leak
-into storage.
+PII: investor_criteria may now hold a real name, by client request — see
+app/models/investor_criteria.py for the full policy and what didn't change.
+What is unaffected by that change: forwarded launch text is still parsed in
+memory and never persisted anywhere in this package, so a broker's contact
+details embedded in a forwarded broadcast still cannot leak into storage —
+that protection was always independent of investor_criteria's own field
+validation.
 """
