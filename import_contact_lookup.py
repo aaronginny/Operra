@@ -54,7 +54,6 @@ USAGE
 import argparse
 import asyncio
 import csv
-import re
 import sys
 from pathlib import Path
 
@@ -63,52 +62,13 @@ from app.models.company import Company
 from app.services.launch_matcher.contact_lookup_importer import (
     RawContact,
     import_contact_lookup,
+    parse_contacts_text,
 )
-
-_PHONE_LINE_RE = re.compile(r"^\+?[\d\s\-().]{7,}$")
-
-
-def _looks_like_phone(line: str) -> bool:
-    return bool(_PHONE_LINE_RE.match(line.strip()))
 
 
 def load_contacts(path: Path) -> list[RawContact]:
-    if path.suffix.lower() == ".csv":
-        with path.open(newline="", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            if reader.fieldnames and {"name", "phone"} <= {
-                (c or "").strip().lower() for c in reader.fieldnames
-            }:
-                return [
-                    RawContact(name=row.get("name", "") or "", phone=row.get("phone", "") or "")
-                    for row in reader
-                ]
-
-    lines = [ln.strip() for ln in path.read_text(encoding="utf-8-sig").splitlines()]
-    lines = [ln for ln in lines if ln]
-
-    # Same-line pairs: "Name<tab or 2+ spaces>+phone".
-    same_line_re = re.compile(r"^(.*?)(?:\t|  +)(\+?[\d\s\-().]{7,})$")
-    if lines and all(same_line_re.match(ln) or _looks_like_phone(ln) for ln in lines[:20]):
-        contacts = []
-        for ln in lines:
-            m = same_line_re.match(ln)
-            if m:
-                contacts.append(RawContact(name=m.group(1).strip(), phone=m.group(2).strip()))
-        if contacts:
-            return contacts
-
-    # Fall back to alternating lines: name, then its phone.
-    contacts = []
-    pending_name = None
-    for ln in lines:
-        if _looks_like_phone(ln):
-            if pending_name is not None:
-                contacts.append(RawContact(name=pending_name, phone=ln))
-                pending_name = None
-        else:
-            pending_name = ln
-    return contacts
+    text = path.read_text(encoding="utf-8-sig")
+    return parse_contacts_text(text, is_csv=path.suffix.lower() == ".csv")
 
 
 def write_results_csv(path: Path, summary) -> None:

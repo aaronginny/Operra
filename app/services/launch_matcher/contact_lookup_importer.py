@@ -13,6 +13,9 @@ itself is the dedupe key, checked against the DB directly.
 
 from __future__ import annotations
 
+import csv
+import io
+import re
 from dataclasses import dataclass, field
 
 from sqlalchemy import select
@@ -27,6 +30,54 @@ from app.services.launch_matcher.contact_signals import (
 )
 
 MAX_NAME = 120
+
+_PHONE_LINE_RE = re.compile(r"^\+?[\d\s\-().]{7,}$")
+
+
+def _looks_like_phone(line: str) -> bool:
+    return bool(_PHONE_LINE_RE.match(line.strip()))
+
+
+def parse_contacts_text(text: str, *, is_csv: bool = False) -> list["RawContact"]:
+    """Parse contact export text into RawContact rows. Auto-detects three
+    shapes: CSV with name/phone header columns; same-line pairs ("Name<tab or
+    2+ spaces>+phone"); or alternating lines (a name line, then its phone
+    line). Shared by the CLI script (import_contact_lookup.py, which reads a
+    local file) and the internal upload endpoint (which reads a POSTed file),
+    so both take a raw export exactly the same way."""
+    if is_csv:
+        reader = csv.DictReader(io.StringIO(text))
+        if reader.fieldnames and {"name", "phone"} <= {
+            (c or "").strip().lower() for c in reader.fieldnames
+        }:
+            return [
+                RawContact(name=row.get("name", "") or "", phone=row.get("phone", "") or "")
+                for row in reader
+            ]
+
+    lines = [ln.strip() for ln in text.splitlines()]
+    lines = [ln for ln in lines if ln]
+
+    same_line_re = re.compile(r"^(.*?)(?:\t|  +)(\+?[\d\s\-().]{7,})$")
+    if lines and all(same_line_re.match(ln) or _looks_like_phone(ln) for ln in lines[:20]):
+        contacts = []
+        for ln in lines:
+            m = same_line_re.match(ln)
+            if m:
+                contacts.append(RawContact(name=m.group(1).strip(), phone=m.group(2).strip()))
+        if contacts:
+            return contacts
+
+    contacts = []
+    pending_name = None
+    for ln in lines:
+        if _looks_like_phone(ln):
+            if pending_name is not None:
+                contacts.append(RawContact(name=pending_name, phone=ln))
+                pending_name = None
+        else:
+            pending_name = ln
+    return contacts
 
 
 def normalize_phone(phone: str) -> str:
