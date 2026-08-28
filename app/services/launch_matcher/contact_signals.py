@@ -41,15 +41,14 @@ SKIP_PHRASES = (
 # whereas the short, curated text this module reads (a contact tag or name)
 # has a much lower risk of an incidental match.
 #
-# "la foret" is included on Aaron's word that it's an Abu Dhabi development —
-# I could not independently verify this and it's worth double-checking.
-# "al barari" / "barari" is deliberately NOT included: it's a well-known
-# DUBAI villa community (off Al Ain Road), not Sharjah as described in the
-# brief that asked for this table. Flagged rather than silently encoded
-# either way — see the bulk-import report for this.
+# "la foret" (Abu Dhabi) and "al barari"/"barari" (Dubai — not Sharjah as
+# first described; Al Barari is the well-known villa community off Al Ain
+# Road) were both confirmed explicitly by Aaron.
 SUPPLEMENTARY_AREAS = {
     "masaar": "Sharjah",
     "la foret": "Abu Dhabi",
+    "al barari": "Dubai",
+    "barari": "Dubai",
 }
 
 # Contact-tag/contact-name shorthand for an emirate ("DXB investor", "Ahmed

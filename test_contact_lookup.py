@@ -2,9 +2,8 @@
 
 Runs the real FastAPI app over ASGI against a throwaway database, same
 convention as test_launch_matcher.py. Covers:
-  A. import classification, emirate/area extraction (incl. the new phrases,
-     Masaar/La Foret, and that "Barari" is deliberately NOT recognised),
-     in-batch dedup
+  A. import classification, emirate/area extraction (incl. the new phrases
+     and the Masaar/La Foret/Al Barari supplementary areas), in-batch dedup
   B. idempotency — DB-level, both at the module level and through the real
      CLI script end to end (subprocess)
   C. the autocomplete endpoint — prefix name match, phone substring match,
@@ -85,13 +84,13 @@ async def override_get_db():
 # ── Synthetic contact export (no real data) ─────────────────────────────
 # 16 rows, "Name" then "+phone" alternating — the shape described for the
 # real export. Covers: short codes (SHJ/DXB/AD), an existing parser area
-# (JVC), an existing parser emirate (abu dhabi), the new supplementary areas
-# (Masaar -> Sharjah, La Foret -> Abu Dhabi), every new skip phrase from this
-# task (switched off / no res / cnt reach / not working / no budget / not in
-# service), a non-real-estate business name with no keyword at all, invalid
-# rows, and a same-file repeat phone to prove in-batch dedup. "Al Barari" is
-# included specifically to prove it is NOT recognised (see contact_signals.py
-# for why) rather than silently mapped to either emirate.
+# (JVC), an existing parser emirate (abu dhabi), the supplementary areas
+# (Masaar -> Sharjah, La Foret -> Abu Dhabi, Al Barari -> Dubai — the last
+# corrected from the original brief's Sharjah claim, confirmed by Aaron),
+# every new skip phrase from this task (switched off / no res / cnt reach /
+# not working / no budget / not in service), a non-real-estate business name
+# with no keyword at all, invalid rows, and a same-file repeat phone to prove
+# in-batch dedup.
 CONTACTS = [
     RawContact("Ahmed SHJ Buyer", "+971502220001"),
     RawContact("Fatima - JVC 2BR", "+971502220002"),
@@ -100,7 +99,7 @@ CONTACTS = [
     RawContact("Yousef Masaar Villa", "+971502220005"),
     RawContact("Layla abu dhabi cash", "+971502220006"),
     RawContact("Omar La Foret AUH", "+971502220007"),
-    RawContact("Noor Al Barari Buyer", "+971502220008"),   # deliberately unrecognised
+    RawContact("Noor Al Barari Buyer", "+971502220008"),
     RawContact("City Vet Clinic", "+971502220009"),        # no keyword -> skip
     RawContact("Rashid - blocked me", "+971502220010"),
     RawContact("Tariq switched off", "+971502220011"),
@@ -119,6 +118,7 @@ EXPECTED_IMPORTED = {
     "Yousef Masaar Villa": ("Sharjah", "Masaar"),
     "Layla abu dhabi cash": ("Abu Dhabi", None),
     "Omar La Foret AUH": ("Abu Dhabi", "La Foret"),  # "AUH" and "la foret" agree
+    "Noor Al Barari Buyer": ("Dubai", "Al Barari"),
 }
 
 
@@ -179,17 +179,19 @@ async def run_import_checks(company_id: int) -> None:
         summary = await import_contact_lookup(db, company_id, CONTACTS)
 
     check("A1 total rows processed == 16", summary.total == 16, str(summary.total))
-    check("A2 imported == 7", summary.imported == 7, str(summary.imported))
-    check("A3 skipped_no_area == 2 (vet clinic + Al Barari)",
-          summary.count("skipped_no_area") == 2, str(summary.count("skipped_no_area")))
+    check("A2 imported == 8", summary.imported == 8, str(summary.imported))
+    check("A3 skipped_no_area == 1 (vet clinic only, now Barari is recognised)",
+          summary.count("skipped_no_area") == 1, str(summary.count("skipped_no_area")))
     check("A4 skipped_bad_phrase == 6 (incl. the one that also says Dubai)",
           summary.count("skipped_bad_phrase") == 6, str(summary.count("skipped_bad_phrase")))
     check("A5 skipped_duplicate == 1 (row 16 repeats row 1's phone)",
           summary.count("skipped_duplicate") == 1, str(summary.count("skipped_duplicate")))
 
     by_name = {r.name: r for r in summary.results}
-    check("A6 'Noor Al Barari Buyer' skipped as no_area (Barari deliberately unrecognised)",
-          by_name["Noor Al Barari Buyer"].status == "skipped_no_area")
+    check("A6 'Noor Al Barari Buyer' imported as Dubai / Al Barari (corrected mapping)",
+          by_name["Noor Al Barari Buyer"].status == "imported"
+          and by_name["Noor Al Barari Buyer"].emirate == "Dubai"
+          and by_name["Noor Al Barari Buyer"].area == "Al Barari")
     check("A7 'Bilal cnt reach Dubai' skipped as bad_phrase despite mentioning Dubai",
           by_name["Bilal cnt reach Dubai"].status == "skipped_bad_phrase")
     for n in ["Tariq switched off", "Hana no res", "Salim not working", "Amir not in service"]:
@@ -197,7 +199,7 @@ async def run_import_checks(company_id: int) -> None:
               by_name[n].status == "skipped_bad_phrase")
 
     rows = await contact_rows(company_id)
-    check("A8 exactly 7 contact_lookup rows created", len(rows) == 7, str(len(rows)))
+    check("A8 exactly 8 contact_lookup rows created", len(rows) == 8, str(len(rows)))
 
     row_by_name = {r.name: r for r in rows}
     for name, (emirate, area) in EXPECTED_IMPORTED.items():
@@ -215,7 +217,7 @@ async def run_import_checks(company_id: int) -> None:
         summary2 = await import_contact_lookup(db, company_id, CONTACTS)
     check("B1 second run imports 0", summary2.imported == 0, str(summary2.imported))
     rows_after = await contact_rows(company_id)
-    check("B2 row count unchanged after rerun (still 7)", len(rows_after) == 7,
+    check("B2 row count unchanged after rerun (still 8)", len(rows_after) == 8,
           str(len(rows_after)))
 
 
@@ -258,10 +260,10 @@ async def run_cli_checks(company_id: int, generic_company_id: int) -> None:
     proc = run_cli("--company-id", str(company_id), "--file", txt_path,
                     "--results-file", results_path)
     check("C4 real run exits 0", proc.returncode == 0, proc.stdout + proc.stderr)
-    check("C5 stdout reports imported=7", "imported             : 7" in proc.stdout, proc.stdout)
+    check("C5 stdout reports imported=8", "imported             : 8" in proc.stdout, proc.stdout)
     rows = await contact_rows(company_id)
-    check("C6 real run created exactly 7 new rows via the CLI",
-          len(rows) - len(before) == 7, f"before={len(before)} now={len(rows)}")
+    check("C6 real run created exactly 8 new rows via the CLI",
+          len(rows) - len(before) == 8, f"before={len(before)} now={len(rows)}")
     check("C7 results CSV was written", os.path.exists(results_path))
 
     proc = run_cli("--company-id", str(company_id), "--file", txt_path,
