@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 .provision_secret
+.import_secret
 .creds.txt
 
 # Investor bulk-import: local run state, never committed. The ledger holds
