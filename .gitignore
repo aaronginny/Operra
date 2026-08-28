@@ -15,6 +15,11 @@ import_results_*.csv
 # real names (contact_lookup stores phone too, but this file never does).
 contact_lookup_results_*.csv
 
+# Real client contact data (Mahmoud's list), pasted into a Claude Code
+# session and saved locally to run the import against -- never source,
+# never committed, real PII (names + phone numbers).
+mahmoud_contacts*.txt
+
 .venv/
 venv/
 ENV/

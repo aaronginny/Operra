@@ -44,11 +44,26 @@ SKIP_PHRASES = (
 # "la foret" (Abu Dhabi) and "al barari"/"barari" (Dubai — not Sharjah as
 # first described; Al Barari is the well-known villa community off Al Ain
 # Road) were both confirmed explicitly by Aaron.
+#
+# "alfurjan" and "jlt" are not new geography claims — they're variants of
+# areas already in parser.py's own AREA_TO_EMIRATE ("al furjan" with the
+# space; "jvc"/"jvt"/"jbr" as the precedent for a well-established 3-letter
+# Dubai acronym) that its word-boundary matching doesn't catch: "alfurjan"
+# has no space to match "al furjan", and "jlt" (Jumeirah Lake Towers) simply
+# isn't in that table yet. Surfaced by the real import run against Mahmoud's
+# actual contact list, not guessed.
 SUPPLEMENTARY_AREAS = {
     "masaar": "Sharjah",
     "la foret": "Abu Dhabi",
     "al barari": "Dubai",
     "barari": "Dubai",
+    "alfurjan": "Dubai",
+    "jlt": "Dubai",
+}
+
+SUPPLEMENTARY_AREA_DISPLAY = {
+    "alfurjan": "Al Furjan",
+    "jlt": "JLT",
 }
 
 # Contact-tag/contact-name shorthand for an emirate ("DXB investor", "Ahmed
@@ -96,7 +111,7 @@ def guess_emirate_and_area(text: str) -> tuple[str | None, str | None]:
 
     for name, canonical in sorted(SUPPLEMENTARY_AREAS.items(), key=lambda kv: -len(kv[0])):
         if re.search(rf"\b{re.escape(name)}\b", lowered):
-            return canonical, name.title()
+            return canonical, SUPPLEMENTARY_AREA_DISPLAY.get(name, name.title())
 
     for name, canonical in sorted(EMIRATES.items(), key=lambda kv: -len(kv[0])):
         if re.search(rf"\b{re.escape(name)}\b", lowered):
