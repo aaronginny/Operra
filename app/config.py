@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     founder_phone: str | None = None
     founder_email: str | None = None
 
+    # ── TEMPORARY: contact_lookup bulk-import endpoint ────────
+    # Gates app/routes/internal_import_contacts.py. Set only long enough to
+    # run the one-time production import, then delete both the env var and
+    # the route — see that file's own docstring.
+    import_secret: str | None = None
+
     # ── Daily report ──────────────────────────────────────────
     daily_report_time: str = "09:00"
 

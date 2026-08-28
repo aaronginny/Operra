@@ -1,19 +1,35 @@
-"""Investor criteria — what an investor is looking for, and nothing about who they are.
+"""Investor criteria — what an investor is looking for, and who they are.
 
-PII-FREE BY CONSTRUCTION. This table has no name, phone, or email column and
-must never gain one. An investor is identified only by `label`, a string the
-advisor chooses ("Investor 4"), which is deliberately meaningless outside their
-own head.
+POLICY HISTORY (client request, changed twice): this table originally carried
+a hard rule that it must never hold a name, phone, or email — enforced
+structurally (no such columns) and at the API layer (regex rejection on
+label/areas/property_type/timeline). That rule was first lifted entirely, then
+deliberately narrowed back down once the actual request became clear: the
+client wants real names, not open phone/email entry across every field.
 
-If a future change appears to need an identity field here — to parse something,
-to match on something, to format a reply — that is a signal the design has
-drifted, not a reason to add the column. The reply format quotes labels only.
+Where it stands now: `name` is a real, optional column — the one place a real
+name belongs, with no pattern rejection, since rejecting phone/email patterns
+there would defeat the field's purpose. `label`, `areas`, `property_type` and
+`timeline` are guarded again exactly as they always were before any of this —
+see `_reject_contact_details` in app/routes/launch_matcher.py, which is the
+enforcement point (this file only defines the column). `notes` was never
+restricted in any version of this policy — the advisor's own scratch space,
+never policed.
+
+There is still no `phone` or `email` column, and none is implied by any of
+this — only a name was ever asked for. The forwarded-launch-message pipeline
+is untouched throughout: inbound broadcasts are still never persisted anywhere
+(see app/services/webhook_service.py and
+app/services/launch_matcher/handler.py), so a footer with someone else's
+contact details still cannot leak into any table via that path — that
+protection was always a separate mechanism from this table's own field
+validation, and remains in place regardless of what this table's own policy
+does.
 
 This is a separate feature from the broker CRM on this repo's real-estate
-vertical (buyers/sellers/listings, which do hold real contact details). The two
-share no tables and are gated on mutually exclusive vertical values so a
-company can never be in both. There is deliberately no link of any kind between
-this table and any contact/campaign data.
+vertical (buyers/sellers/listings, which hold real contact details of their
+own). The two share no tables and are gated on mutually exclusive vertical
+values so a company can never be in both.
 """
 
 import datetime
@@ -48,9 +64,18 @@ class InvestorCriteria(Base):
         nullable=False, index=True,
     )
 
-    # The advisor's own shorthand for this investor — "Investor 4", "the
-    # Sharjah guy's brother". Never a real name; see the module docstring.
+    # The advisor's own identifier for this investor — a shorthand like
+    # "Investor 4", or any reference they prefer. Phone/email patterns are
+    # rejected here (see _reject_contact_details in
+    # app/routes/launch_matcher.py); a real name belongs in `name` below, not
+    # here — see the module docstring for why.
     label: Mapped[str] = mapped_column(String(80), nullable=False)
+
+    # The investor's real name, when the advisor has it and chooses to store
+    # it. Optional and nullable: existing rows predate this column and are not
+    # backfilled. Used in the WhatsApp reply in preference to `label` when set
+    # — see InvestorMatch.summary in app/services/launch_matcher/matcher.py.
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     # Top-level filter. Always set.
     emirate: Mapped[str] = mapped_column(String(20), nullable=False, server_default="Dubai")

@@ -218,80 +218,131 @@ async def seed_investors(client: httpx.AsyncClient, ctx: dict) -> None:
 
 # ── A. The hard rule: no PII can be persisted ────────────────
 
-async def test_no_pii_guardrail(client: httpx.AsyncClient, ctx: dict) -> None:
-    print("\n-- A. No-PII guardrail (the hard rule) --")
+async def test_names_now_allowed(client: httpx.AsyncClient, ctx: dict) -> None:
+    """Investor identity policy — narrowed scope (client request, twice).
+
+    Timeline: the original hard rule (no name/phone/email anywhere) was fully
+    removed, then deliberately narrowed back once the actual request became
+    clear — the client wants real names, not open phone/email entry across
+    every field. So the CURRENT, intended state is:
+
+      * `name` — real names allowed, no pattern rejection (that's the field's
+        whole purpose)
+      * `label` / `areas` / `property_type` / `timeline` — phone/email
+        patterns rejected again, exactly as before any of this started
+      * `notes` — never restricted, in any version
+
+    This function was test_no_pii_guardrail (asserted rejection everywhere),
+    briefly test_names_now_allowed asserting the opposite everywhere, and is
+    now this: rejection restored on the general fields, exemption kept on
+    exactly the one field it was always meant for.
+    """
+    print("\n-- A. Investor identity policy: name allowed, other fields still guarded --")
     h = auth(ctx["advisor_token"])
 
-    # Structural: the table simply has no identity columns.
+    # Structural: `name` is a real, intentional column; phone/email still
+    # aren't, and were never asked for.
     columns = {c.name for c in InvestorCriteria.__table__.columns}
-    forbidden = {"name", "phone", "phone_number", "email", "mobile",
-                 "contact", "first_name", "last_name", "full_name"}
-    overlap = columns & forbidden
-    check("A1. investor_criteria has no name/phone/email column",
+    check("A1. investor_criteria HAS a name column (intentional)",
+          "name" in columns, f"columns={columns}")
+    still_absent = {"phone", "phone_number", "email", "mobile", "contact"}
+    overlap = columns & still_absent
+    check("A2. still no phone/email column (only a name was ever requested)",
           not overlap, f"found {overlap}")
 
-    # And no column that merely looks identity-ish.
-    suspicious = {c for c in columns
-                  if any(t in c for t in ("name", "phone", "email", "mobile", "contact"))}
-    check("A2. no column name even suggests an identity field",
-          not suspicious, f"found {suspicious}")
+    # A real name in the dedicated field is accepted and stored verbatim.
+    r = await client.post("/launch-matcher/investors", headers=h, json={
+        "label": "Investor N1", "name": "Ahmed Al Maktoum",
+        "emirate": "Dubai", "budget_min": 1_000_000, "budget_max": 2_000_000})
+    check("A3. a real name in the name field is accepted (201)",
+          r.status_code == 201, f"got {r.status_code} {r.text[:160]}")
+    name_investor_id = r.json()["id"] if r.status_code == 201 else None
+    if r.status_code == 201:
+        check("A3b. the stored name round-trips exactly",
+              r.json().get("name") == "Ahmed Al Maktoum", str(r.json().get("name")))
 
-    # Unknown fields are refused, not silently dropped — so an attempt to store
-    # identity fails loudly instead of appearing to succeed.
-    for field in ("name", "phone", "email", "contact_number", "full_name"):
-        r = await client.post("/launch-matcher/investors", headers=h, json={
-            "label": f"Investor PII {field}", "emirate": "Dubai",
-            "budget_min": 1, "budget_max": 2, field: "Ahmed Al Maktoum"})
-        check(f"A3.{field} — extra '{field}' field is rejected",
-              r.status_code == 422, f"got {r.status_code} {r.text[:120]}")
+    # The exemption is deliberate, not incidental: even a value that WOULD
+    # trip the phone/email regex is accepted specifically in `name`, proving
+    # the guardrail genuinely skips this field rather than just never being
+    # triggered by ordinary names.
+    r = await client.post("/launch-matcher/investors", headers=h, json={
+        "label": "Investor N2", "name": "Ahmed +971 50 123 4567",
+        "emirate": "Dubai", "budget_min": 1, "budget_max": 2})
+    check("A3c. a phone-shaped value in `name` is still accepted "
+          "(name is deliberately exempt from the guardrail)",
+          r.status_code == 201, f"got {r.status_code} {r.text[:120]}")
+    if r.status_code == 201:
+        await client.delete(f"/launch-matcher/investors/{r.json()['id']}", headers=h)
 
-    # Contact details smuggled into a structured field are refused on sight.
-    pii_values = [
+    # label / areas / property_type / timeline: rejection is BACK — the
+    # narrower scope this branch settled on, restoring the original behaviour
+    # on every field except the new one.
+    rejected_again = [
         ("email in label", {"label": "ahmed@example.com"}),
-        ("email in label with text", {"label": "Investor 5 ahmed.k@gmail.com"}),
-        ("intl phone in label", {"label": "Investor 6 +971 50 123 4567"}),
-        ("local phone in label", {"label": "Investor 7 0501234567"}),
-        ("dashed phone in label", {"label": "Investor 8 971-50-1234567"}),
-        ("phone in timeline", {"label": "Investor 9", "timeline": "call 0509876543"}),
-        ("email in areas", {"label": "Investor 10x", "areas": "ahmed@example.com"}),
+        ("phone in label", {"label": "Investor P1 +971 50 123 4567"}),
+        ("phone in timeline", {"label": "Investor P2", "timeline": "call 0509876543"}),
+        ("email in areas", {"label": "Investor P3", "areas": "ahmed@example.com"}),
+        ("phone in property_type", {"label": "Investor P4",
+                                    "property_type": "call me on 0501234567"}),
     ]
-    for name, extra in pii_values:
+    for case_name, extra in rejected_again:
         body = {"emirate": "Dubai", "budget_min": 1, "budget_max": 2}
         body.update(extra)
-        body.setdefault("label", "Investor X")
         r = await client.post("/launch-matcher/investors", headers=h, json=body)
-        check(f"A4. {name} is rejected",
+        check(f"A4. {case_name} is rejected again (422, restored scope)",
               r.status_code == 422, f"got {r.status_code} {r.text[:120]}")
 
-    # Nothing from any of those attempts reached the database.
-    async with SessionLocal() as db:
-        rows = (await db.execute(
-            select(InvestorCriteria).where(
-                InvestorCriteria.company_id == ctx["advisor_company_id"])
-        )).scalars().all()
-    leaked = [r.label for r in rows
-              if "@" in r.label or any(ch.isdigit() for ch in r.label.replace("Investor ", ""))]
-    check("A5. no PII-bearing row was persisted by any attempt",
-          not leaked, f"leaked {leaked}")
+    # The update path is guarded too, not just create — confirms the
+    # restoration covers both endpoints, matching the original scope.
+    if name_investor_id:
+        r = await client.patch(f"/launch-matcher/investors/{name_investor_id}",
+                               headers=h, json={"areas": "reach me at ahmed@example.com"})
+        check("A4b. the update path also rejects a smuggled email (422)",
+              r.status_code == 422, f"got {r.status_code} {r.text[:120]}")
 
-    # The new structured field is a closed vocabulary, not free text, so it
-    # cannot become somewhere to park a name.
+    # extra="forbid" is unrelated to any version of this policy and still
+    # applies: an unsupported key is still a 422, exactly as for any other
+    # unknown field.
+    r = await client.post("/launch-matcher/investors", headers=h, json={
+        "label": "Investor X", "emirate": "Dubai", "budget_min": 1, "budget_max": 2,
+        "phone": "+971501234567"})
+    check("A5. an unsupported 'phone' key is still refused (extra=forbid, "
+          "unrelated to the label/areas/timeline guardrail)", r.status_code == 422,
+          f"got {r.status_code} {r.text[:120]}")
+
+    # Update path: name can be set, changed, and cleared — unaffected by the
+    # guardrail's restoration, since name was never subject to it.
+    if name_investor_id:
+        r = await client.patch(f"/launch-matcher/investors/{name_investor_id}",
+                               headers=h, json={"name": None})
+        check("A6. name can be explicitly cleared via update",
+              r.status_code == 200 and r.json().get("name") is None,
+              f"{r.status_code} {r.json().get('name') if r.status_code == 200 else ''}")
+
+    if name_investor_id:
+        await client.delete(f"/launch-matcher/investors/{name_investor_id}", headers=h)
+
+    # payment_preference is a closed vocabulary — unaffected by any version of
+    # this policy, since it was never the free-text guardrail's concern.
     r = await client.post("/launch-matcher/investors", headers=h, json={
         "label": "Investor PP", "emirate": "Dubai", "budget_min": 1, "budget_max": 2,
         "payment_preference": "Ahmed Al Maktoum 0501234567"})
     stored = r.json().get("payment_preference") if r.status_code == 201 else None
-    check("A7. payment_preference falls back to a safe value, never free text",
+    check("A7. payment_preference still falls back to a safe value "
+          "(unrelated closed-vocabulary validation)",
           r.status_code == 201 and stored == "either", f"{r.status_code} stored={stored}")
     if r.status_code == 201:
         await client.delete(f"/launch-matcher/investors/{r.json()['id']}", headers=h)
 
-    # A normal label still works — the guardrail must not block real use.
+    # An ordinary label-only record still works exactly as before either policy.
     r = await client.post("/launch-matcher/investors", headers=h, json={
         "label": "Investor 99", "emirate": "Dubai",
         "budget_min": 1_000_000, "budget_max": 2_000_000})
-    check("A6. an ordinary label is still accepted", r.status_code == 201,
-          f"{r.status_code} {r.text[:120]}")
+    check("A8. a label-only investor (no name given) still works",
+          r.status_code == 201, f"{r.status_code} {r.text[:120]}")
     if r.status_code == 201:
+        check("A8b. name defaults to null when not supplied",
+              r.json().get("name") is None, str(r.json().get("name")))
         await client.delete(f"/launch-matcher/investors/{r.json()['id']}", headers=h)
 
 
@@ -377,6 +428,40 @@ async def test_matching(client: httpx.AsyncClient, ctx: dict) -> None:
     print("\n     Reply preview:")
     for line in reply.split("\n"):
         print(f"       {line}")
+
+
+async def test_name_used_in_reply(client: httpx.AsyncClient, ctx: dict) -> None:
+    """Requirement: the WhatsApp reply uses the investor's name when set.
+
+    Exercised end-to-end through the real API and the real preview endpoint
+    (which runs the same build_reply() the live WhatsApp path uses) rather
+    than by importing matcher internals — this is what actually ships.
+    """
+    print("\n-- C2. WhatsApp reply prefers name over label when set --")
+    h = auth(ctx["advisor_token"])
+
+    r = await client.post("/launch-matcher/investors", headers=h, json={
+        "label": "Investor NR1", "name": "Fatima Al Zaabi",
+        "emirate": "Dubai", "budget_min": 1_000_000, "budget_max": 2_000_000})
+    check("C2.1 named investor created", r.status_code == 201, f"{r.status_code}")
+    named_id = r.json()["id"] if r.status_code == 201 else None
+
+    r = await client.post("/launch-matcher/preview", headers=h,
+                          json={"text": HARTLAND_LAUNCH})
+    check("C2.2 preview call succeeds", r.status_code == 200, f"{r.status_code}")
+    reply = r.json().get("reply", "") if r.status_code == 200 else ""
+
+    check("C2.3 the reply shows the real name",
+          "Fatima Al Zaabi" in reply, reply)
+    check("C2.4 the reply does NOT show that investor's internal label",
+          "Investor NR1" not in reply, reply)
+    # And the fallback path is unaffected: investors with no name stored still
+    # show their label, exactly as before this change.
+    check("C2.5 label-only investors still show their label (fallback intact)",
+          "Investor 4" in reply, reply)
+
+    if named_id:
+        await client.delete(f"/launch-matcher/investors/{named_id}", headers=h)
 
 
 async def test_no_match_is_honest(client: httpx.AsyncClient, ctx: dict) -> None:
@@ -666,10 +751,11 @@ async def main() -> None:
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        await test_no_pii_guardrail(client, ctx)
+        await test_names_now_allowed(client, ctx)
         await seed_investors(client, ctx)
         await test_isolation(client, ctx)
         await test_matching(client, ctx)
+        await test_name_used_in_reply(client, ctx)
         await test_payment_preference(client, ctx)
         await test_no_match_is_honest(client, ctx)
         await test_whatsapp_flow(client, ctx)

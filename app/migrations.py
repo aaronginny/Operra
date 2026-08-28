@@ -590,10 +590,12 @@ _MIGRATIONS = [
     #
     # One table, deliberately. Investor criteria are stored; forwarded launch
     # messages are NOT -- they are parsed in memory, answered, and discarded,
-    # so no forwarded text can ever be persisted.
+    # so no forwarded text can ever be persisted. That part is unchanged.
     #
-    # There is no name, phone or email column here and there must never be
-    # one: an investor is identified only by the advisor's own `label`.
+    # As originally written this table had no name/phone/email column by hard
+    # rule. That rule was later relaxed (client request) and a `name` column
+    # was added in migration 036 -- see app/models/investor_criteria.py for
+    # the current policy. There is still no phone or email column.
     #
     # Inert for every existing account: companies.vertical defaults to
     # 'generic', and "launch_matcher" is mutually exclusive with the broker
@@ -606,6 +608,7 @@ _MIGRATIONS = [
             id SERIAL PRIMARY KEY,
             company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
             label VARCHAR(80) NOT NULL,
+            name VARCHAR(120),
             emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
             areas VARCHAR(500) NOT NULL DEFAULT '',
             budget_min NUMERIC(18,2) NOT NULL DEFAULT '0',
@@ -652,6 +655,25 @@ _MIGRATIONS = [
         ALTER TABLE investor_criteria
         ADD COLUMN IF NOT EXISTS payment_preference VARCHAR(15)
             NOT NULL DEFAULT 'either';
+        """,
+    ),
+    # ---------------------------------------------------------------------
+    # 036 -- investor_criteria.name. Added after 034 was written, so it needs
+    #        its own ALTER for the same reason 035 did: on a database where
+    #        034 already created the table, the amended CREATE TABLE above is
+    #        a no-op and would silently skip the column.
+    #
+    #        Policy change (client request): investor_criteria may now hold a
+    #        real name. See the model's docstring in
+    #        app/models/investor_criteria.py for what this does and does not
+    #        change. Nullable and unbackfilled -- existing rows simply have no
+    #        name until the advisor adds one.
+    # ---------------------------------------------------------------------
+    (
+        "036_investor_criteria.name",
+        """
+        ALTER TABLE investor_criteria
+        ADD COLUMN IF NOT EXISTS name VARCHAR(120);
         """,
     ),
 ]
@@ -841,6 +863,7 @@ _SQLITE_MIGRATIONS = [
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             company_id INTEGER NOT NULL REFERENCES companies(id),
             label VARCHAR(80) NOT NULL,
+            name VARCHAR(120),
             emirate VARCHAR(20) NOT NULL DEFAULT 'Dubai',
             areas VARCHAR(500) NOT NULL DEFAULT '',
             budget_min NUMERIC(18,2) NOT NULL DEFAULT '0',
@@ -876,6 +899,13 @@ _SQLITE_MIGRATIONS = [
         "sqlite.investor_criteria.payment_preference",
         "ALTER TABLE investor_criteria ADD COLUMN payment_preference "
         "VARCHAR(15) NOT NULL DEFAULT 'either';",
+    ),
+    # Mirror of migration 036. SQLite has no ADD COLUMN IF NOT EXISTS; the
+    # duplicate-column error is swallowed by run_migrations on re-run, which
+    # is this file's established convention.
+    (
+        "sqlite.investor_criteria.name",
+        "ALTER TABLE investor_criteria ADD COLUMN name VARCHAR(120);",
     ),
 ]
 
