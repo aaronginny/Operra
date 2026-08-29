@@ -17,6 +17,7 @@ DO NOT leave this in the codebase permanently. Once the real import is done:
   4. Delete the IMPORT_SECRET env var from Render.
 """
 
+import hashlib
 import hmac
 import logging
 
@@ -37,11 +38,43 @@ router = APIRouter(prefix="/internal", tags=["internal"], include_in_schema=Fals
 
 
 def _check_secret(provided: str | None) -> None:
-    expected = settings.import_secret
+    # Both sides are stripped: pasting a value into a hosting provider's env
+    # var field routinely picks up a trailing newline or space, which would
+    # otherwise fail compare_digest against a byte-identical-looking secret.
+    expected = (settings.import_secret or "").strip()
+    supplied = (provided or "").strip()
     # Same failure for "not configured", "no header sent", and "wrong
     # value" -- a 404, indistinguishable from the route not existing.
-    if not expected or not provided or not hmac.compare_digest(provided, expected):
+    if not expected or not supplied or not hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=404)
+
+
+@router.get("/import-secret-diag")
+async def import_secret_diag(x_import_secret: str | None = Header(default=None)):
+    """TEMPORARY diagnostic — deleted with the rest of this file.
+
+    Reports only lengths and truncated SHA-256 fingerprints, never any secret
+    value, so a mismatch between the env var and the caller's header can be
+    identified without either being exposed. Unauthenticated on purpose: the
+    thing being diagnosed is precisely whether the secret check can pass, so
+    gating this on that same check would make it useless.
+    """
+    configured = (settings.import_secret or "").strip()
+    supplied = (x_import_secret or "").strip()
+
+    def fingerprint(value: str) -> str | None:
+        return hashlib.sha256(value.encode()).hexdigest()[:12] if value else None
+
+    return {
+        "configured": bool(configured),
+        "configured_len": len(configured),
+        "configured_fp": fingerprint(configured),
+        "raw_configured_len": len(settings.import_secret or ""),
+        "received": bool(supplied),
+        "received_len": len(supplied),
+        "received_fp": fingerprint(supplied),
+        "match": bool(configured) and configured == supplied,
+    }
 
 
 @router.post("/import-contacts")

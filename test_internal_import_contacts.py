@@ -133,6 +133,38 @@ async def main() -> None:
         check("E1 route is hidden from the OpenAPI schema",
               "/internal/import-contacts" not in paths, str(list(paths)[:5]))
 
+        # Whitespace tolerance: a secret pasted into a hosting provider's env
+        # var field routinely picks up a trailing newline/space. Neither side
+        # should be able to fail on that alone.
+        settings.import_secret = "test-secret-value-not-real\n"
+        res = await client.post("/internal/import-contacts",
+                                 data={"company_id": lm_id, "dry_run": True}, files=files,
+                                 headers={"X-Import-Secret": "test-secret-value-not-real"})
+        check("F1 trailing newline on the CONFIGURED secret still authenticates",
+              res.status_code == 200, f"{res.status_code} {res.text[:200]}")
+
+        settings.import_secret = "test-secret-value-not-real"
+        res = await client.post("/internal/import-contacts",
+                                 data={"company_id": lm_id, "dry_run": True}, files=files,
+                                 headers={"X-Import-Secret": "  test-secret-value-not-real  "})
+        check("F2 surrounding spaces on the SUPPLIED header still authenticates",
+              res.status_code == 200, f"{res.status_code} {res.text[:200]}")
+
+        settings.import_secret = "test-secret-value-not-real"
+        res = await client.post("/internal/import-contacts",
+                                 data={"company_id": lm_id, "dry_run": True}, files=files,
+                                 headers={"X-Import-Secret": "test-secret-value-not-reaL"})
+        check("F3 a genuinely different secret is still rejected (404)",
+              res.status_code == 404, str(res.status_code))
+
+        res = await client.get("/internal/import-secret-diag",
+                                headers={"X-Import-Secret": "test-secret-value-not-real"})
+        body = res.json()
+        check("G1 diag reports a match for the correct secret",
+              res.status_code == 200 and body["match"] is True, str(body))
+        check("G2 diag never returns any secret value",
+              "test-secret-value-not-real" not in res.text, res.text)
+
     await engine.dispose()
     if os.path.exists(TEST_DB_PATH):
         try:
