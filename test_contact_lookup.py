@@ -320,6 +320,44 @@ async def run_autocomplete_checks(client: httpx.AsyncClient, ctx: dict) -> None:
     check("D8 the other company sees only its own contact via this endpoint",
           other_names == ["Ahmed SHJ Other Co"], str(other_names))
 
+    # Substring matching — the point of the change. These contacts are named
+    # "FirstName Project", so the recalled word is often mid-string.
+    res = await client.get("/launch-matcher/contact-lookup?q=Masaar",
+                            headers=auth(ctx["mahmoud_token"]))
+    names = [c["name"] for c in res.json()]
+    check("D9 a mid-name word is found ('Masaar' -> 'Yousef Masaar Villa')",
+          "Yousef Masaar Villa" in names, str(names))
+
+    res = await client.get("/launch-matcher/contact-lookup?q=JVC",
+                            headers=auth(ctx["mahmoud_token"]))
+    check("D10 'JVC' finds 'Fatima - JVC 2BR' mid-name",
+          "Fatima - JVC 2BR" in [c["name"] for c in res.json()], res.text)
+
+    # Prefix hits must still rank first, since the list is capped at 8.
+    async with SessionLocal() as db:
+        db.add(ContactLookup(company_id=ctx["mahmoud_id"], name="Zzz Trailing Sara",
+                              phone="+971502229001", emirate="Dubai"))
+        db.add(ContactLookup(company_id=ctx["mahmoud_id"], name="Sara Leading Buyer",
+                              phone="+971502229002", emirate="Dubai"))
+        await db.commit()
+    res = await client.get("/launch-matcher/contact-lookup?q=Sara",
+                            headers=auth(ctx["mahmoud_token"]))
+    ranked = [c["name"] for c in res.json()]
+    check("D11 both a prefix and a mid-name match are returned",
+          "Sara Leading Buyer" in ranked and "Zzz Trailing Sara" in ranked, str(ranked))
+    check("D12 the prefix match ranks first despite sorting later alphabetically",
+          ranked.index("Sara Leading Buyer") < ranked.index("Zzz Trailing Sara"), str(ranked))
+
+    # LIKE wildcards in user input must be literal, not match-everything.
+    res = await client.get("/launch-matcher/contact-lookup?q=%25",
+                            headers=auth(ctx["mahmoud_token"]))
+    check("D13 a literal '%' matches nothing rather than every contact",
+          res.status_code == 200 and res.json() == [], res.text[:200])
+    res = await client.get("/launch-matcher/contact-lookup?q=_",
+                            headers=auth(ctx["mahmoud_token"]))
+    check("D14 a literal '_' matches nothing rather than any single char",
+          res.status_code == 200 and res.json() == [], res.text[:200])
+
 
 def run_fallback_tier_checks() -> None:
     """FALLBACK_EMIRATE_HINTS must sit below every other tier.

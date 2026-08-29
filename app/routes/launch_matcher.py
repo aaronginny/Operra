@@ -38,7 +38,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import or_, select
+from sqlalchemy import case, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -212,18 +212,34 @@ async def search_contact_lookup(
     db: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_launch_matcher_company),
 ):
-    """Search this company's imported contacts by name-prefix or phone match,
+    """Search this company's imported contacts by name or phone substring,
     for the "add investor" modal's lookup field. Selecting a result only
     pre-fills the form client-side — this endpoint never creates or touches
-    an investor_criteria row."""
+    an investor_criteria row.
+
+    Name matching is substring, not prefix: these contacts are named
+    "FirstName Project" ("Alaa Shomous", "Khaled Azizi Kawther"), so the part
+    the advisor recalls is often in the middle. Prefix matches are still
+    ranked first, because the result list is capped and a prefix hit is
+    almost always the one being looked for.
+    """
     q = q.strip()
+    # Escape LIKE wildcards in user input. Matters more here than under
+    # prefix matching: an unescaped "%" would otherwise match every contact.
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     stmt = (
         select(ContactLookup)
         .where(
             ContactLookup.company_id == current_user.company_id,
-            or_(ContactLookup.name.ilike(f"{q}%"), ContactLookup.phone.like(f"%{q}%")),
+            or_(
+                ContactLookup.name.ilike(f"%{escaped}%", escape="\\"),
+                ContactLookup.phone.like(f"%{escaped}%", escape="\\"),
+            ),
         )
-        .order_by(ContactLookup.name)
+        .order_by(
+            case((ContactLookup.name.ilike(f"{escaped}%", escape="\\"), 0), else_=1),
+            ContactLookup.name,
+        )
         .limit(8)
     )
     return (await db.execute(stmt)).scalars().all()
