@@ -1,6 +1,5 @@
 """Authentication API routes."""
 
-import hmac
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -8,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select
 
 from app.config import settings
 from app.database import get_db
@@ -46,10 +45,6 @@ def _normalize_email(email: str | None) -> str | None:
     return email.strip().lower() or None
 
 
-def _is_founder(email: str) -> bool:
-    """Return True if this email is the configured founder."""
-    founder = settings.founder_email
-    return bool(founder and email.lower() == founder.lower())
 
 
 @router.post("/signup")
@@ -189,34 +184,3 @@ async def update_profile(
         "name": current_user.name,
         "access_token": new_token,
     }
-
-
-class ResetRequest(BaseModel):
-    confirm: str
-
-
-@router.post("/reset")
-async def reset_users(
-    payload: ResetRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Clear all users and companies. Founder-only; requires env-configured token.
-
-    Returns 404 unless ADMIN_RESET_TOKEN is set, so the route is invisible
-    in production. Requires the caller to be the configured founder *and*
-    pass the matching token in the request body.
-    """
-    import os
-    expected = os.getenv("ADMIN_RESET_TOKEN")
-    if not expected:
-        raise HTTPException(status_code=404, detail="Not Found")
-    if not _is_founder(current_user.email or ""):
-        raise HTTPException(status_code=403, detail="Forbidden")
-    if not hmac.compare_digest(payload.confirm, expected):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    await db.execute(delete(User))
-    await db.execute(delete(Company))
-    logger.warning("[PhantomPilot] /auth/reset invoked by founder %s — all users/companies deleted", current_user.email)
-    return {"success": True, "message": "All users and companies cleared."}
