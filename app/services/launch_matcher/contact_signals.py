@@ -83,6 +83,30 @@ SHORT_CODE_EMIRATES = {
     "AD": "Abu Dhabi",
 }
 
+# Last-resort emirate hints — project/tag words that recur in this advisor's
+# own contact naming and that Aaron confirmed all mean Dubai. Checked AFTER
+# every other table, and that ordering is load-bearing: 14 contacts in the
+# real list pair one of these with a Sharjah signal ("Ahmed SHJ Azizi
+# Kawther", "Masaar Corner Astro", "Aysha Riza Masaar Astro"). Promoting
+# these to the area tier would flip all 14 from Sharjah to Dubai; as a
+# fallback they can only ever classify a contact that nothing else matched,
+# which is exactly the intent -- recover previously-unmatched contacts
+# without disturbing a single existing classification.
+#
+# These set the EMIRATE only, never an area. Aaron confirmed the emirate;
+# he did not say these are area names, and at least "Astro" reads like a
+# lead-source tag rather than a place (it appears alongside "Bayut", a UAE
+# property portal). Per this feature's standing rule, an area that isn't
+# known is left null rather than guessed -- Mahmoud sets it on the dashboard.
+FALLBACK_EMIRATE_HINTS = {
+    "astro": "Dubai",
+    "shomous": "Dubai",
+    "shomouse": "Dubai",
+    "aludra": "Dubai",
+    "kawther": "Dubai",
+    "kawthar": "Dubai",
+}
+
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?:\+?\d[\d\s\-().]{6,}\d)")
 BARE_PHONE_RE = re.compile(r"^[\d\s\-+()]{7,}$")
@@ -102,6 +126,9 @@ def guess_emirate_and_area(text: str) -> tuple[str | None, str | None]:
     the area, since a naive first-match-wins scan hits the emirate table
     first. Returns (emirate, area) — area is None only when no area-level
     signal, from either table, was found.
+
+    FALLBACK_EMIRATE_HINTS is consulted last of all, so it can only classify
+    text that every other tier left unmatched — see that table's own comment.
     """
     lowered = text.lower()
 
@@ -122,6 +149,12 @@ def guess_emirate_and_area(text: str) -> tuple[str | None, str | None]:
             if re.search(rf"\b{code}\b", text):  # case-sensitive on purpose
                 return canonical, None
         elif re.search(rf"\b{code}\b", text, re.I):
+            return canonical, None
+
+    # Last resort only — see FALLBACK_EMIRATE_HINTS for why this must stay
+    # below every other tier. Emirate only; area stays None.
+    for name, canonical in sorted(FALLBACK_EMIRATE_HINTS.items(), key=lambda kv: -len(kv[0])):
+        if re.search(rf"\b{re.escape(name)}\b", lowered):
             return canonical, None
 
     return None, None

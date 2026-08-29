@@ -321,6 +321,45 @@ async def run_autocomplete_checks(client: httpx.AsyncClient, ctx: dict) -> None:
           other_names == ["Ahmed SHJ Other Co"], str(other_names))
 
 
+def run_fallback_tier_checks() -> None:
+    """FALLBACK_EMIRATE_HINTS must sit below every other tier.
+
+    These words (Astro/Shomous/Aludra/Kawther — confirmed Dubai) recur in
+    this advisor's contact naming, but 14 contacts in the real list pair one
+    of them with a Sharjah signal. If the fallback were promoted to the area
+    tier it would flip all 14 to Dubai, so the ordering is the thing actually
+    under test here, not just the lookup.
+    """
+    print("\n== F. fallback emirate hints — recognised, but lowest priority ==")
+    from app.services.launch_matcher.contact_signals import guess_emirate_and_area as g
+
+    check("F1 a bare fallback word resolves to Dubai with no area",
+          g("Alaa Shomous") == ("Dubai", None), str(g("Alaa Shomous")))
+    check("F2 'Khaled Azizi Kawther' -> Dubai", g("Khaled Azizi Kawther") == ("Dubai", None),
+          str(g("Khaled Azizi Kawther")))
+    check("F3 'Samar Azizi ALUDRA' -> Dubai (case-insensitive)",
+          g("Samar Azizi ALUDRA") == ("Dubai", None), str(g("Samar Azizi ALUDRA")))
+
+    # The load-bearing cases: a stronger signal must still win.
+    check("F4 'Ahmed SHJ Azizi Kawther' stays Sharjah (SHJ beats the fallback)",
+          g("Ahmed SHJ Azizi Kawther") == ("Sharjah", None),
+          str(g("Ahmed SHJ Azizi Kawther")))
+    check("F5 'Masaar Corner Astro' stays Sharjah/Masaar (area beats the fallback)",
+          g("Masaar Corner Astro") == ("Sharjah", "Masaar"), str(g("Masaar Corner Astro")))
+    check("F6 'Sadaf SHJ & Ajman Astro' keeps its emirate, not Dubai",
+          g("Sadaf SHJ & Ajman Astro")[0] in ("Sharjah", "Ajman"),
+          str(g("Sadaf SHJ & Ajman Astro")))
+    check("F7 'Najib SHJ Astro Aljada 3BR' stays Sharjah/Aljada",
+          g("Najib SHJ Astro Aljada 3BR") == ("Sharjah", "Aljada"),
+          str(g("Najib SHJ Astro Aljada 3BR")))
+
+    # Words deliberately NOT added stay unmatched.
+    check("F8 'Shomokh Tarek Elie Saab' still unmatched (a name, not Shomous)",
+          g("Shomokh Tarek Elie Saab") == (None, None), str(g("Shomokh Tarek Elie Saab")))
+    check("F9 'Shomo5y Lagoons LCR' still unmatched (variant not confirmed)",
+          g("Shomo5y Lagoons LCR") == (None, None), str(g("Shomo5y Lagoons LCR")))
+
+
 async def run_isolation_checks(company_id: int) -> None:
     print("\n== E. contact_lookup is invisible to matching/WhatsApp ==")
 
@@ -389,6 +428,7 @@ async def main() -> None:
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         await run_autocomplete_checks(client, ctx)
 
+    run_fallback_tier_checks()
     await run_isolation_checks(ctx["mahmoud_id"])
 
     await engine.dispose()
