@@ -18,13 +18,33 @@ class Company(Base):
     )
 
     # -- Product vertical --------------------------------------
-    # "generic"     -- the default PhantomPilot task/enquiry product.
-    # "real_estate" -- additionally unlocks the broker CRM (buyers, sellers,
-    #                  listings, matching engine, commissions).
-    # Every real-estate route, nav item and notification is gated on this
-    # column, so an existing "generic" account sees no change whatsoever.
-    # Both new and existing companies default to "generic" -- opting in is
+    # A company has exactly one vertical, assigned once and deliberately by
+    # the platform operator at account setup -- never a self-serve toggle a
+    # client can flip. Known values today:
+    #
+    # "generic"        -- the default PhantomPilot task/enquiry product.
+    # "real_estate"     -- additionally unlocks the broker CRM (buyers,
+    #                      sellers, listings, matching engine, commissions).
+    #                      Ported from DealKnot; built and Postgres-verified
+    #                      but not yet activated for a live client.
+    # "launch_matcher"  -- WhatsApp-only investor/launch matching for a
+    #                      single Dubai real-estate advisor. No dashboard
+    #                      screens beyond one-time setup; mutually exclusive
+    #                      with "real_estate" by construction (see
+    #                      app.dependencies.require_vertical).
+    #
+    # Every vertical-specific route, nav item, notification, and inbound
+    # WhatsApp handler is gated on this column, so an existing "generic"
+    # account sees no change whatsoever when a new vertical is added. Both
+    # new and existing companies default to "generic" -- opting in is
     # always explicit.
+    #
+    # A vertical that needs to handle inbound WhatsApp messages or a daily
+    # proactive nudge registers itself with app.verticals.registry (see
+    # app.verticals.bootstrap for the list of what's currently registered)
+    # rather than adding another hardcoded check keyed off this column's
+    # value -- see app.services.webhook_service.dispatch_inbound and
+    # app.services.reminder_service._send_vertical_daily_hooks.
     vertical: Mapped[str] = mapped_column(
         String(30), nullable=False, server_default="generic"
     )

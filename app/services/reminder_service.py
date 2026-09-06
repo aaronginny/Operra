@@ -176,11 +176,62 @@ async def _send_morning_pulse(db) -> None:
         await send_whatsapp_message(employee.phone_number, msg)
         logger.info("Morning pulse sent to %s (%d tasks)", employee.name, task_count)
 
-    await _send_real_estate_pulses(db)
+    await _send_vertical_daily_hooks(db)
+
+
+async def _send_vertical_daily_hooks(db) -> None:
+    """Run every registered vertical's daily hook, on the same 9 AM tick as
+    the employee pulse above, once per company on that vertical.
+
+    Replaces what used to be a hardcoded call per vertical — before this,
+    the only entry was _send_real_estate_pulses below, and a second
+    vertical's daily nudge (broker_intel's content-nudge feature) would have
+    meant a second hardcoded call appended right here. Now it means calling
+    register_vertical(Vertical(name=..., daily=...)) once, from that
+    vertical's own module — see app.verticals.registry and
+    app.verticals.bootstrap.
+
+    Company enumeration, the per-company pulse-enabled toggle, and the
+    per-company try/except are all generic here rather than duplicated by
+    each vertical's own hook — a hook is just "what to do for one company",
+    same contract send_broker_pulse(db, company_id) already had.
+    """
+    from app.models.company import Company
+    from app.verticals.registry import all_verticals
+
+    for vertical in all_verticals():
+        if vertical.daily is None:
+            continue
+
+        stmt = select(Company.id).where(Company.vertical == vertical.name)
+        company_ids = list((await db.execute(stmt)).scalars().all())
+
+        for company_id in company_ids:
+            # Respect the same per-company pulse toggle the employee pulse honours.
+            if not _company_pulse_enabled(company_id):
+                logger.debug(
+                    "Daily hook skipped for company=%s vertical=%s (disabled in settings)",
+                    company_id, vertical.name,
+                )
+                continue
+            try:
+                await vertical.daily(db, company_id)
+            except Exception:
+                logger.exception(
+                    "Daily hook failed for company=%s vertical=%s", company_id, vertical.name,
+                )
 
 
 async def _send_real_estate_pulses(db) -> None:
     """Send the broker pulse to every real-estate company.
+
+    Kept byte-for-byte as it was before the platform-refactor: production no
+    longer calls this directly (see _send_vertical_daily_hooks above, which
+    reaches send_broker_pulse the same way, generically, now that
+    real_estate is registered with the vertical registry), but
+    test_real_estate.py calls this function directly by name, so it stays
+    exactly as it always was rather than becoming a thin wrapper around
+    something else.
 
     Runs on the same 9 AM tick as the employee pulse above but is a separate
     message to a different audience: the employee pulse nudges an assignee

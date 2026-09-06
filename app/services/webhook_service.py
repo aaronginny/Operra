@@ -30,6 +30,14 @@ from app.services.messaging_service import send_welcome_message, send_whatsapp_m
 from app.models.user import User, UserRole
 from app.models.notification import Notification
 
+# Populates the vertical registry (app.verticals.registry) as a side effect
+# of import. Must stay a top-level import in THIS file: dispatch_inbound and
+# process_incoming_message below are defined later in this same module, so
+# Python guarantees this line has already run before either can be called
+# from anywhere — see app.verticals.bootstrap's own docstring and
+# dispatch_inbound's docstring for what that guarantees structurally.
+import app.verticals.bootstrap  # noqa: F401,E402
+
 logger = logging.getLogger(__name__)
 
 
@@ -613,6 +621,50 @@ async def handle_manager_reply(
 # Full message processing pipeline
 # ---------------------------------------------------------------------------
 
+async def dispatch_inbound(db: AsyncSession, sender: str, text: str) -> dict | None:
+    """Resolve the sender's company + vertical, and dispatch to that
+    vertical's own registered inbound handler, if it has one.
+
+    This is the ordering guarantee between a vertical's handler and this
+    module's own generic writes, made structural rather than a comment's
+    promise: process_incoming_message below calls this FIRST and returns
+    its result immediately whenever it isn't None — before
+    _run_generic_pipeline (the only function in this module that writes
+    message_logs or auto-registers an Employee row) is ever called. A
+    vertical registered with persist_inbound=False (launch_matcher today)
+    cannot reach those writes not because this function remembers not to
+    call them, but because the code containing them lives in a function
+    that is never invoked on this path. Breaking that again requires either
+    calling _run_generic_pipeline from a second place, or adding a third
+    PII-bearing write outside it — both are visible, structural edits to
+    this file, not an accidental reordering. See
+    test_platform_refactor.py, which spies on the session to assert this
+    holds, including for a deliberate revert of this split.
+
+    Returns the handler's result dict when a vertical claims this message —
+    the caller must return that result as-is and must not fall through — or
+    None when no registered vertical's handler applies, meaning
+    process_incoming_message should run the generic pipeline exactly as it
+    always has.
+    """
+    from app.models.company import Company
+    from app.verticals.registry import get_vertical
+
+    user = await get_ceo_user(db, sender)
+    if not user:
+        return None
+
+    company = await db.get(Company, user.company_id)
+    if company is None:
+        return None
+
+    vertical = get_vertical(company.vertical)
+    if vertical is None or vertical.inbound is None:
+        return None
+
+    return await vertical.inbound(db, company.id, sender, text)
+
+
 async def process_incoming_message(
     db: AsyncSession,
     sender: str,
@@ -621,33 +673,43 @@ async def process_incoming_message(
 ) -> dict:
     """Process an incoming WhatsApp message end-to-end.
 
-    1. Auto-register employee if new
-    2. Log the raw message
-    3. Handle reply commands (DONE / STARTED / DELAY / HELP)
-    4. Extract & save task via AI
-    5. Send confirmations
+    1. Dispatch to a registered vertical's own handler, if the sender's
+       company has one (see dispatch_inbound) — launch_matcher today,
+       broker_intel in future.
+    2. Otherwise, run the generic pipeline (see _run_generic_pipeline):
+       auto-register the employee if new, log the raw message, handle reply
+       commands (DONE / STARTED / DELAY / HELP), extract & save a task via
+       AI, and send confirmations.
 
     Returns a result dict describing what happened.
     """
     if not text.strip():
         return {"status": "no_text"}
 
-    # ── Launch Matcher dispatch ───────────────────────────────────
-    # Runs before everything below, including the MessageLog write. A
-    # launch-matcher company's messages are forwarded developer broadcasts
-    # whose footers routinely carry another agent's name and number; logging
-    # sender + raw_text for them would put that in a table on this feature's
-    # path, which its no-PII rule forbids. So the check happens first and the
-    # handler returns rather than falling through.
-    #
-    # Returns None for every other tenant, leaving the existing pipeline below
-    # byte-for-byte unchanged.
-    from app.services.launch_matcher.handler import try_handle_launch_matcher
+    claimed = await dispatch_inbound(db, sender, text)
+    if claimed is not None:
+        return claimed
 
-    launch_result = await try_handle_launch_matcher(db, sender, text)
-    if launch_result is not None:
-        return launch_result
+    return await _run_generic_pipeline(db, sender, text, force_company_id)
 
+
+async def _run_generic_pipeline(
+    db: AsyncSession,
+    sender: str,
+    text: str,
+    force_company_id: int = None,
+) -> dict:
+    """The generic task/enquiry pipeline — every existing tenant's actual
+    path, unchanged line-for-line by the platform-refactor split above.
+
+    Reached only when dispatch_inbound has already declined to claim the
+    message (see that function's docstring for why this is what keeps
+    message_logs and employees unreachable for a persist_inbound=False
+    vertical). This function is this module's ONLY caller of MessageLog(...)
+    and the ONLY place that auto-registers an Employee row for an unknown
+    sender — both moved here verbatim, not rewritten, from the second half
+    of what used to be one function.
+    """
     # ── TEST MODE: CEO can simulate employee messages ─────────────
     # Prefix "EMPLOYEE:" (any case) strips CEO detection and processes
     # the rest as if it came from a regular employee (same sender number).
