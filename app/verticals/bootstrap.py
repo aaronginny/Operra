@@ -24,3 +24,4 @@ about it.
 
 from app.services.launch_matcher import handler as _launch_matcher_handler  # noqa: F401
 from app.services import real_estate_notifications as _real_estate_notifications  # noqa: F401
+from app.services.broker_intel import handler as _broker_intel_handler  # noqa: F401
