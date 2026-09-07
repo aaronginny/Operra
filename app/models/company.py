@@ -32,6 +32,14 @@ class Company(Base):
     #                      screens beyond one-time setup; mutually exclusive
     #                      with "real_estate" by construction (see
     #                      app.dependencies.require_vertical).
+    # "broker_intel"    -- WhatsApp-only market intel + daily content for a
+    #                      Dubai broker: an AI-generated briefing on a
+    #                      project/area on demand, and a daily ARTICLE /
+    #                      FUN FACT caption. Entirely stateless -- it writes
+    #                      no rows at all, not even its own, so it needs no
+    #                      table and no migration (see
+    #                      app.services.broker_intel.state for why, and what
+    #                      would change if that is revisited).
     #
     # Every vertical-specific route, nav item, notification, and inbound
     # WhatsApp handler is gated on this column, so an existing "generic"
