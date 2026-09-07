@@ -113,6 +113,47 @@ async def main() -> None:
             u = await get_ceo_user(db, FOUNDER_PHONE)
             check("5 with FOUNDER_EMAIL unset the fallback cannot fire",
                   u is None, f"got user_id={u.id if u else None}")
+
+        # ── The actual production failure: two users, one number ──
+        # A stale generic row (lower id, so it wins a naive unordered query)
+        # holding the same number as the vertical client.
+        settings.founder_phone, settings.founder_email = FOUNDER_PHONE, FOUNDER_EMAIL
+        async with SessionLocal() as db:
+            db.add(User(id=5, company_id=1, name="Stale Duplicate",
+                         email="stale@example.com", role=UserRole.ceo,
+                         whatsapp_number=TENANT_PHONE))
+            await db.commit()
+
+        async with SessionLocal() as db:
+            u = await get_ceo_user(db, TENANT_PHONE)
+            check("6 with a DUPLICATE number, the vertical account wins over "
+                  "the generic one (the production bug)",
+                  u is not None and u.id == 22,
+                  f"got user_id={u.id if u else None} "
+                  f"(5 = the stale generic row that used to win)")
+
+        # Stable across repeated calls — not luck of row order.
+        async with SessionLocal() as db:
+            ids = []
+            for _ in range(4):
+                u = await get_ceo_user(db, TENANT_PHONE)
+                ids.append(u.id if u else None)
+            check("7 resolution is deterministic across repeated lookups",
+                  set(ids) == {22}, str(ids))
+
+        # A duplicate where BOTH are generic still resolves deterministically.
+        async with SessionLocal() as db:
+            db.add(User(id=6, company_id=1, name="Second Generic",
+                         email="gen2@example.com", role=UserRole.ceo,
+                         whatsapp_number="+919111111111"))
+            db.add(User(id=7, company_id=30, name="Third Generic",
+                         email="gen3@example.com", role=UserRole.ceo,
+                         whatsapp_number="+919111111111"))
+            await db.commit()
+        async with SessionLocal() as db:
+            u = await get_ceo_user(db, "+919111111111")
+            check("8 two generic rows tie-break to the lowest id, stably",
+                  u is not None and u.id == 6, f"got user_id={u.id if u else None}")
     finally:
         settings.founder_phone, settings.founder_email = orig_phone, orig_email
 

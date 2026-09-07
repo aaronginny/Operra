@@ -8,11 +8,12 @@ import logging
 import re
 from datetime import datetime
 
-from sqlalchemy import select, func as sa_func
+from sqlalchemy import case, select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.employee import Employee
 from app.models.task import Task, TaskStatus
+from app.models.company import Company
 from app.models.user import User
 from app.services.ai_service import parse_ceo_command, _MONTH_NAMES, _extract_date_from_text, _extract_task_keyword
 from app.config import settings
@@ -121,6 +122,36 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
 # ---------------------------------------------------------------------------
 
 
+# Tie-break when more than one user carries the same WhatsApp number.
+#
+# Both lookups below used a bare .first() on an unordered query, which the
+# database is free to answer with any matching row — and did. Two production
+# users shared one number; the arbitrary winner sat on a generic company, so
+# an inbound message from a vertical client's own handset was answered by the
+# generic pipeline instead of her vertical's handler. Nothing was corrupted
+# and nothing looked broken; the message simply went to the wrong place.
+#
+# The order is deliberate, not just stable:
+#   1. A user whose company has a non-generic vertical wins. A vertical is
+#      assigned once, deliberately, by the operator (see companies.vertical),
+#      so it is the more specific claim on a number; "generic" is the default
+#      a row holds by never having been told otherwise.
+#   2. Then lowest user id, so the outcome is reproducible when that does not
+#      separate them.
+#
+# This only changes behaviour where the result was already arbitrary. A
+# number held by exactly one user — every ordinary case — resolves as before.
+#
+# It is a tie-break, not a licence to share numbers: one handset can only
+# reach one account, so a duplicate still means one of the two rows is wrong
+# and wants cleaning up. This makes the failure deterministic and sane rather
+# than silently dependent on row order.
+_ROUTING_ORDER = (
+    case((Company.vertical == "generic", 1), else_=0),
+    User.id.asc(),
+)
+
+
 async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
     """Return the User record for any app user whose whatsapp_number matches
     sender_phone. This covers every business owner / team leader on the platform
@@ -135,7 +166,12 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
     logger.info("get_ceo_user: checking sender=%r normalized=%r", sender_phone, normalized)
 
     # 1. Exact match against users.whatsapp_number (any role)
-    stmt = select(User).where(User.whatsapp_number == normalized)
+    stmt = (
+        select(User)
+        .outerjoin(Company, Company.id == User.company_id)
+        .where(User.whatsapp_number == normalized)
+        .order_by(*_ROUTING_ORDER)
+    )
     result = await db.execute(stmt)
     user = result.scalars().first()
     if user:
@@ -145,7 +181,12 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
     # 2. Suffix fallback (last 10 digits) — handles +91XXXXXXXXXX vs XXXXXXXXXX mismatches
     suffix = re.sub(r"\D", "", normalized)[-10:]
     if len(suffix) == 10:
-        stmt2 = select(User).where(User.whatsapp_number.like(f"%{suffix}"))
+        stmt2 = (
+            select(User)
+            .outerjoin(Company, Company.id == User.company_id)
+            .where(User.whatsapp_number.like(f"%{suffix}"))
+            .order_by(*_ROUTING_ORDER)
+        )
         result2 = await db.execute(stmt2)
         user2 = result2.scalars().first()
         if user2:
