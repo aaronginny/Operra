@@ -265,13 +265,26 @@ _MIGRATIONS = [
     #        company_id=14 (a stale signup row) but all real data lives in company_id=1.
     #        Re-point their company_id so get_ceo_user() resolves the right company,
     #        then delete any remaining duplicate users in company 14 with no real data.
+    #
+    #        NARROWED (2026-09-07) from `company_id != 1` to `company_id = 14`.
+    #        Every migration here reruns on every boot, so the old predicate was
+    #        not a one-time repair but a standing rule: any user holding that
+    #        number, ever, got pulled to company 1 on the next restart. It did
+    #        exactly that to a newly provisioned broker_intel account that had
+    #        been given the number as a live-test placeholder — silently, since
+    #        her login still succeeded and simply resolved to the wrong tenant.
+    #
+    #        `company_id = 14` is the fix this migration's own comment describes.
+    #        It still applies on any database where it has not yet run, and it
+    #        can no longer touch an account created later, because company 14 is
+    #        a specific historical row and ids are only ever assigned upward.
     (
         "users.fix_ceo_company",
         """
         UPDATE users
         SET company_id = 1
         WHERE whatsapp_number = '+919150016161'
-          AND company_id != 1;
+          AND company_id = 14;
         """,
     ),
     (
