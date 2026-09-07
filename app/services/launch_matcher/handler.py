@@ -16,8 +16,13 @@ Two deliberate properties of this module:
   * It runs BEFORE the generic inbound pipeline. app.services.webhook_service
     logs sender and raw text to message_logs for the task product; routing a
     launch-matcher company through that would write a phone number and the
-    forwarded text to a table on this feature's path. So the dispatcher below
-    is called first and returns without falling through.
+    forwarded text to a table on this feature's path. This vertical registers
+    itself (bottom of this file) with app.verticals.registry, and
+    webhook_service.dispatch_inbound — called before anything in the generic
+    pipeline can run, including its message_logs writes — hands a matched
+    message straight to this vertical without the generic pipeline ever
+    starting. See dispatch_inbound's own docstring for why that ordering is
+    structural rather than a comment's promise.
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ from app.services.launch_matcher.providers import (
     get_provider,
 )
 from app.services.launch_matcher.sources import resolve_source
+from app.verticals.registry import Vertical, register_vertical
 
 logger = logging.getLogger(__name__)
 
@@ -150,3 +156,40 @@ async def try_handle_launch_matcher(
 
     message = InboundMessage(sender=sender, text=text)
     return await handle_launch_message(db, company_id, message)
+
+
+# ── Vertical registration (platform-refactor) ────────────────────────────
+#
+# Registers this vertical with app.verticals.registry so
+# webhook_service.dispatch_inbound can route to it generically instead of
+# via a hardcoded call to try_handle_launch_matcher. This runs once, at
+# import time (see app.verticals.bootstrap for why that import is guaranteed
+# to happen before dispatch_inbound can be reached by anything).
+#
+# Everything above this line is unchanged from before the refactor and
+# still works standalone: resolve_launch_matcher_company,
+# try_handle_launch_matcher, build_reply and handle_launch_message all keep
+# their exact signatures and behaviour, and existing tests call them
+# directly. _registry_inbound below is new, additive glue, not a
+# replacement for try_handle_launch_matcher — dispatch_inbound already
+# resolves company_id itself (the same sender -> company -> vertical lookup
+# resolve_launch_matcher_company does, generalised over the registry instead
+# of one hardcoded string), so this adapter skips straight to
+# handle_launch_message rather than re-resolving it.
+async def _registry_inbound(
+    db: AsyncSession, company_id: int, sender: str, text: str
+) -> dict:
+    message = InboundMessage(sender=sender, text=text)
+    return await handle_launch_message(db, company_id, message)
+
+
+register_vertical(
+    Vertical(
+        name=LAUNCH_MATCHER_VERTICAL,
+        inbound=_registry_inbound,
+        # No forwarded broadcast, and no auto-registered Employee row for the
+        # advisor's own number, may ever reach the generic pipeline's writes
+        # — see this module's own docstring and dispatch_inbound.
+        persist_inbound=False,
+    )
+)

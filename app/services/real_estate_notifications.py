@@ -22,6 +22,7 @@ from app.models.match import Match
 from app.models.seller import Seller
 from app.models.user import User, UserRole
 from app.services.messaging_service import send_whatsapp_message
+from app.verticals.registry import Vertical, register_vertical
 
 logger = logging.getLogger(__name__)
 
@@ -305,3 +306,22 @@ async def send_broker_pulse(db: AsyncSession, company_id: int) -> int:
             sent += 1
     logger.info("Broker pulse: company=%s delivered=%d", company_id, sent)
     return sent
+
+
+# ── Vertical registration (platform-refactor) ────────────────────────────
+#
+# Registers this vertical's daily hook so reminder_service's scheduler tick
+# can reach it through the generic per-vertical loop
+# (reminder_service._send_vertical_daily_hooks) instead of a hardcoded call.
+# send_broker_pulse's existing signature — (db, company_id) -> int — already
+# matches what that loop calls for every registered vertical, so it is
+# registered directly with no wrapper.
+#
+# reminder_service._send_real_estate_pulses (imported directly by
+# test_real_estate.py) is left completely unchanged below this point in the
+# codebase — this registration doesn't touch it, and production reaching
+# send_broker_pulse via the registry now rather than via that function
+# doesn't change what any company receives, when, or how often: same query
+# (vertical == "real_estate"), same per-company pulse-enabled check, same
+# per-company try/except.
+register_vertical(Vertical(name="real_estate", daily=send_broker_pulse))
