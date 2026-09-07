@@ -152,25 +152,44 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
             logger.info("get_ceo_user: suffix match user_id=%s role=%s", user2.id, user2.role)
             return user2
 
-    # 3. FOUNDER_PHONE env var fallback — for the platform owner's own account when
-    # their whatsapp_number hasn't been saved to the DB yet.
-    if settings.founder_phone:
+    # 3. FOUNDER_PHONE env var fallback — for the platform owner's own account
+    # when their whatsapp_number hasn't been saved to the DB yet.
+    #
+    # NARROWED (2026-09-07). This used to resolve the match to
+    # `select(User).order_by(User.id.asc()).limit(1)` — the oldest user in the
+    # entire database, whatever company they belong to. That is not "the
+    # founder", it is "whoever signed up first", and on a multi-tenant
+    # database the two stopped being the same person long ago. Any sender
+    # whose last 10 digits happened to equal FOUNDER_PHONE's was silently
+    # answered as that user, in that user's company, with that company's
+    # vertical — the same shape of bug as migration 021: a broad rule written
+    # for a single historical convenience, still firing for everyone.
+    #
+    # The founder is now resolved by identity (FOUNDER_EMAIL) rather than by
+    # position. If that lookup finds nobody, this returns None rather than
+    # guessing: an unrecognised sender falling through to the generic pipeline
+    # is the correct, already-handled outcome, and is far better than
+    # answering them as an arbitrary tenant.
+    if settings.founder_phone and settings.founder_email:
         founder_normalized = normalize_phone_number(settings.founder_phone)
         founder_suffix = re.sub(r"\D", "", founder_normalized)[-10:]
         sender_suffix = re.sub(r"\D", "", normalized)[-10:]
         if founder_suffix and founder_suffix == sender_suffix:
-            stmt3 = (
-                select(User)
-                .order_by(User.id.asc())
-                .limit(1)
+            stmt3 = select(User).where(
+                sa_func.lower(User.email) == settings.founder_email.strip().lower()
             )
             result3 = await db.execute(stmt3)
             user3 = result3.scalars().first()
             if user3:
                 logger.info(
-                    "get_ceo_user: FOUNDER_PHONE fallback matched, using user_id=%s", user3.id
+                    "get_ceo_user: FOUNDER_PHONE fallback matched founder user_id=%s",
+                    user3.id,
                 )
                 return user3
+            logger.warning(
+                "get_ceo_user: FOUNDER_PHONE matched but no user has FOUNDER_EMAIL "
+                "— declining rather than falling back to an arbitrary user."
+            )
 
     logger.info("get_ceo_user: no app user found for sender=%r", sender_phone)
     return None
