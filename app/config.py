@@ -91,12 +91,6 @@ class Settings(BaseSettings):
     founder_phone: str | None = None
     founder_email: str | None = None
 
-    # ── TEMPORARY: broker_intel provisioning endpoint ─────────
-    # Gates app/routes/internal_broker_setup.py. Set only long enough to
-    # provision the broker's account, then delete both the env var and the
-    # route — see that file's docstring.
-    broker_setup_secret: str | None = None
-
     # ── Daily report ──────────────────────────────────────────
     daily_report_time: str = "09:00"
 
