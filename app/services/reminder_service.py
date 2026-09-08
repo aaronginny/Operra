@@ -11,7 +11,7 @@ Follow-up tiers:
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -48,8 +48,13 @@ OVERDUE_NAG_INTERVAL = timedelta(hours=4)
 
 _scheduler_task: asyncio.Task | None = None
 _last_checkin_date = None
-_last_morning_pulse_date = None
 _last_archive_cleanup_date = None
+
+# {company_id: date} — the last day this company's proactive-message slot
+# (employee morning pulse OR a vertical's daily hook) was evaluated. Replaces
+# a single global `_last_morning_pulse_date` — see _company_pulse_due for why
+# that was a bug, not a simplification.
+_last_pulse_date_by_company: dict[int, date] = {}
 
 # Cache of {company_id: CompanySettings} refreshed each scheduler tick
 _company_settings_cache: dict[int, CompanySettings] = {}
@@ -88,6 +93,65 @@ def _company_pulse_time(company_id: int) -> tuple[int, int]:
         return 9, 0
 
 
+def _company_pulse_due(company_id: int, now: datetime) -> bool:
+    """True exactly when THIS company's own configured pulse window is open
+    right now and it hasn't already been evaluated today.
+
+    Shared by _send_morning_pulse and _send_vertical_daily_hooks so a
+    company's employee pulse and its vertical's daily hook — conceptually
+    "this company's one daily proactive-message slot" — share one dedup
+    state, the same coupling the two already had (the vertical sweep used to
+    run only as a trailing call inside the employee sweep). What changes is
+    that the slot is now keyed per company instead of shared globally: until
+    2026-09-08 this was a single `_last_morning_pulse_date` checked ONCE
+    against whichever company's window opened FIRST that day, via
+    `break` on the first match. That meant:
+      * only one company's window could ever open per day — a second
+        company on a different configured time never fired at all, because
+        the process-wide date flag was already set;
+      * once ANY window opened, EVERY enabled company's employees (and every
+        vertical-registered company) were swept immediately, not gated by
+        their OWN configured time at all.
+    Concretely: adding a broker_intel client at 05:00 UTC silently cut off
+    every other tenant's 09:00 pulse for the rest of that day, because the
+    05:00 window satisfied the one shared gate first.
+
+    A company absent from _company_settings_cache (no CompanySettings row —
+    true of every account created directly rather than through the Settings
+    page, e.g. Mahmoud's and the broker_intel client's) was invisible to that
+    scan entirely, since it only iterated cache entries. Such a company could
+    still be swept by _send_morning_pulse's own per-employee loop (which
+    tolerates a missing cache entry via _company_pulse_enabled/
+    _company_pulse_time's defaults) but only as a side effect of some OTHER
+    company's window happening to open that day — never reliably at its own
+    effective default of 09:00. Evaluating every company that actually has
+    something to do (a task-having employee, or a registered vertical),
+    rather than only those already in the settings cache, fixes this too.
+    """
+    if _last_pulse_date_by_company.get(company_id) == now.date():
+        return False
+    if not _company_pulse_enabled(company_id):
+        return False
+    ph, pm = _company_pulse_time(company_id)
+    pulse_dt = datetime(now.year, now.month, now.day, ph, pm)
+    return pulse_dt <= now < pulse_dt + timedelta(minutes=30)
+
+
+def _mark_company_pulsed(company_id: int, now: datetime) -> None:
+    """Record that this company's daily slot was evaluated today — set once
+    a company is found due, regardless of whether the send inside that slot
+    ultimately succeeded, matching the original global flag's own semantics
+    (it was set once the gate opened, not once a message was confirmed
+    sent)."""
+    _last_pulse_date_by_company[company_id] = now.date()
+
+
+def _reset_pulse_state_for_tests() -> None:
+    """Test-only escape hatch, matching the pattern in app.verticals.registry.
+    Production never calls this."""
+    _last_pulse_date_by_company.clear()
+
+
 def _get_next_checkpoint(task) -> str | None:
     """Return the text of the first incomplete checkpoint, or None."""
     import json
@@ -103,10 +167,17 @@ def _get_next_checkpoint(task) -> str | None:
     return None
 
 
-async def _send_morning_pulse(db) -> None:
-    """Send a personalized 9 AM WhatsApp to every employee with active tasks.
+async def _send_morning_pulse(db, now: datetime) -> None:
+    """Send a personalized morning WhatsApp to every employee with active
+    tasks, at THEIR OWN company's configured pulse time.
 
     References the first incomplete checkpoint to make the message actionable.
+
+    Safe to call every scheduler tick: which companies are actually due is
+    decided once, up front, via _company_pulse_due, so a company already
+    handled today or not yet in its own window is simply skipped — see that
+    function's docstring for why this must be a per-company decision rather
+    than one shared gate the caller checks before calling this at all.
     """
     from app.models.employee import Employee
 
@@ -130,6 +201,12 @@ async def _send_morning_pulse(db) -> None:
         if not emp_tasks[emp_id]:
             del emp_tasks[emp_id]
 
+    # Decided once, per company, before touching any employee — not per
+    # employee, so two employees at the same company share one decision
+    # rather than the second seeing the first's pass already consumed it.
+    company_ids = {emp_task_list[0].company_id for emp_task_list in emp_tasks.values()}
+    due_companies = {cid for cid in company_ids if _company_pulse_due(cid, now)}
+
     from app.services.billing_service import check_can_send_morning_pulse
 
     for emp_id, emp_task_list in emp_tasks.items():
@@ -137,15 +214,13 @@ async def _send_morning_pulse(db) -> None:
         if not employee or not employee.phone_number:
             continue
 
-        # Morning pulse is a paid feature (basic / premium only)
         company_id = emp_task_list[0].company_id
-        if not await check_can_send_morning_pulse(db, company_id):
-            logger.debug("Morning pulse skipped for company=%s (free tier)", company_id)
+        if company_id not in due_companies:
             continue
 
-        # Skip if pulse disabled in company settings
-        if not _company_pulse_enabled(company_id):
-            logger.debug("Morning pulse skipped for company=%s (disabled in settings)", company_id)
+        # Morning pulse is a paid feature (basic / premium only)
+        if not await check_can_send_morning_pulse(db, company_id):
+            logger.debug("Morning pulse skipped for company=%s (free tier)", company_id)
             continue
 
         # Build message — pick the most important task (overdue first, then nearest deadline)
@@ -176,12 +251,17 @@ async def _send_morning_pulse(db) -> None:
         await send_whatsapp_message(employee.phone_number, msg)
         logger.info("Morning pulse sent to %s (%d tasks)", employee.name, task_count)
 
-    await _send_vertical_daily_hooks(db)
+    # Marked once per due company, after the loop, regardless of whether that
+    # company actually had a phone-having employee to message this tick —
+    # matching the original global flag, which was set once the gate opened,
+    # not once a specific send succeeded (see _mark_company_pulsed).
+    for company_id in due_companies:
+        _mark_company_pulsed(company_id, now)
 
 
-async def _send_vertical_daily_hooks(db) -> None:
-    """Run every registered vertical's daily hook, on the same 9 AM tick as
-    the employee pulse above, once per company on that vertical.
+async def _send_vertical_daily_hooks(db, now: datetime) -> None:
+    """Run every registered vertical's daily hook, at THAT COMPANY's own
+    configured pulse time, once per company on that vertical.
 
     Replaces what used to be a hardcoded call per vertical — before this,
     the only entry was _send_real_estate_pulses below, and a second
@@ -190,6 +270,14 @@ async def _send_vertical_daily_hooks(db) -> None:
     register_vertical(Vertical(name=..., daily=...)) once, from that
     vertical's own module — see app.verticals.registry and
     app.verticals.bootstrap.
+
+    Called independently from _check_and_remind rather than nested inside
+    _send_morning_pulse (which is where it used to live, run once
+    unconditionally at that function's end): nesting meant an unrelated
+    exception anywhere earlier in the employee-pulse loop — one bad phone
+    number, say — would propagate out and this would never run that tick, for
+    ANY company, employee-pulse or not. Each is now independently gated and
+    wrapped by the caller, so the two can no longer take each other down.
 
     Company enumeration, the per-company pulse-enabled toggle, and the
     per-company try/except are all generic here rather than duplicated by
@@ -206,13 +294,11 @@ async def _send_vertical_daily_hooks(db) -> None:
         stmt = select(Company.id).where(Company.vertical == vertical.name)
         company_ids = list((await db.execute(stmt)).scalars().all())
 
+        # _company_pulse_due folds in the enabled-toggle check already, and —
+        # the actual fix — each company's OWN configured time, independent of
+        # every other company's, on this vertical or any other.
         for company_id in company_ids:
-            # Respect the same per-company pulse toggle the employee pulse honours.
-            if not _company_pulse_enabled(company_id):
-                logger.debug(
-                    "Daily hook skipped for company=%s vertical=%s (disabled in settings)",
-                    company_id, vertical.name,
-                )
+            if not _company_pulse_due(company_id, now):
                 continue
             try:
                 await vertical.daily(db, company_id)
@@ -220,6 +306,10 @@ async def _send_vertical_daily_hooks(db) -> None:
                 logger.exception(
                     "Daily hook failed for company=%s vertical=%s", company_id, vertical.name,
                 )
+            # Marked regardless of success/failure above — same reasoning as
+            # _mark_company_pulsed's own docstring: this is "today's slot was
+            # evaluated", not "today's send succeeded".
+            _mark_company_pulsed(company_id, now)
 
 
 async def _send_real_estate_pulses(db) -> None:
@@ -377,28 +467,22 @@ async def _check_and_remind() -> None:
                         task.last_update = now # reset interval
                         task.last_followup_sent = now
 
-        # ── Morning Pulse (configurable time, 30-min window) ────
-        # Checks each company's configured pulse time and sends if within window.
-        global _last_morning_pulse_date
+        # ── Morning Pulse + vertical daily hooks (per-company time, 30-min window) ──
+        # Called every tick, unconditionally: each decides for itself, per
+        # company, whether that company is due right now — see
+        # _company_pulse_due. Independent try/except per call so one failing
+        # can never block the other (see _send_vertical_daily_hooks's own
+        # docstring for why that decoupling matters).
         today = now.date()
-        if _last_morning_pulse_date != today:
-            # Use the first company's pulse time as the global gate; per-company
-            # filtering happens inside _send_morning_pulse via _company_pulse_enabled.
-            should_pulse = False
-            for cid, cs in _company_settings_cache.items():
-                if cs.morning_pulse_enabled:
-                    ph, pm = _company_pulse_time(cid)
-                    pulse_dt = datetime(now.year, now.month, now.day, ph, pm)
-                    if pulse_dt <= now < pulse_dt + timedelta(minutes=30):
-                        should_pulse = True
-                        break
-            if should_pulse:
-                try:
-                    await _send_morning_pulse(db)
-                    _last_morning_pulse_date = today
-                    logger.info("Morning pulse completed for %s", today)
-                except Exception:
-                    logger.exception("Morning pulse failed")
+        try:
+            await _send_morning_pulse(db, now)
+        except Exception:
+            logger.exception("Morning pulse failed")
+
+        try:
+            await _send_vertical_daily_hooks(db, now)
+        except Exception:
+            logger.exception("Vertical daily hooks failed")
 
         # Legacy daily check-in (replaced by morning pulse above)
         global _last_checkin_date
