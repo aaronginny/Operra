@@ -19,6 +19,7 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    false as sa_false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -63,7 +64,8 @@ class Match(Base):
     matched_seller_area: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Broker has introduced the two parties (DealKnot's `connections` table).
-    connected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # SQL literal false(), not the string "false" — see Company.is_premium.
+    connected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa_false())
     # Set once the "new match" WhatsApp notification has gone out, so the
     # notification fires exactly once per match.
     notified_at: Mapped[datetime.datetime | None] = mapped_column(

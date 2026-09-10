@@ -3,6 +3,7 @@
 import datetime
 
 from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -62,8 +63,16 @@ class Company(Base):
     subscription_level: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="free"
     )
+    # server_default is the SQL literal false(), NOT the Python string
+    # "false". As a string this renders DEFAULT 'false', which Postgres
+    # parses correctly as boolean false but SQLite — which has no native
+    # boolean — stores as the TEXT 'false' and reads back as a non-empty,
+    # therefore TRUTHY, value. A brand-new company then read as premium on
+    # SQLite and correctly non-premium on Postgres, so every local test of a
+    # billing-gated feature was silently unreliable. false() renders 0 on
+    # SQLite and false on Postgres.
     is_premium: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="false"
+        Boolean, nullable=False, server_default=sa_false()
     )
     tasks_created_count: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"

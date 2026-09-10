@@ -50,7 +50,7 @@ from app.models.project import Project
 from app.services.billing_service import (
     check_can_create_task,
     check_can_use_checkpoints,
-    check_can_use_god_mode,
+    check_can_use_control_tower,
     check_can_send_morning_pulse,
     increment_task_count,
 )
@@ -103,8 +103,8 @@ async def test_free_tier():
             report("A1: 4th task blocked", True, str(e)[:80])
 
         # A2 — God Mode blocked for free tier
-        ok = await check_can_use_god_mode(db, company.id, user_role="employee")
-        report("A2: God Mode blocked (free tier)", not ok, f"check_can_use_god_mode returned {ok}")
+        ok = await check_can_use_control_tower(db, company.id, user_role="employee")
+        report("A2: God Mode blocked (free tier)", not ok, f"check_can_use_control_tower returned {ok}")
 
         # A3 — Morning pulse skipped for free tier
         ok = await check_can_send_morning_pulse(db, company.id)
@@ -140,7 +140,7 @@ async def test_founder_bypass():
             report("B1: CEO bypasses task limit (count=999)", False, str(e))
 
         # B2 — God Mode allowed for CEO
-        ok = await check_can_use_god_mode(db, company.id, user_role="ceo")
+        ok = await check_can_use_control_tower(db, company.id, user_role="ceo")
         report("B2: God Mode allowed for CEO", ok, f"returned {ok}")
 
         # B3 — Morning pulse: company is free but CEO company should send pulse
@@ -239,7 +239,7 @@ async def test_basic_tier():
             report("D2: Task blocked for unpaid project", True, str(e)[:80])
 
         # D3 — God Mode allowed on basic tier
-        ok = await check_can_use_god_mode(db, company.id, user_role="employee")
+        ok = await check_can_use_control_tower(db, company.id, user_role="employee")
         report("D3: God Mode allowed on basic tier", ok, f"returned {ok}")
 
         # D4 — checkpoints allowed on basic tier
@@ -280,7 +280,7 @@ async def test_premium_tier():
             report("E1: Unlimited tasks on premium", False, str(e))
 
         # E2 — God Mode allowed
-        ok = await check_can_use_god_mode(db, company.id, user_role="employee")
+        ok = await check_can_use_control_tower(db, company.id, user_role="employee")
         report("E2: God Mode allowed on premium", ok)
 
         # E3 — morning pulse allowed
@@ -327,11 +327,74 @@ async def test_premium_expiry():
             report("F1: Expired premium blocks at free limit", True, str(e)[:80])
 
         # God Mode blocked after expiry
-        ok = await check_can_use_god_mode(db, company.id, user_role="employee")
+        ok = await check_can_use_control_tower(db, company.id, user_role="employee")
         report("F2: God Mode blocked after premium expiry", not ok, f"returned {ok}")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
+
+async def test_boolean_column_defaults():
+    """Guard the boolean-server_default bug class.
+
+    Company.is_premium was declared server_default="false" — the PYTHON
+    STRING. That renders DEFAULT 'false', which Postgres parses correctly as
+    boolean false, but SQLite (no native boolean type) stores as the TEXT
+    'false' and reads back as a non-empty, therefore TRUTHY, value. A
+    brand-new company read as PREMIUM on SQLite and correctly non-premium on
+    Postgres, so every local SQLite test of a billing-gated feature was
+    silently passing regardless of real entitlement.
+
+    This suite runs on SQLite, which is exactly where the bug bites, so
+    these assertions fail loudly on the old declaration and pass on the
+    fixed one (server_default=false()).
+    """
+    print("\n── G. Boolean column defaults (SQLite/Postgres parity) ───────")
+    from sqlalchemy.schema import CreateTable
+    from sqlalchemy.dialects import postgresql, sqlite as sqlite_dialect
+    from app.models.company_settings import CompanySettings
+
+    async with SessionLocal() as db:
+        # A company created with NO explicit billing fields — the exact shape
+        # that used to read as premium on SQLite.
+        company = Company(name="DefaultsCo")
+        db.add(company)
+        await db.flush()
+        cid = company.id
+        await db.commit()
+
+    async with SessionLocal() as db:
+        fresh = await db.get(Company, cid)
+        report("G1: fresh company is_premium is exactly False (not truthy)",
+               fresh.is_premium is False, f"got {fresh.is_premium!r}")
+        report("G2: fresh company is not billing-eligible for morning pulse",
+               not await check_can_send_morning_pulse(db, cid),
+               "a free, non-trial company must be blocked")
+
+    # Structural guard: no boolean column may carry a QUOTED string default.
+    offenders = []
+    for table in (Company.__table__, CompanySettings.__table__):
+        for dialect_name, dialect in (("sqlite", sqlite_dialect.dialect()),
+                                       ("postgres", postgresql.dialect())):
+            ddl = str(CreateTable(table).compile(dialect=dialect))
+            for line in ddl.splitlines():
+                stripped = line.strip()
+                if "BOOLEAN" in stripped.upper() and (
+                    "DEFAULT 'true'" in stripped or "DEFAULT 'false'" in stripped
+                ):
+                    offenders.append(f"{table.name}.{dialect_name}: {stripped}")
+    report("G3: no BOOLEAN column renders a quoted-string DEFAULT on either dialect",
+           not offenders, "; ".join(offenders[:3]))
+
+    # And the values actually render as real booleans/ints per dialect.
+    sqlite_ddl = str(CreateTable(Company.__table__).compile(dialect=sqlite_dialect.dialect()))
+    pg_ddl = str(CreateTable(Company.__table__).compile(dialect=postgresql.dialect()))
+    sqlite_line = next(l.strip() for l in sqlite_ddl.splitlines() if "is_premium" in l)
+    pg_line = next(l.strip() for l in pg_ddl.splitlines() if "is_premium" in l)
+    report("G4: is_premium renders DEFAULT 0 on SQLite",
+           "DEFAULT 0" in sqlite_line, sqlite_line)
+    report("G5: is_premium renders DEFAULT false on Postgres",
+           "DEFAULT false" in pg_line, pg_line)
+
 
 async def main():
     print("=" * 62)
@@ -346,6 +409,7 @@ async def main():
     await test_basic_tier()
     await test_premium_tier()
     await test_premium_expiry()
+    await test_boolean_column_defaults()
 
     # ── Summary ───────────────────────────────────────────────
     passed = sum(1 for r in results if r[0] == PASS)

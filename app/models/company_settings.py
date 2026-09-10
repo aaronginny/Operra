@@ -1,6 +1,7 @@
 """CompanySettings model — per-company reminder configuration."""
 
 from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -15,7 +16,7 @@ class CompanySettings(Base):
         nullable=False, unique=True, index=True,
     )
     morning_pulse_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
+        Boolean, nullable=False, server_default=sa_true()
     )
     morning_pulse_time: Mapped[str] = mapped_column(
         String(5), nullable=False, server_default="09:00"
@@ -24,5 +25,5 @@ class CompanySettings(Base):
         Integer, nullable=False, server_default="4"
     )
     reminders_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
+        Boolean, nullable=False, server_default=sa_true()
     )
