@@ -9,6 +9,8 @@ Meta Cloud API (real webhook):
   POST /webhook/whatsapp  — Real Meta payload; extracts sender + text and processes
 """
 
+import hashlib
+import hmac
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -26,6 +28,44 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhook", tags=["WhatsApp"])
 
 VERIFY_TOKEN: str = settings.whatsapp_verify_token
+
+
+def _verify_meta_signature(raw_body: bytes, header: str | None) -> bool:
+    """Verify Meta's X-Hub-Signature-256 over the RAW request body.
+
+    Without this, POST /webhook/whatsapp is an open endpoint: anyone who
+    knows the URL can post a payload naming any sender, and the app will
+    process it as a genuine inbound WhatsApp message. Meta signs every
+    webhook with HMAC-SHA256 keyed on the App Secret, so checking it is what
+    distinguishes a real delivery from a forgery.
+
+    Must run against the raw bytes, before any JSON parsing — re-serialising
+    the parsed body would change whitespace and key order and never match.
+
+    When META_APP_SECRET is unset this returns True with a loud warning
+    rather than rejecting, exactly as twilio_webhook.py treats a missing
+    TWILIO_AUTH_TOKEN. That is deliberate: shipping this must not silently
+    sever inbound delivery on an environment that hasn't been given the
+    secret yet. Verification switches on the moment the secret is set.
+    """
+    secret = settings.meta_app_secret
+    if not secret:
+        logger.warning(
+            "Meta webhook: signature check SKIPPED (META_APP_SECRET unset) — "
+            "this endpoint is currently unauthenticated."
+        )
+        return True
+
+    if not header or not header.startswith("sha256="):
+        logger.warning("Meta webhook: missing or malformed X-Hub-Signature-256")
+        return False
+
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    provided = header.split("=", 1)[1].strip()
+    if not hmac.compare_digest(expected, provided):
+        logger.warning("Meta webhook: SIGNATURE MISMATCH — rejecting request")
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +182,13 @@ async def meta_receive_message(
     """
     import json as _json
     raw_bytes = await request.body()
+
+    # Authenticate the request BEFORE parsing or acting on it.
+    if not _verify_meta_signature(raw_bytes, request.headers.get("X-Hub-Signature-256")):
+        # 403, not 200: a forged or misconfigured caller should be told it
+        # was rejected. Meta itself never lands here when the secret matches.
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
     logger.info("=== META WEBHOOK HIT === method=POST path=/webhook/whatsapp")
     logger.info("=== HEADERS === %s", dict(request.headers))
     logger.info("=== RAW BODY === %s", raw_bytes.decode("utf-8", errors="replace"))

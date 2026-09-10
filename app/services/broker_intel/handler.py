@@ -73,6 +73,19 @@ async def build_reply(
     gen = generator or get_generator()
     intent = intents.parse(text)
 
+    # Small talk. Answered before anything reads the text as a project name.
+    if intent.kind == "greeting":
+        return formatter.render_greeting()
+
+    # She confirmed a subject we flagged as unrecognised. Proceed with the
+    # subject she originally sent, now with her explicit go-ahead.
+    if intent.kind == "confirm":
+        pending = state.take_pending(company_id, sender)
+        if pending is None or pending.kind != "confirm_subject":
+            return formatter.render_forgot_context()
+        state.set_pending(company_id, sender, "audience", pending.subject)
+        return formatter.render_format_question(pending.subject)
+
     # She answered ME / LEAD to a question we asked earlier.
     if intent.kind == "audience":
         pending = state.take_pending(company_id, sender)
@@ -95,6 +108,13 @@ async def build_reply(
         return formatter.render_social_caption(kind, lines)
 
     if intent.kind == "lead_intel" and intent.subject:
+        # Nothing in the curated geography tables corroborates this name, so
+        # confirm before briefing — see Intent.confidence for why a question
+        # beats a confident answer here.
+        if intent.confidence == "low":
+            state.set_pending(company_id, sender, "confirm_subject", intent.subject)
+            return formatter.render_confirm_subject(intent.subject)
+
         # Format already stated in the same message — no need to ask.
         if intent.audience:
             lines = await gen.lead_intel(intent.subject, intent.audience)

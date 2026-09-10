@@ -1816,6 +1816,33 @@
           </div>
         </div>
 
+        <!-- Password card — not vertical-gated, so every account gets it -->
+        <div class="settings-section" style="opacity:0;animation:rise .35s .05s ease-out forwards">
+          <div style="font-size:13px;font-weight:700;color:var(--text-2);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:10px">Password</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-label">Change your password</div>
+                <div class="settings-hint">
+                  Enter your current password, then a new one of at least 8 characters.
+                  You'll stay signed in on this device.
+                </div>
+              </div>
+              <div class="settings-row-control">
+                <input class="form-input" id="pwCurrent" type="password"
+                  autocomplete="current-password" placeholder="Current password" />
+                <input class="form-input" id="pwNew" type="password" style="margin-top:8px"
+                  autocomplete="new-password" placeholder="New password (min 8 characters)" />
+                <input class="form-input" id="pwConfirm" type="password" style="margin-top:8px"
+                  autocomplete="new-password" placeholder="Confirm new password" />
+                <button class="btn-submit" id="btnChangePassword"
+                  style="margin-top:10px;width:100%">Update password</button>
+                <div id="pwStatus" class="status-msg" style="margin-top:8px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Reminders card -->
         <div class="settings-section" style="opacity:0;animation:rise .35s .1s ease-out forwards">
           <div style="font-size:13px;font-weight:700;color:var(--text-2);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:10px">Auto Reminders</div>
@@ -3913,6 +3940,64 @@
     } finally {
       btn.disabled = false;
       btn.textContent = 'Save';
+    }
+  });
+
+  /* ── Change password ──
+     The API is the source of truth for every rule here; the client-side
+     checks below only save a round trip on the obvious cases. The server's
+     own message is shown verbatim when it rejects, so a rule can't drift
+     between the two and silently confuse the user. */
+  document.getElementById('btnChangePassword').addEventListener('click', async () => {
+    const cur = document.getElementById('pwCurrent').value;
+    const nw = document.getElementById('pwNew').value;
+    const conf = document.getElementById('pwConfirm').value;
+    const status = document.getElementById('pwStatus');
+    const btn = document.getElementById('btnChangePassword');
+
+    const fail = (msg) => {
+      status.textContent = msg;
+      status.style.color = 'var(--danger, #e5484d)';
+    };
+
+    if (!cur) { fail('Enter your current password.'); return; }
+    if (nw.length < 8) { fail('New password must be at least 8 characters.'); return; }
+    if (nw !== conf) { fail("New passwords don't match."); return; }
+    if (nw === cur) { fail('New password must be different from the current one.'); return; }
+
+    status.textContent = '';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+      const res = await fetch(`${API}/auth/change-password`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ current_password: cur, new_password: nw }),
+      });
+      if (!res.ok) {
+        let msg = 'Could not update password.';
+        try {
+          const err = await res.json();
+          if (err && err.detail) {
+            msg = typeof err.detail === 'string'
+              ? err.detail
+              : (err.detail[0] && err.detail[0].msg) || msg;
+          }
+        } catch (_) {}
+        fail(msg);
+        return;
+      }
+      document.getElementById('pwCurrent').value = '';
+      document.getElementById('pwNew').value = '';
+      document.getElementById('pwConfirm').value = '';
+      status.textContent = '✓ Password updated.';
+      status.style.color = 'var(--success, #30a46c)';
+      toast('Password updated.');
+    } catch {
+      fail('Could not update password. Check your connection.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Update password';
     }
   });
 

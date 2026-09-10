@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -184,3 +184,61 @@ async def update_profile(
         "name": current_user.name,
         "access_token": new_token,
     }
+
+
+# ── Change password ───────────────────────────────────────────────────────────
+
+MIN_PASSWORD_LENGTH = 8
+
+
+class ChangePasswordRequest(BaseModel):
+    """extra="forbid" is deliberate: a stray `email`/`user_id` key must be a
+    422, not a silently ignored field that leaves the caller believing they
+    changed someone else's password."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Change the authenticated user's own password.
+
+    Until now there was no in-app way to do this — signup only creates, and
+    PATCH /auth/profile covers name and WhatsApp number only — so every
+    rotation needed a temporary secret-gated endpoint deployed and removed
+    again. This is the permanent replacement.
+
+    The account is taken from the JWT and is never a parameter, so this
+    cannot be aimed at another user. Requiring the current password means a
+    borrowed or stolen token alone is not enough to lock the owner out of
+    their own account.
+    """
+    if not current_user.password_hash or not verify_password(
+        payload.current_password, current_user.password_hash
+    ):
+        # Deliberately vague, and the same shape the login route uses: this
+        # must not become an oracle for whether a given account has a
+        # password set.
+        raise HTTPException(status_code=403, detail="Current password is incorrect")
+
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=400, detail="New password must be different from the current one"
+        )
+
+    current_user.password_hash = get_password_hash(payload.new_password)
+    await db.flush()
+
+    # Never log the password itself — only that a rotation happened.
+    logger.info(
+        "Password changed for user_id=%s company_id=%s",
+        current_user.id, current_user.company_id,
+    )
+    return {"success": True, "message": "Password updated."}

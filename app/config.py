@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     meta_phone_number_id: str | None = None
     meta_access_token: str | None = None
     meta_waba_id: str | None = None
+    # App Secret, used ONLY to verify X-Hub-Signature-256 on inbound Meta
+    # webhooks (app/routes/whatsapp_webhook.py). Distinct from the access
+    # token: the token authenticates US to Meta, this proves a request came
+    # FROM Meta. While unset, verification is skipped with a loud warning,
+    # matching how twilio_webhook.py treats a missing TWILIO_AUTH_TOKEN —
+    # so adding this setting cannot by itself break inbound delivery.
+    meta_app_secret: str | None = None
 
     # ── WhatsApp webhook verification ─────────────────────────
     whatsapp_verify_token: str = ""

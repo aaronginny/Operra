@@ -273,6 +273,69 @@ async def run_daily_checks(company_id: int) -> None:
           "•" in r3 and formatter.MARKET_CAVEAT in r3)
 
 
+# ── G. polish: greetings + unrecognised subjects ─────────────
+
+async def run_polish_checks(company_id: int) -> None:
+    """Two rough edges found in live use with the real client.
+
+    Bare greetings were read as project names, producing "Got it —
+    *hello*. ME or LEAD?"; and an unrecognised name was accepted without
+    question, so the bot would brief confidently on something that might not
+    exist — which matters most under the forwardable format, where she could
+    send it to a client before noticing.
+    """
+    print("\n== G. polish: greetings and unrecognised subjects ==")
+    state._reset_for_tests()
+    gen = StubContentGenerator()
+
+    for greeting in ("hi", "hello", "Good morning", "hey", "thanks", "ok"):
+        i = intents.parse(greeting)
+        check(f"G1 {greeting!r} parses as a greeting, not a project",
+              i.kind == "greeting", f"{i.kind}/{i.subject}")
+
+    r = await build_reply(company_id, BROKER_PHONE, "hello", gen)
+    check("G2 a greeting gets a natural reply, not 'Got it — *hello*'",
+          "Got it" not in r and "ME or LEAD" not in r, r[:70])
+    check("G3 the greeting reply explains what it can do (de-facto welcome)",
+          "project" in r.lower() and "ARTICLE" in r)
+    check("G4 no generation is triggered by small talk", not gen.calls, str(gen.calls))
+
+    i = intents.parse("hi, what about JVC")
+    check("G5 'hi, what about JVC' is still a briefing request",
+          i.kind == "lead_intel" and i.area == "JVC", f"{i.kind}/{i.area}")
+
+    check("G6 a known area is high confidence",
+          intents.parse("Sobha Hartland").confidence == "high")
+    check("G7 an unrecognised name is low confidence",
+          intents.parse("Zzq Nonexistent Towers").confidence == "low")
+
+    state._reset_for_tests()
+    gen2 = StubContentGenerator()
+    r = await build_reply(company_id, BROKER_PHONE, "Zzq Nonexistent Towers", gen2)
+    check("G8 an unrecognised project asks for confirmation instead of briefing",
+          "recognise" in r and "YES" in r, r[:80])
+    check("G9 nothing is generated before she confirms", not gen2.calls, str(gen2.calls))
+
+    r = await build_reply(company_id, BROKER_PHONE, "YES", gen2)
+    check("G10 confirming proceeds to the format question with the ORIGINAL subject",
+          "Zzq Nonexistent Towers" in r and "ME" in r and "LEAD" in r, r[:90])
+
+    r = await build_reply(company_id, BROKER_PHONE, "ME", gen2)
+    check("G11 and then briefs on it, caveat intact",
+          "•" in r and formatter.MARKET_CAVEAT in r)
+
+    state._reset_for_tests()
+    gen3 = StubContentGenerator()
+    r = await build_reply(company_id, BROKER_PHONE, "Sobha Hartland", gen3)
+    check("G12 a KNOWN project still goes straight to the format question",
+          "ME" in r and "LEAD" in r and "recognise" not in r, r[:70])
+
+    state._reset_for_tests()
+    r = await build_reply(company_id, BROKER_PHONE, "yes", StubContentGenerator())
+    check("G13 a bare YES with no pending question asks again rather than guessing",
+          "lost track" in r.lower(), r[:70])
+
+
 # ── E. isolation ─────────────────────────────────────────────
 
 async def run_isolation_checks(company_id: int) -> None:
@@ -355,6 +418,7 @@ async def main() -> None:
     run_caveat_checks()
     await run_lead_intel_checks(ctx["company_id"])
     await run_daily_checks(ctx["company_id"])
+    await run_polish_checks(ctx["company_id"])
     await run_isolation_checks(ctx["company_id"])
     await run_other_vertical_checks()
 

@@ -56,6 +56,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/launch-matcher", tags=["Launch Matcher"])
 
+# Contact-lookup suggestions returned per query. Was 8, which was too tight
+# for this data: hundreds of contacts share a project word ("Masaar" alone
+# matches ~180), so the one being looked for could fall off the list even
+# though the query found it. Prefix matches are ordered first (see the
+# search endpoint), so raising the cap widens the tail without pushing the
+# obvious match down. 20 still fits a scrollable phone dropdown.
+MAX_CONTACT_SUGGESTIONS = 20
+
 MAX_LABEL = 80
 MAX_NAME = 120
 MAX_AREAS = 500
@@ -240,7 +248,7 @@ async def search_contact_lookup(
             case((ContactLookup.name.ilike(f"{escaped}%", escape="\\"), 0), else_=1),
             ContactLookup.name,
         )
-        .limit(8)
+        .limit(MAX_CONTACT_SUGGESTIONS)
     )
     return (await db.execute(stmt)).scalars().all()
 
