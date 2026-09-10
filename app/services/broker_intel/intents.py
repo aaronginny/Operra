@@ -78,6 +78,29 @@ _GREETINGS = (
 # Confirms a low-confidence subject the bot asked about (see Intent.confidence).
 _CONFIRM_WORDS = ("yes", "yep", "yeah", "yup", "correct", "confirm", "go ahead", "proceed", "y")
 
+# Signals that she is asking about more than one place. Used two ways: to
+# decide a multi-area message is a comparison, and — the case that actually
+# bit her — to notice that a message MEANT to name several areas when only
+# one was recognised, so the bot says so instead of silently answering half.
+_COMPARISON_MARKERS = (
+    "compare", "comparison", "versus", "vs", "against",
+    "difference", "differences", "better",
+)
+
+# She asked "I need data backed reply, with numbers". The bot has no live
+# transaction data — briefings are AI-generated general context — so an
+# explicit request for real figures must be answered honestly rather than
+# mis-parsed. Matched only when no area/project is present, so "compare
+# Arjan and JVC in terms of rates and ROI" stays a comparison: mentioning
+# rates while naming places is not the same as asking what the tool is.
+_DATA_REQUEST_PHRASES = (
+    "data backed", "data-backed", "backed by data", "with numbers",
+    "actual numbers", "real numbers", "give me numbers", "need numbers",
+    "hard numbers", "exact figures", "real data", "actual data", "live data",
+    "official data", "dld data", "transaction data", "statistics", "stats",
+    "source", "sourced", "citation", "citations", "evidence",
+)
+
 # Stripped before project-name extraction so "tell me about Sobha Hartland"
 # yields "Sobha Hartland" rather than the whole sentence. Ordered longest
 # first so the longer phrasings win.
@@ -102,6 +125,9 @@ class Intent:
     kind is one of:
       greeting  — small talk, not a query
       confirm   — she confirmed a subject the bot was unsure about
+      comparison — two or more recognised areas (subjects holds all of them)
+      partial_comparison — one area recognised, but the wording meant more
+      data_request — an explicit ask for real figures / sourced data
       content   — she picked ARTICLE / FUN FACT (value holds which)
       audience  — she picked ME / LEAD (value holds "self" / "lead")
       lead_intel — she named a project/area (subject holds it; audience may
@@ -127,6 +153,9 @@ class Intent:
     emirate: str | None = None
     area: str | None = None
     confidence: str | None = None
+    # comparison only: every recognised area, in the order she wrote them.
+    subjects: list[str] | None = None
+    emirates: list[str] | None = None
 
 
 def _match_audience(lowered: str, *, bare: bool) -> str | None:
@@ -148,6 +177,69 @@ def _match_content(lowered: str) -> str | None:
             if _has_word(lowered, w):
                 return kind
     return None
+
+
+def find_all_areas(text: str) -> list[tuple[str, str]]:
+    """Every distinct known area in the text, as (emirate, display name), in
+    the order they appear.
+
+    find_area below returns only the first match, which is what silently
+    dropped "JVC" from "Compare Arjan and JVC" — the caller had no way to
+    know a second area was even present. This returns all of them so the
+    handler can compare rather than quietly pick one.
+
+    Longest name first, and matched spans are consumed, so "sobha hartland"
+    is one area rather than also counting as "hartland".
+    """
+    lowered = text.lower()
+    consumed: list[tuple[int, int]] = []
+    found: list[tuple[int, str, str]] = []
+
+    def overlaps(start: int, end: int) -> bool:
+        return any(start < e and end > s for s, e in consumed)
+
+    for name in sorted(AREA_TO_EMIRATE, key=len, reverse=True):
+        for m in re.finditer(rf"(?<!\w){re.escape(name)}(?!\w)", lowered):
+            if overlaps(m.start(), m.end()):
+                continue
+            consumed.append((m.start(), m.end()))
+            found.append((m.start(), AREA_TO_EMIRATE[name],
+                           AREA_DISPLAY.get(name, name.title())))
+
+    # De-duplicate by display name, keeping first appearance order.
+    seen: set[str] = set()
+    ordered: list[tuple[str, str]] = []
+    for _pos, emirate, display in sorted(found, key=lambda t: t[0]):
+        if display not in seen:
+            seen.add(display)
+            ordered.append((emirate, display))
+    return ordered
+
+
+def wants_comparison(text: str) -> bool:
+    """True when the wording implies more than one place, whether or not we
+    recognised them all.
+
+    "and"/"&" are deliberately NOT treated as markers on their own in a long
+    sentence: "tell me about JVC and the market there" is one area with an
+    incidental conjunction, not a comparison. They only count in a short
+    message, where "Arjan and Nakheel Heights" really is a list of two —
+    which is the case worth catching, since the second name may be a project
+    the curated tables don't know and so can't be detected directly.
+    """
+    lowered = text.lower()
+    for marker in _COMPARISON_MARKERS:
+        if _has_word(lowered, marker.strip()):
+            return True
+    if len(text.split()) <= 6 and (_has_word(lowered, "and") or "&" in text):
+        return True
+    return False
+
+
+def wants_real_data(text: str) -> bool:
+    """True when she is explicitly asking for real figures / sourced data."""
+    lowered = text.lower()
+    return any(phrase in lowered for phrase in _DATA_REQUEST_PHRASES)
 
 
 def find_area(text: str) -> tuple[str | None, str | None]:
@@ -214,6 +306,13 @@ def parse(text: str) -> Intent:
         if stripped in _CONFIRM_WORDS:
             return Intent(kind="confirm")
 
+    # An explicit ask for real figures, when nothing here names a place.
+    # Checked BEFORE the keyword replies below because a phrasing like "give
+    # me actual numbers" contains "me", which the bare-audience matcher would
+    # otherwise claim as a ME/LEAD format choice.
+    if emirate is None and not find_all_areas(text) and wants_real_data(text):
+        return Intent(kind="data_request")
+
     # A bare keyword reply. Checked first, and only when the message carries
     # no geography — "article about JVC" is a briefing request, not a post.
     content = _match_content(lowered)
@@ -227,6 +326,38 @@ def parse(text: str) -> Intent:
 
     # Inside a longer message only an explicit phrase counts.
     audience = _match_audience(lowered, bare=False)
+
+    # Two or more recognised areas -> a genuine side-by-side, not a silent
+    # pick of whichever matched first.
+    all_areas = find_all_areas(text)
+    if len(all_areas) >= 2:
+        return Intent(
+            kind="comparison",
+            subjects=[display for _em, display in all_areas],
+            emirates=[em for em, _display in all_areas],
+            audience=audience,
+            confidence="high",
+        )
+
+    # Exactly one area, but the wording clearly meant several. Say so rather
+    # than answering half the question — the case that prompted this fix.
+    if len(all_areas) == 1 and wants_comparison(text):
+        return Intent(
+            kind="partial_comparison",
+            subject=all_areas[0][1],
+            emirate=all_areas[0][0],
+            area=all_areas[0][1],
+            audience=audience,
+            confidence="high",
+        )
+
+    # An explicit ask for real figures, and nothing here names a place —
+    # answer honestly about what this tool has rather than trying to read
+    # "I need data backed reply, with numbers" as a project name. Checked
+    # after the area paths on purpose: naming rates/ROI alongside real areas
+    # is a briefing request, not a question about the tool's sourcing.
+    if not all_areas and emirate is None and wants_real_data(text):
+        return Intent(kind="data_request")
 
     # An area or emirate came from the curated tables, so it is definitely
     # real. Anything else is a shape-based guess from her wording.

@@ -92,6 +92,46 @@ def render_social_caption(kind: str, lines: list[str]) -> str:
 
 # ── Non-content replies (no generated market claims, so no caveat) ──
 
+def render_comparison(subjects: list[str], lines: list[str], audience: str) -> str:
+    """A genuine side-by-side. Goes through _content_reply like every other
+    content-bearing reply, so the caveat still cannot be skipped."""
+    header = "" if audience == "lead" else "*" + " vs ".join(subjects) + "*"
+    return _content_reply(header, lines)
+
+
+def render_partial_comparison(found: str, original: str) -> str:
+    """One area recognised where the wording meant several.
+
+    This is the reply for the bug she actually hit: the bot answered about
+    Arjan alone and gave no sign it had dropped "JVC" or that she'd asked to
+    compare. Saying what was understood — and what wasn't — is the whole
+    point, so it names the one it found rather than asking a blank question.
+    """
+    return (
+        f"I could only pick out *{found}* in that.\n\n"
+        "Did you mean to compare it with somewhere else? Send both areas "
+        "and I'll do a side-by-side — e.g. \"Arjan vs JVC\"."
+    )
+
+
+def render_no_live_data() -> str:
+    """She asked for figures. Answer honestly about what this does and does
+    not have, rather than producing something that could pass for sourced
+    data — and rather than mis-reading the request as a project name, which
+    is what it used to do."""
+    return (
+        "Straight answer: I don't have live transaction data.\n\n"
+        "- My briefings are *general AI-generated context* — useful for "
+        "framing a conversation, not for quoting figures\n"
+        "- I can't give you verified prices, yields or DLD-registered "
+        "transaction numbers\n"
+        "- Anything I say with a number in it should be checked before you "
+        "put it in front of a client\n\n"
+        "If sourced data would genuinely help your work, tell Aaron and it "
+        "can be looked at as a proper feature."
+    )
+
+
 def render_greeting() -> str:
     """Replied to small talk. Doubles as the de-facto welcome message, since
     "hi" is what a new user sends first — so it says what this can actually

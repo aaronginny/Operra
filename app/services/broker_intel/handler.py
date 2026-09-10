@@ -77,6 +77,24 @@ async def build_reply(
     if intent.kind == "greeting":
         return formatter.render_greeting()
 
+    # An explicit ask for real figures. Answered honestly rather than
+    # mis-parsed as a project name — this vertical has no live data source.
+    if intent.kind == "data_request":
+        return formatter.render_no_live_data()
+
+    # Two or more areas: a real side-by-side, not a silent pick of the first.
+    if intent.kind == "comparison" and intent.subjects:
+        audience = intent.audience or "self"
+        lines = await gen.compare_areas(intent.subjects, audience)
+        if not lines:
+            return formatter.render_unavailable()
+        return formatter.render_comparison(intent.subjects, lines, audience)
+
+    # One area found where she clearly meant several — say so instead of
+    # answering half the question.
+    if intent.kind == "partial_comparison" and intent.subject:
+        return formatter.render_partial_comparison(intent.subject, text)
+
     # She confirmed a subject we flagged as unrecognised. Proceed with the
     # subject she originally sent, now with her explicit go-ahead.
     if intent.kind == "confirm":
