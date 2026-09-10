@@ -92,6 +92,34 @@ def render_social_caption(kind: str, lines: list[str]) -> str:
 
 # ── Non-content replies (no generated market claims, so no caveat) ──
 
+def render_greeting() -> str:
+    """Replied to small talk. Doubles as the de-facto welcome message, since
+    "hi" is what a new user sends first — so it says what this can actually
+    do rather than just greeting back."""
+    return (
+        "Hello! 👋\n\n"
+        "Send me a project or area and I'll put together a briefing — "
+        "market context, why it appeals, developer, nearby landmarks.\n\n"
+        "- e.g. *Sobha Hartland* or *tell me about JVC*\n"
+        "- or reply *ARTICLE* / *FUN FACT* for something to post today"
+    )
+
+
+def render_confirm_subject(subject: str) -> str:
+    """Asked when the subject is a low-confidence guess (see Intent.confidence).
+
+    Deliberately offers to proceed rather than refusing: it may well be a
+    genuine new launch the curated tables don't list yet. It just must not
+    silently produce a confident briefing about something that might not
+    exist.
+    """
+    return (
+        f"I don't recognise *{subject}* as a project or area I know.\n\n"
+        "If that's right, reply *YES* and I'll brief you on it anyway.\n"
+        "Otherwise send the area — e.g. \"JVC\" or \"Sobha Hartland\"."
+    )
+
+
 def render_unreadable() -> str:
     return (
         "I couldn't tell which project or area you meant.\n\n"

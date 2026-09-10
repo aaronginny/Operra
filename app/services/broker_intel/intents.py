@@ -60,6 +60,24 @@ _CONTENT_WORDS = {
     "fun_fact": ("fun fact", "funfact", "fact", "trivia"),
 }
 
+# Greetings and small talk. Checked before project extraction, because
+# extract_project below will happily treat "hello" as a project name — it has
+# no vocabulary of real projects to check against, only a shape. That
+# produced "Got it — *hello*. ME or LEAD?", which is the kind of reply that
+# makes a tool feel broken on first contact.
+_GREETINGS = (
+    "hi", "hii", "hiii", "hey", "hello", "helo", "yo",
+    "good morning", "good afternoon", "good evening", "gm", "ga",
+    "salam", "salaam", "assalam", "assalamualaikum", "as salam alaikum",
+    "namaste", "hola", "morning", "evening",
+    "thanks", "thank you", "thx", "ty", "shukran",
+    "ok", "okay", "k", "cool", "great", "nice", "done",
+    "test", "testing",
+)
+
+# Confirms a low-confidence subject the bot asked about (see Intent.confidence).
+_CONFIRM_WORDS = ("yes", "yep", "yeah", "yup", "correct", "confirm", "go ahead", "proceed", "y")
+
 # Stripped before project-name extraction so "tell me about Sobha Hartland"
 # yields "Sobha Hartland" rather than the whole sentence. Ordered longest
 # first so the longer phrasings win.
@@ -82,11 +100,24 @@ class Intent:
     """What the message asked for.
 
     kind is one of:
+      greeting  — small talk, not a query
+      confirm   — she confirmed a subject the bot was unsure about
       content   — she picked ARTICLE / FUN FACT (value holds which)
       audience  — she picked ME / LEAD (value holds "self" / "lead")
       lead_intel — she named a project/area (subject holds it; audience may
                    already be set if she said both in one message)
       unknown   — nothing usable
+
+    confidence, for lead_intel only:
+      "high" — the subject matched the curated UAE geography tables, so it
+               is definitely a real place.
+      "low"  — the subject is a best-effort name lifted from her text with
+               nothing to corroborate it. It might be a genuine new launch
+               the tables don't list, or it might be a typo or a stray
+               sentence. The handler asks rather than briefing on it, since
+               a confident briefing about a project that does not exist is
+               worse than a question — especially under the forwardable
+               format, where she might send it to a client before noticing.
     """
 
     kind: str
@@ -95,6 +126,7 @@ class Intent:
     audience: str | None = None
     emirate: str | None = None
     area: str | None = None
+    confidence: str | None = None
 
 
 def _match_audience(lowered: str, *, bare: bool) -> str | None:
@@ -169,6 +201,19 @@ def parse(text: str) -> Intent:
     lowered = text.lower()
     emirate, area = find_area(text)
 
+    # Greetings / small talk, before anything tries to read the text as a
+    # project name. Only for a short message carrying no geography, so
+    # "hi, what about JVC" is still a briefing request.
+    stripped = lowered.strip(" .!?,")
+    if emirate is None and len(text.split()) <= 3:
+        if stripped in _GREETINGS or any(
+            stripped == g or stripped.startswith(g + " ") for g in _GREETINGS
+        ):
+            return Intent(kind="greeting")
+
+        if stripped in _CONFIRM_WORDS:
+            return Intent(kind="confirm")
+
     # A bare keyword reply. Checked first, and only when the message carries
     # no geography — "article about JVC" is a briefing request, not a post.
     content = _match_content(lowered)
@@ -183,7 +228,13 @@ def parse(text: str) -> Intent:
     # Inside a longer message only an explicit phrase counts.
     audience = _match_audience(lowered, bare=False)
 
-    subject = area or extract_project(text) or emirate
+    # An area or emirate came from the curated tables, so it is definitely
+    # real. Anything else is a shape-based guess from her wording.
+    if area or emirate:
+        subject, confidence = (area or emirate), "high"
+    else:
+        subject, confidence = extract_project(text), "low"
+
     if subject:
         return Intent(
             kind="lead_intel",
@@ -191,6 +242,7 @@ def parse(text: str) -> Intent:
             audience=audience,
             emirate=emirate,
             area=area,
+            confidence=confidence,
         )
 
     return Intent(kind="unknown")
