@@ -358,6 +358,35 @@ async def run_autocomplete_checks(client: httpx.AsyncClient, ctx: dict) -> None:
     check("D14 a literal '_' matches nothing rather than any single char",
           res.status_code == 200 and res.json() == [], res.text[:200])
 
+    # ── result cap ──
+    # The real list has ~180 contacts sharing "Masaar", so an 8-row cap could
+    # hide the intended match. Seed more than the cap and confirm both that
+    # the cap is the new value AND that prefix matches still lead at that
+    # depth — raising the limit is only useful if ordering still holds.
+    from app.routes.launch_matcher import MAX_CONTACT_SUGGESTIONS
+    async with SessionLocal() as db:
+        for i in range(MAX_CONTACT_SUGGESTIONS + 12):
+            db.add(ContactLookup(company_id=ctx["mahmoud_id"],
+                                  name=f"Zeta Capfill {i:03d}",
+                                  phone=f"+9715039{i:05d}", emirate="Dubai"))
+        # One prefix match that sorts LAST alphabetically among its peers,
+        # so it can only lead by virtue of the prefix-first ordering.
+        db.add(ContactLookup(company_id=ctx["mahmoud_id"], name="Capfill Leader",
+                              phone="+971503990001", emirate="Dubai"))
+        await db.commit()
+
+    res = await client.get("/launch-matcher/contact-lookup?q=Capfill",
+                            headers=auth(ctx["mahmoud_token"]))
+    rows = res.json()
+    check(f"D15 cap raised to {MAX_CONTACT_SUGGESTIONS} (was 8)",
+          len(rows) == MAX_CONTACT_SUGGESTIONS, f"got {len(rows)}")
+    check("D16 the prefix match still ranks first at the larger cap",
+          rows and rows[0]["name"] == "Capfill Leader",
+          str([r["name"] for r in rows[:3]]))
+    check("D17 mid-name matches still fill the rest of the list",
+          any(r["name"].startswith("Zeta Capfill") for r in rows),
+          str([r["name"] for r in rows[:3]]))
+
 
 def run_fallback_tier_checks() -> None:
     """FALLBACK_EMIRATE_HINTS must sit below every other tier.
