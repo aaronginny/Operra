@@ -86,10 +86,29 @@ _FUN_FACT_SYSTEM = (
 )
 
 
+_COMPARISON_SYSTEM = (
+    "You are a Dubai real-estate market briefing assistant for a working "
+    "broker.\n"
+    "Given two or more areas, produce a SIDE-BY-SIDE comparison. Cover each "
+    "area on its own terms and make the contrast explicit — who each one "
+    "suits, how they differ on lifestyle, tenant demand and longer-term "
+    "prospects.\n"
+    "Prefix every bullet with the area name in asterisks, e.g. "
+    "'- *JVC* affordable townhouses, strong family tenant demand'. Give each "
+    "area a comparable number of bullets, and end with one bullet starting "
+    "'- *In short*' summarising the trade-off.\n"
+    + _SHARED_RULES
+)
+
+
 class ContentGenerator(Protocol):
     """Anything that can produce bullet lines for broker_intel."""
 
     async def lead_intel(self, subject: str, audience: str) -> list[str] | None: ...
+
+    async def compare_areas(
+        self, subjects: list[str], audience: str
+    ) -> list[str] | None: ...
 
     async def social_caption(self, kind: str) -> list[str] | None: ...
 
@@ -152,6 +171,14 @@ class OpenAIContentGenerator:
             f"Brief me on: {subject}",
         )
 
+    async def compare_areas(self, subjects: list[str], audience: str) -> list[str] | None:
+        rules = _AUDIENCE_RULES.get(audience, _AUDIENCE_RULES["self"])
+        joined = " vs ".join(subjects)
+        return await self._complete(
+            f"{_COMPARISON_SYSTEM}\n{rules}",
+            f"Compare these areas for a client: {joined}",
+        )
+
     async def social_caption(self, kind: str) -> list[str] | None:
         system = _ARTICLE_SYSTEM if kind == "article" else _FUN_FACT_SYSTEM
         return await self._complete(system, "Write today's caption.")
@@ -178,6 +205,15 @@ class StubContentGenerator:
             "Developer has an established delivery record.",
             "Longer-term appreciation prospects are viewed positively.",
         ]
+
+    async def compare_areas(self, subjects: list[str], audience: str) -> list[str] | None:
+        self.calls.append(("compare_areas", f"{'|'.join(subjects)}|{audience}"))
+        lines = []
+        for s_ in subjects:
+            lines.append(f"{s_} draws steady interest from its own type of buyer.")
+            lines.append(f"{s_} has amenities and transport within easy reach.")
+        lines.append("In short, the right choice depends on the tenant profile you want.")
+        return lines
 
     async def social_caption(self, kind: str) -> list[str] | None:
         self.calls.append(("social_caption", kind))

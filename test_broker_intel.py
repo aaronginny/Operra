@@ -336,6 +336,84 @@ async def run_polish_checks(company_id: int) -> None:
           "lost track" in r.lower(), r[:70])
 
 
+# ── H. real-usage regressions (from Manju's actual conversation) ──
+
+async def run_real_usage_checks(company_id: int) -> None:
+    """Both cases come verbatim from her live conversation log.
+
+    1. "Compare Arjan and JVC in terms of real estate rates and ROI" —
+       the bot recognised Arjan, answered about it alone, and gave no sign
+       it had dropped JVC or that a comparison was asked for. Silently
+       answering half a question is worse than saying what you understood.
+
+    2. "I need data backed reply, with numbers" — an explicit request for
+       something this tool does not have was parsed as a project name, so
+       she was asked to confirm it was a real place. An explicit ask must
+       get an honest answer, not a mis-parse.
+    """
+    print("\n== H. real-usage regressions (her actual messages) ==")
+    state._reset_for_tests()
+
+    HER_COMPARISON = "Compare Arjan and JVC in terms of real estate rates and ROI"
+    HER_DATA_ASK = "I need data backed reply, with numbers"
+
+    # ── 1. multi-area comparison ──
+    i = intents.parse(HER_COMPARISON)
+    check("H1 her comparison message parses as a comparison, not one area",
+          i.kind == "comparison", f"{i.kind}/{i.subject}")
+    check("H2 BOTH areas are captured — JVC is no longer dropped",
+          i.subjects == ["Arjan", "JVC"], str(i.subjects))
+
+    gen = StubContentGenerator()
+    r = await build_reply(company_id, BROKER_PHONE, HER_COMPARISON, gen)
+    check("H3 the reply names both areas", "Arjan" in r and "JVC" in r, r[:80])
+    check("H4 it generated a comparison, not a single-area briefing",
+          any(c[0] == "compare_areas" for c in gen.calls), str(gen.calls))
+    check("H5 the comparison still carries the sourcing caveat",
+          formatter.MARKET_CAVEAT in r)
+
+    # ── 2. partial comparison: say so, don't answer half ──
+    state._reset_for_tests()
+    gen2 = StubContentGenerator()
+    r = await build_reply(company_id, BROKER_PHONE,
+                           "compare Arjan and Nakheel Heights", gen2)
+    check("H6 one area found where several were meant -> says which it got",
+          "Arjan" in r and "only" in r.lower(), r[:90])
+    check("H7 ...and generates nothing rather than answering half",
+          not gen2.calls, str(gen2.calls))
+
+    # ── 3. explicit data request ──
+    i = intents.parse(HER_DATA_ASK)
+    check("H8 her data request parses as data_request, not a project name",
+          i.kind == "data_request", f"{i.kind}/{i.subject!r}")
+
+    state._reset_for_tests()
+    gen3 = StubContentGenerator()
+    r = await build_reply(company_id, BROKER_PHONE, HER_DATA_ASK, gen3)
+    check("H9 it answers honestly about having no live data",
+          "don't have live transaction data" in r, r[:80])
+    check("H10 it does NOT ask her to confirm it's a real place (the old bug)",
+          "recognise" not in r and "YES" not in r, r[:80])
+    check("H11 it generates nothing — no briefing dressed up as data",
+          not gen3.calls, str(gen3.calls))
+    check("H12 it offers the route to getting real data added",
+          "feature" in r.lower())
+
+    # ── 4. the fixes must not swallow ordinary messages ──
+    state._reset_for_tests()
+    check("H13 a plain single-area request is still a normal briefing",
+          intents.parse("what about Arjan").kind == "lead_intel")
+    check("H14 'and' in a sentence about ONE area is not a comparison",
+          intents.parse("tell me about JVC and the market there").kind == "lead_intel",
+          intents.parse("tell me about JVC and the market there").kind)
+    check("H15 mentioning rates/ROI alongside real areas stays a comparison, "
+          "not a data_request",
+          intents.parse(HER_COMPARISON).kind == "comparison")
+    check("H16 'give me actual numbers' is a data request, not a ME/LEAD choice",
+          intents.parse("give me actual numbers").kind == "data_request",
+          intents.parse("give me actual numbers").kind)
+
+
 # ── E. isolation ─────────────────────────────────────────────
 
 async def run_isolation_checks(company_id: int) -> None:
@@ -419,6 +497,7 @@ async def main() -> None:
     await run_lead_intel_checks(ctx["company_id"])
     await run_daily_checks(ctx["company_id"])
     await run_polish_checks(ctx["company_id"])
+    await run_real_usage_checks(ctx["company_id"])
     await run_isolation_checks(ctx["company_id"])
     await run_other_vertical_checks()
 
