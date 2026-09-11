@@ -1,34 +1,53 @@
-"""Reply formatting for broker_intel — and the one place the sourcing
-caveat is enforced.
+"""Reply formatting for broker_intel — and the two places its sourcing
+caveats are enforced.
 
-HARD REQUIREMENT, made structural. Every reply that carries AI-generated
-market commentary must say so, and must never let a figure read as an
-official Dubai Land Department number. That promise is kept here rather than
-in the generator or the handler, because both of those have many code paths
-and this has one: `_content_reply` is the only function in the package that
-turns generated bullets into a message body, and it appends the caveat
-unconditionally, after the caller's text, with no parameter to switch it off.
+HARD REQUIREMENT, made structural. Every reply that carries market
+commentary must say so, and must never let a figure read as an official
+Dubai Land Department number. That promise is kept here rather than in the
+generator or the handler, because both of those have many code paths and
+this module has exactly two entry points for it:
 
-So a new content feature cannot ship an uncaveated reply by forgetting a
-flag. It can only do so by adding a second bullets-to-body function
-somewhere else, which is a visible edit — and test_broker_intel.py asserts
-the property over every reply-producing entry point in this module, so a
-second path fails the suite rather than passing quietly.
+  * `_content_reply` — for reply content that is PURELY AI-generated, with
+    no search behind it (the daily nudge's article/fun-fact captions).
+    Appends MARKET_CAVEAT.
+  * `_sourced_reply` — for reply content built from real web search results
+    via extraction.py's structured pipeline (lead intel, comparisons).
+    Appends SOURCED_CAVEAT, and also lists which sources were actually
+    cited.
 
-The wording is deliberately readable in both audiences. The lead-ready
-format is forwarded to a client verbatim, so the caveat cannot read like an
-internal note to the broker; "indicative market context" works in front of
-a client, "FYI these numbers are AI-generated, don't quote them" would not.
+Both take the caller's text and append their caveat unconditionally, with
+no parameter to switch it off — so a new content feature cannot ship an
+uncaveated reply by forgetting a flag. It can only do so by adding a THIRD
+bullets-to-body function somewhere else, which is a visible edit, and
+test_broker_intel.py asserts the caveat property over every reply-producing
+entry point in this module, so a third path fails the suite rather than
+passing quietly.
+
+The wording of both caveats is deliberately readable in both audiences. The
+lead-ready format is forwarded to a client verbatim, so neither caveat may
+read like an internal note to the broker.
 """
 
 from __future__ import annotations
 
-# Appended to every content-bearing reply. Short enough not to dominate a
-# phone screen, explicit enough that no figure above it can be mistaken for
-# an official registry number.
+# Appended to replies with NO search behind them — currently only the daily
+# nudge's article/fun-fact captions, which remain general AI commentary by
+# design (see content.py's docstring on the sourcing policy for those).
 MARKET_CAVEAT = (
     "_General market context, AI-generated — indicative only, "
     "not official DLD data._"
+)
+
+# Appended to replies built from real web search results (lead intel,
+# comparisons). Deliberately does NOT say "AI-generated" — the figures in
+# these replies come from cited sources, not from the model's own
+# knowledge — but is equally explicit that they are not DLD transaction
+# records: search mostly surfaces portal LISTING prices, which run above
+# what a unit actually sells for, and nothing here is guaranteed current.
+SOURCED_CAVEAT = (
+    "_From real published sources (portals, agencies, press) — not "
+    "official DLD data. Often listing prices, which run above sale "
+    "prices. Not guaranteed current — verify before quoting a client._"
 )
 
 _FORMAT_PROMPT = (
@@ -44,13 +63,29 @@ def _bullets(lines: list[str]) -> str:
 
 
 def _content_reply(header: str, lines: list[str]) -> str:
-    """The ONLY bullets-to-body path in this package. Always caveated.
-
-    Every content-bearing renderer below routes through here. See this
-    module's docstring for why that matters and what enforces it.
+    """Bullets-to-body path for PURELY AI-generated content (no search
+    behind it). Always caveated with MARKET_CAVEAT — see module docstring.
     """
     parts = [p for p in (header, _bullets(lines)) if p]
     return "\n\n".join(parts) + f"\n\n{MARKET_CAVEAT}"
+
+
+def _sourced_reply(
+    header: str,
+    lines: list[str],
+    cited_sources: list[tuple[int, object]],
+) -> str:
+    """Bullets-to-body path for content built from real search results —
+    the counterpart to _content_reply. Always caveated with SOURCED_CAVEAT,
+    and lists exactly which sources were actually cited (each `[n]` marker
+    that reached this reply's bullets, resolved to its domain) — never the
+    full search result set, only what got used.
+    """
+    parts = [p for p in (header, _bullets(lines)) if p]
+    if cited_sources:
+        parts.append("Sources: " + "  ".join(f"[{i}] {s.domain}" for i, s in cited_sources))
+    parts.append(SOURCED_CAVEAT)
+    return "\n\n".join(parts)
 
 
 # ── Feature 1: lead intel ────────────────────────────────────
@@ -60,8 +95,15 @@ def render_format_question(subject: str) -> str:
     return f"Got it — *{subject}*.\n\n{_FORMAT_PROMPT}"
 
 
-def render_lead_intel(subject: str, lines: list[str], audience: str) -> str:
-    """The briefing itself.
+def render_lead_intel(
+    subject: str,
+    lines: list[str],
+    audience: str,
+    cited_sources: list[tuple[int, object]] | None = None,
+) -> str:
+    """The briefing itself, built from real search results — see
+    briefing.py. cited_sources defaults to empty so existing direct callers
+    (tests probing the caveat property) still work without threading it.
 
     The 'lead' audience gets no header naming the broker or the request,
     because the whole message is forwarded to the client as-is; a header
@@ -69,7 +111,7 @@ def render_lead_intel(subject: str, lines: list[str], audience: str) -> str:
     them.
     """
     header = "" if audience == "lead" else f"*{subject}*"
-    return _content_reply(header, lines)
+    return _sourced_reply(header, lines, cited_sources or [])
 
 
 # ── Feature 2: daily content nudge ───────────────────────────
@@ -92,11 +134,17 @@ def render_social_caption(kind: str, lines: list[str]) -> str:
 
 # ── Non-content replies (no generated market claims, so no caveat) ──
 
-def render_comparison(subjects: list[str], lines: list[str], audience: str) -> str:
-    """A genuine side-by-side. Goes through _content_reply like every other
-    content-bearing reply, so the caveat still cannot be skipped."""
+def render_comparison(
+    subjects: list[str],
+    lines: list[str],
+    audience: str,
+    cited_sources: list[tuple[int, object]] | None = None,
+) -> str:
+    """A genuine side-by-side, built from real search results per area —
+    see briefing.py. Goes through _sourced_reply like render_lead_intel, so
+    the caveat and source list still cannot be skipped."""
     header = "" if audience == "lead" else "*" + " vs ".join(subjects) + "*"
-    return _content_reply(header, lines)
+    return _sourced_reply(header, lines, cited_sources or [])
 
 
 def render_partial_comparison(found: str, original: str) -> str:
@@ -115,20 +163,34 @@ def render_partial_comparison(found: str, original: str) -> str:
 
 
 def render_no_live_data() -> str:
-    """She asked for figures. Answer honestly about what this does and does
-    not have, rather than producing something that could pass for sourced
-    data — and rather than mis-reading the request as a project name, which
-    is what it used to do."""
+    """She asked for real figures with no area or project named — nothing
+    to search on yet. Now that briefings ARE search-backed (see
+    briefing.py), the honest answer is to say what's still true (no
+    official DLD transaction data) and point her at what actually gets
+    real numbers: naming a subject."""
     return (
-        "Straight answer: I don't have live transaction data.\n\n"
-        "- My briefings are *general AI-generated context* — useful for "
-        "framing a conversation, not for quoting figures\n"
-        "- I can't give you verified prices, yields or DLD-registered "
-        "transaction numbers\n"
-        "- Anything I say with a number in it should be checked before you "
-        "put it in front of a client\n\n"
-        "If sourced data would genuinely help your work, tell Aaron and it "
-        "can be looked at as a proper feature."
+        "I don't have official DLD transaction data — but I can search "
+        "real published sources (portals, agencies, press) for a specific "
+        "area or project.\n\n"
+        "Tell me which one — e.g. *Arjan* or *JVC* — and I'll pull current "
+        "figures with sources attached.\n\n"
+        "Worth knowing: those are listing/asking prices, not registered "
+        "sale prices, so they can run above what a unit actually sells for."
+    )
+
+
+def render_thin_sources(subject: str) -> str:
+    """Search ran for `subject` but turned up nothing usable — distinct
+    from render_unavailable (a hard failure of search or extraction) and
+    render_no_live_data (no subject was even given). Same principle as
+    both: no data beats invented data, said plainly rather than papered
+    over with vague market commentary."""
+    return (
+        f"I searched, but couldn't find good sourced information on "
+        f"*{subject}* right now.\n\n"
+        "That can happen for a very new or small project that hasn't been "
+        "written about yet. Try the area it's in instead, or check back "
+        "later as more gets published."
     )
 
 

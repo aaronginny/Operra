@@ -7,13 +7,20 @@ Set TEST_DATABASE_URL to run it against Postgres.
     python test_broker_intel.py
     TEST_DATABASE_URL=postgresql+asyncpg://... python test_broker_intel.py
 
+See also test_broker_intel_sourcing.py for the search/extraction/assembly
+pipeline's own unit tests (the mixed-unit regression, scope isolation,
+defensive JSON parsing) — this file covers the conversational flow and its
+integration with the rest of the app.
+
 Sections:
   A  intent parsing — how she names a project/area (design question 1)
-  B  the caveat property — enforced over EVERY reply-producing entry point
-  C  feature 1, lead intel, both formats, end to end
+  B  the two caveats — enforced over EVERY reply-producing entry point
+  C  feature 1, lead intel, both formats, end to end (stub search+extraction)
   D  feature 2, the daily nudge and its reply
   E  isolation — nothing written, generic pipeline never reached (session spy)
   F  other verticals unaffected
+  G  polish: greetings and unrecognised subjects
+  H  real-usage regressions (from Manju's actual conversation)
 """
 
 import asyncio
@@ -25,6 +32,17 @@ DEFAULT_SQLITE_URL = f"sqlite+aiosqlite:///./{TEST_DB_PATH}"
 TEST_DB_URL = os.environ.get("TEST_DATABASE_URL") or DEFAULT_SQLITE_URL
 IS_SQLITE = TEST_DB_URL.startswith("sqlite")
 os.environ["DATABASE_URL"] = TEST_DB_URL
+
+# This suite must be hermetic regardless of what real keys happen to sit in
+# the local .env (they're there for live manual verification — see
+# search.py / extraction.py docstrings). Any test that does NOT explicitly
+# inject a stub search/extraction provider falls through to
+# get_search_provider()/get_extraction_provider(), which read these two
+# settings — so they're pinned to placeholder shapes here, the same way
+# .env.example ships a placeholder OPENAI_API_KEY. Without this, Section E's
+# isolation check would make a real, live Tavily/OpenAI call every run.
+os.environ["TAVILY_API_KEY"] = "tvly-your-tavily-api-key-here"
+os.environ["OPENAI_API_KEY"] = "sk-your-openai-api-key-here"
 
 from sqlalchemy import select, text as sa_text  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
@@ -44,11 +62,13 @@ from app.models.message_log import MessageLog  # noqa: E402
 from app.models.user import User, UserRole  # noqa: E402
 from app.services.broker_intel import formatter, intents, state  # noqa: E402
 from app.services.broker_intel.content import StubContentGenerator  # noqa: E402
+from app.services.broker_intel.extraction import Claim, StubExtractionProvider  # noqa: E402
 from app.services.broker_intel.handler import (  # noqa: E402
     BROKER_INTEL_VERTICAL,
     build_reply,
     send_daily_nudge,
 )
+from app.services.broker_intel.search import SourceResult, StubSearchProvider  # noqa: E402
 from app.services.launch_matcher import providers as providers_module  # noqa: E402
 from app.services.launch_matcher.providers import RecordingProvider  # noqa: E402
 
@@ -64,6 +84,10 @@ def check(name: str, condition: bool, detail: str = "") -> None:
     results.append((PASS if condition else FAIL, name, detail))
     print(("  [ok] " if condition else "  [XX] ") + name
           + (f"  -- {detail}" if detail and not condition else ""))
+
+
+def src(domain: str, content: str = "search result text") -> SourceResult:
+    return SourceResult(url=f"https://{domain}/x", domain=domain, title="x", content=content)
 
 
 def install_recorder() -> RecordingProvider:
@@ -147,97 +171,174 @@ def run_intent_checks() -> None:
           intents.parse("").kind == "unknown" and intents.parse("👍").kind == "unknown")
 
 
-# ── B. the caveat property ───────────────────────────────────
+# ── B. the two caveats ────────────────────────────────────────
 
 def run_caveat_checks() -> None:
-    print("\n== B. sourcing caveat — enforced on every content-bearing reply ==")
+    print("\n== B. the two caveats — enforced on every content-bearing reply ==")
     lines = ["Prices in the area have risen sharply.", "Yields look strong."]
+    sourced_lines = ["Price/sqft: AED 1,500-1,650 [1][2]"]
+    cited = [(1, src("bayut.com")), (2, src("propertyfinder.ae"))]
 
     contentful = {
-        "render_lead_intel/self": formatter.render_lead_intel("X", lines, "self"),
-        "render_lead_intel/lead": formatter.render_lead_intel("X", lines, "lead"),
+        "render_lead_intel/self": formatter.render_lead_intel("X", sourced_lines, "self", cited),
+        "render_lead_intel/lead": formatter.render_lead_intel("X", sourced_lines, "lead", cited),
+        "render_comparison/self": formatter.render_comparison(["X", "Y"], sourced_lines, "self", cited),
+    }
+    ungrounded = {
         "render_social_caption/article": formatter.render_social_caption("article", lines),
         "render_social_caption/fun_fact": formatter.render_social_caption("fun_fact", lines),
     }
-    for name, body in contentful.items():
-        check(f"B1 {name} carries the caveat", formatter.MARKET_CAVEAT in body, body[-80:])
 
-    check("B2 the caveat names DLD explicitly and marks the content AI-generated",
+    for name, body in contentful.items():
+        check(f"B1 {name} carries SOURCED_CAVEAT", formatter.SOURCED_CAVEAT in body, body[-90:])
+        check(f"B1b {name} does NOT carry the old ungrounded MARKET_CAVEAT",
+              formatter.MARKET_CAVEAT not in body, body[-90:])
+        check(f"B1c {name} lists the sources actually cited",
+              "bayut.com" in body and "propertyfinder.ae" in body, body)
+
+    for name, body in ungrounded.items():
+        check(f"B2 {name} carries MARKET_CAVEAT (ungrounded content stays labelled as such)",
+              formatter.MARKET_CAVEAT in body, body[-80:])
+        check(f"B2b {name} does NOT carry SOURCED_CAVEAT",
+              formatter.SOURCED_CAVEAT not in body, body[-80:])
+
+    check("B3 SOURCED_CAVEAT names DLD explicitly and does not call itself AI-generated",
+          "DLD" in formatter.SOURCED_CAVEAT and "AI-generated" not in formatter.SOURCED_CAVEAT,
+          formatter.SOURCED_CAVEAT)
+    check("B4 MARKET_CAVEAT still names DLD and is explicitly AI-generated",
           "DLD" in formatter.MARKET_CAVEAT and "AI-generated" in formatter.MARKET_CAVEAT,
           formatter.MARKET_CAVEAT)
 
-    # Structural: one bullets-to-body path, and it has no opt-out.
+    # Structural: exactly two bullets-to-body paths, neither with an opt-out.
     import inspect
-    src = inspect.getsource(formatter)
-    check("B3 _content_reply is the only place bullets become a body",
-          src.count("def _bullets(") == 1 and src.count("_bullets(") == 2,
-          f"_bullets referenced {src.count('_bullets(')}x")
-    check("B4 _content_reply takes no flag that could disable the caveat",
-          "def _content_reply(header: str, lines: list[str]) -> str:" in src)
+    src_text = inspect.getsource(formatter)
+    check("B5 _bullets has exactly one definition",
+          src_text.count("def _bullets(") == 1, str(src_text.count("def _bullets(")))
+    check("B6 _bullets is called from exactly two reply-assembly functions "
+          "(_content_reply and _sourced_reply) — a third path would need a "
+          "visible new call site here",
+          src_text.count("_bullets(") == 3,  # 1 def + 2 calls
+          f"_bullets referenced {src_text.count('_bullets(')}x")
+    check("B7 _content_reply takes no flag that could disable MARKET_CAVEAT",
+          "def _content_reply(header: str, lines: list[str]) -> str:" in src_text)
+    check("B8 _sourced_reply takes no flag that could disable SOURCED_CAVEAT",
+          "def _sourced_reply(" in src_text
+          and "cited_sources: list[tuple[int, object]],\n) -> str:" in src_text)
 
     # The lead-ready format is forwarded verbatim, so it must not address her.
     lead_body = contentful["render_lead_intel/lead"]
-    check("B5 lead-ready format carries no internal-note language",
+    check("B9 lead-ready format carries no internal-note language",
           not any(w in lead_body.lower() for w in ("your briefing", "for you", "fyi", "note:")),
           lead_body[:80])
 
     # A failed generation must not be papered over with market-sounding filler.
     unavailable = formatter.render_unavailable()
-    check("B6 the generation-failure reply makes no market claim",
-          formatter.MARKET_CAVEAT not in unavailable and "•" not in unavailable)
+    check("B10 the generation-failure reply makes no market claim",
+          formatter.MARKET_CAVEAT not in unavailable
+          and formatter.SOURCED_CAVEAT not in unavailable
+          and "•" not in unavailable)
+
+    thin = formatter.render_thin_sources("Ghost Towers")
+    check("B11 the thin-sources reply also makes no market claim",
+          formatter.MARKET_CAVEAT not in thin and formatter.SOURCED_CAVEAT not in thin
+          and "•" not in thin, thin)
 
 
 # ── C. feature 1 ─────────────────────────────────────────────
 
 async def run_lead_intel_checks(company_id: int) -> None:
-    print("\n== C. feature 1 — lead intel on demand ==")
+    print("\n== C. feature 1 — lead intel on demand (stub search + extraction) ==")
     state._reset_for_tests()
-    gen = StubContentGenerator()
 
-    r1 = await build_reply(company_id, BROKER_PHONE, "tell me about Sobha Hartland", gen)
-    check("C1 first message asks which format, and generates nothing yet",
-          "ME" in r1 and "LEAD" in r1 and not gen.calls, f"calls={gen.calls}")
+    sobha_search = StubSearchProvider({
+        "Sobha Hartland": [src("bayut.com"), src("propertyfinder.ae")],
+    })
+    sobha_extractor = StubExtractionProvider(claims=[
+        Claim("price_per_sqft", "Sobha Hartland", 1500, "", "", 1),
+        Claim("price_per_sqft", "Sobha Hartland", 1700, "", "", 2),
+        Claim("qualitative", "Sobha Hartland", None, "",
+              "Waterfront community with strong tenant demand", 1),
+    ])
 
-    r2 = await build_reply(company_id, BROKER_PHONE, "ME", gen)
-    check("C2 answering ME returns the briefing", "•" in r2 and formatter.MARKET_CAVEAT in r2)
-    check("C3 the briefing is bulleted, not paragraphs",
-          r2.count("•") >= 3 and max(len(x) for x in r2.splitlines()) < 200)
+    r1 = await build_reply(company_id, BROKER_PHONE, "tell me about Sobha Hartland")
+    check("C1 first message asks which format, and searches nothing yet",
+          "ME" in r1 and "LEAD" in r1 and not sobha_extractor.calls, r1[:60])
+
+    r2 = await build_reply(company_id, BROKER_PHONE, "ME",
+                            search=sobha_search, extractor=sobha_extractor)
+    check("C2 answering ME returns the briefing", "•" in r2 and formatter.SOURCED_CAVEAT in r2)
+    bullet_lines = [x for x in r2.splitlines() if x.startswith("•")]
+    check("C3 the briefing is bulleted, not paragraphs, and each bullet stays scannable",
+          r2.count("•") >= 2 and max(len(x) for x in bullet_lines) < 120,
+          str(bullet_lines))
     check("C4 the subject survived the two-step exchange",
-          any("Sobha Hartland" in c[1] for c in gen.calls), str(gen.calls))
-    check("C5 it generated for the 'self' audience",
-          any(c[1].endswith("|self") for c in gen.calls), str(gen.calls))
+          any(c[0] == "Sobha Hartland" for c in sobha_extractor.calls), str(sobha_extractor.calls))
+    check("C5 the ME reply uses the terse label style ('Price/sqft:'), not a sentence",
+          "Price/sqft:" in r2, r2)
 
-    # Second turn: the LEAD format.
-    gen2 = StubContentGenerator()
-    await build_reply(company_id, BROKER_PHONE, "what about JVC", gen2)
-    r3 = await build_reply(company_id, BROKER_PHONE, "LEAD", gen2)
-    check("C6 LEAD generates for the forwardable audience",
-          any(c[1].endswith("|lead") for c in gen2.calls), str(gen2.calls))
-    check("C7 the forwardable reply still carries the caveat",
-          formatter.MARKET_CAVEAT in r3)
+    # Second turn: the LEAD format, from scratch.
+    state._reset_for_tests()
+    lead_search = StubSearchProvider({"JVC": [src("bayut.com"), src("engelvoelkers.com")]})
+    lead_extractor = StubExtractionProvider(claims=[
+        Claim("price_per_sqft", "JVC", 1450, "", "", 1),
+        Claim("price_per_sqft", "JVC", 1600, "", "", 2),
+    ])
+    await build_reply(company_id, BROKER_PHONE, "what about JVC",
+                       search=lead_search, extractor=lead_extractor)
+    r3 = await build_reply(company_id, BROKER_PHONE, "LEAD",
+                            search=lead_search, extractor=lead_extractor)
+    check("C6 the LEAD reply reads as a sentence naming the area, not the ME label style",
+          "JVC" in r3 and "Price/sqft:" not in r3, r3[:100])
+    check("C7 the forwardable reply still carries SOURCED_CAVEAT",
+          formatter.SOURCED_CAVEAT in r3)
 
     # Both in one message — no question needed.
-    gen3 = StubContentGenerator()
-    r4 = await build_reply(company_id, BROKER_PHONE, "Dubai Hills for the lead", gen3)
+    state._reset_for_tests()
+    dh_search = StubSearchProvider({"Dubai Hills": [src("bayut.com")]})
+    dh_extractor = StubExtractionProvider(claims=[
+        Claim("price_per_sqft", "Dubai Hills", 1800, "", "", 1),
+    ])
+    r4 = await build_reply(company_id, BROKER_PHONE, "Dubai Hills for the lead",
+                            search=dh_search, extractor=dh_extractor)
     check("C8 project + format in one message skips the question",
-          "•" in r4 and gen3.calls, r4[:60])
+          "•" in r4 and dh_search.calls == ["Dubai Hills"], r4[:60])
 
     # State loss must degrade to a question, never to a wrong subject.
     state._reset_for_tests()
-    r5 = await build_reply(company_id, BROKER_PHONE, "ME", StubContentGenerator())
+    r5 = await build_reply(company_id, BROKER_PHONE, "ME")
     check("C9 answering ME with no pending question asks again rather than guessing",
           "lost track" in r5.lower())
 
-    # Generation failure must not fabricate.
-    class Dead:
-        async def lead_intel(self, subject, audience): return None
-        async def social_caption(self, kind): return None
-    await build_reply(company_id, BROKER_PHONE, "tell me about Arjan", Dead())
-    r6 = await build_reply(company_id, BROKER_PHONE, "ME", Dead())
-    check("C10 a failed generation says so and invents nothing",
+    # Search found sources, but extraction hard-failed — must not fabricate.
+    state._reset_for_tests()
+
+    class DeadExtractor:
+        async def extract_claims(self, subject, sources):
+            return None
+
+    dead_search = StubSearchProvider({"Arjan": [src("bayut.com")]})
+    await build_reply(company_id, BROKER_PHONE, "tell me about Arjan",
+                       search=dead_search, extractor=DeadExtractor())
+    r6 = await build_reply(company_id, BROKER_PHONE, "ME",
+                            search=dead_search, extractor=DeadExtractor())
+    check("C10 a failed extraction says so and invents nothing",
           "couldn't generate" in r6.lower() and "•" not in r6, r6[:80])
 
-    r7 = await build_reply(company_id, BROKER_PHONE, "hi", StubContentGenerator())
+    # Nothing usable found by search at all — the honest thin-sources reply.
+    state._reset_for_tests()
+    empty_search = StubSearchProvider({})
+    await build_reply(company_id, BROKER_PHONE, "tell me about Zzq Ghost Towers",
+                       search=empty_search, extractor=StubExtractionProvider(claims=[]))
+    # "Zzq Ghost Towers" is a low-confidence subject, so this first asks to
+    # confirm — mirrors G8-G11 below. Confirm, then check the thin reply.
+    r6b = await build_reply(company_id, BROKER_PHONE, "yes",
+                             search=empty_search, extractor=StubExtractionProvider(claims=[]))
+    r6c = await build_reply(company_id, BROKER_PHONE, "ME",
+                             search=empty_search, extractor=StubExtractionProvider(claims=[]))
+    check("C10b nothing found by search -> honest thin reply, no fabrication",
+          "couldn't find" in r6c.lower() and "•" not in r6c, r6c[:80])
+
+    r7 = await build_reply(company_id, BROKER_PHONE, "hi")
     check("C11 an unreadable message asks for a project/area",
           "project" in r7.lower() or "area" in r7.lower())
 
@@ -253,16 +354,16 @@ async def run_daily_checks(company_id: int) -> None:
     body = rec.sent[0][1] if rec.sent else ""
     check("D2 it offers both choices", "ARTICLE" in body and "FUN FACT" in body, body[:80])
     check("D3 the offer itself makes no market claim (so needs no caveat)",
-          formatter.MARKET_CAVEAT not in body)
+          formatter.MARKET_CAVEAT not in body and formatter.SOURCED_CAVEAT not in body)
 
     gen = StubContentGenerator()
     r1 = await build_reply(company_id, BROKER_PHONE, "ARTICLE", gen)
-    check("D4 ARTICLE returns a caption with the caveat",
+    check("D4 ARTICLE returns a caption with MARKET_CAVEAT (still ungrounded content)",
           "•" in r1 and formatter.MARKET_CAVEAT in r1)
     check("D5 it is short enough to post", len(r1) < 700, f"len={len(r1)}")
 
     r2 = await build_reply(company_id, BROKER_PHONE, "FUN FACT", gen)
-    check("D6 FUN FACT returns a caption with the caveat",
+    check("D6 FUN FACT returns a caption with MARKET_CAVEAT",
           "•" in r2 and formatter.MARKET_CAVEAT in r2)
     check("D7 the two kinds produce different copy", r1 != r2)
 
@@ -310,19 +411,28 @@ async def run_polish_checks(company_id: int) -> None:
           intents.parse("Zzq Nonexistent Towers").confidence == "low")
 
     state._reset_for_tests()
-    gen2 = StubContentGenerator()
-    r = await build_reply(company_id, BROKER_PHONE, "Zzq Nonexistent Towers", gen2)
+    zzq_search = StubSearchProvider({"Zzq Nonexistent Towers": [src("bayut.com")]})
+    zzq_extractor = StubExtractionProvider(claims=[
+        Claim("qualitative", "Zzq Nonexistent Towers", None, "",
+              "A newly listed development with limited public information", 1),
+    ])
+    r = await build_reply(company_id, BROKER_PHONE, "Zzq Nonexistent Towers",
+                           search=zzq_search, extractor=zzq_extractor)
     check("G8 an unrecognised project asks for confirmation instead of briefing",
           "recognise" in r and "YES" in r, r[:80])
-    check("G9 nothing is generated before she confirms", not gen2.calls, str(gen2.calls))
+    check("G9 nothing is searched or extracted before she confirms",
+          not zzq_search.calls and not zzq_extractor.calls,
+          f"search={zzq_search.calls} extract={zzq_extractor.calls}")
 
-    r = await build_reply(company_id, BROKER_PHONE, "YES", gen2)
+    r = await build_reply(company_id, BROKER_PHONE, "YES",
+                           search=zzq_search, extractor=zzq_extractor)
     check("G10 confirming proceeds to the format question with the ORIGINAL subject",
           "Zzq Nonexistent Towers" in r and "ME" in r and "LEAD" in r, r[:90])
 
-    r = await build_reply(company_id, BROKER_PHONE, "ME", gen2)
-    check("G11 and then briefs on it, caveat intact",
-          "•" in r and formatter.MARKET_CAVEAT in r)
+    r = await build_reply(company_id, BROKER_PHONE, "ME",
+                           search=zzq_search, extractor=zzq_extractor)
+    check("G11 and then briefs on it, SOURCED_CAVEAT intact",
+          "•" in r and formatter.SOURCED_CAVEAT in r, r)
 
     state._reset_for_tests()
     gen3 = StubContentGenerator()
@@ -331,7 +441,7 @@ async def run_polish_checks(company_id: int) -> None:
           "ME" in r and "LEAD" in r and "recognise" not in r, r[:70])
 
     state._reset_for_tests()
-    r = await build_reply(company_id, BROKER_PHONE, "yes", StubContentGenerator())
+    r = await build_reply(company_id, BROKER_PHONE, "yes")
     check("G13 a bare YES with no pending question asks again rather than guessing",
           "lost track" in r.lower(), r[:70])
 
@@ -339,23 +449,48 @@ async def run_polish_checks(company_id: int) -> None:
 # ── H. real-usage regressions (from Manju's actual conversation) ──
 
 async def run_real_usage_checks(company_id: int) -> None:
-    """Both cases come verbatim from her live conversation log.
+    """Both cases come verbatim from her live conversation log — and the
+    stub sources/claims below are deliberately shaped to reproduce the two
+    concrete defects found while building the sourced-briefing pipeline:
+    a total-price/price-per-sqft mixup for Arjan, and a Dubai-wide yield
+    figure that must not attach itself to JVC.
 
-    1. "Compare Arjan and JVC in terms of real estate rates and ROI" —
-       the bot recognised Arjan, answered about it alone, and gave no sign
-       it had dropped JVC or that a comparison was asked for. Silently
-       answering half a question is worse than saying what you understood.
-
+    1. "Compare Arjan and JVC in terms of real estate rates and ROI" — the
+       bot recognised Arjan, answered about it alone, and gave no sign it
+       had dropped JVC or that a comparison was asked for.
     2. "I need data backed reply, with numbers" — an explicit request for
-       something this tool does not have was parsed as a project name, so
-       she was asked to confirm it was a real place. An explicit ask must
-       get an honest answer, not a mis-parse.
+       real figures was parsed as a project name, so she was asked to
+       confirm it was a real place.
     """
     print("\n== H. real-usage regressions (her actual messages) ==")
     state._reset_for_tests()
 
     HER_COMPARISON = "Compare Arjan and JVC in terms of real estate rates and ROI"
     HER_DATA_ASK = "I need data backed reply, with numbers"
+
+    def h_claims(subject: str, sources) -> list[Claim]:
+        if subject == "Arjan":
+            return [
+                # THE mixed-unit bug: a total price and a price-per-sqft
+                # figure from the same source. Must render as two bullets.
+                Claim("total_price", "Arjan", 1_000_000, "", "", 1),
+                Claim("price_per_sqft", "Arjan", 1_564, "", "", 1),
+                Claim("price_per_sqft", "Arjan", 1_450, "", "", 2),
+                Claim("rental_yield_pct", "Arjan", 8.0, "", "", 1),
+                Claim("qualitative", "Arjan", None, "",
+                      "Popular with first-time investors for its affordability", 1),
+            ]
+        if subject == "JVC":
+            return [
+                Claim("price_per_sqft", "JVC", 1_469, "", "", 1),
+                Claim("rental_yield_pct", "JVC", 7.5, "", "", 1),
+                # THE citywide-leak bug: a Dubai-wide figure that must NOT
+                # attach itself to JVC's briefing.
+                Claim("rental_yield_pct", "citywide", 6.68, "", "", 2),
+                Claim("qualitative", "JVC", None, "",
+                      "Well-established with strong rental demand", 1),
+            ]
+        return []
 
     # ── 1. multi-area comparison ──
     i = intents.parse(HER_COMPARISON)
@@ -364,23 +499,40 @@ async def run_real_usage_checks(company_id: int) -> None:
     check("H2 BOTH areas are captured — JVC is no longer dropped",
           i.subjects == ["Arjan", "JVC"], str(i.subjects))
 
-    gen = StubContentGenerator()
-    r = await build_reply(company_id, BROKER_PHONE, HER_COMPARISON, gen)
+    h_search = StubSearchProvider({
+        "Arjan": [src("propertyfinder.ae"), src("bayut.com")],
+        "JVC": [src("bayut.com"), src("engelvoelkers.com")],
+    })
+    h_extractor = StubExtractionProvider(claims=h_claims)
+    r = await build_reply(company_id, BROKER_PHONE, HER_COMPARISON,
+                           search=h_search, extractor=h_extractor)
     check("H3 the reply names both areas", "Arjan" in r and "JVC" in r, r[:80])
-    check("H4 it generated a comparison, not a single-area briefing",
-          any(c[0] == "compare_areas" for c in gen.calls), str(gen.calls))
-    check("H5 the comparison still carries the sourcing caveat",
-          formatter.MARKET_CAVEAT in r)
+    check("H4 it actually searched BOTH areas, not a single-area briefing",
+          h_search.calls == ["Arjan", "JVC"], str(h_search.calls))
+    check("H5 the comparison still carries SOURCED_CAVEAT", formatter.SOURCED_CAVEAT in r)
+
+    lines_in_r = r.splitlines()
+    check("H5b Arjan's total price and price/sqft never share one bullet "
+          "(the mixed-unit bug this pipeline replaced)",
+          any("1,000,000" in ln for ln in lines_in_r)
+          and any("/sqft" in ln for ln in lines_in_r)
+          and not any("1,000,000" in ln and "/sqft" in ln for ln in lines_in_r),
+          r)
+    check("H5c the Dubai-wide yield figure (6.68) is dropped from JVC's briefing",
+          "6.68" not in r, r)
 
     # ── 2. partial comparison: say so, don't answer half ──
     state._reset_for_tests()
-    gen2 = StubContentGenerator()
+    partial_search = StubSearchProvider({"Arjan": [src("bayut.com")], "Nakheel Heights": []})
+    partial_extractor = StubExtractionProvider(claims=[])
     r = await build_reply(company_id, BROKER_PHONE,
-                           "compare Arjan and Nakheel Heights", gen2)
+                           "compare Arjan and Nakheel Heights",
+                           search=partial_search, extractor=partial_extractor)
     check("H6 one area found where several were meant -> says which it got",
           "Arjan" in r and "only" in r.lower(), r[:90])
-    check("H7 ...and generates nothing rather than answering half",
-          not gen2.calls, str(gen2.calls))
+    check("H7 ...and searches/extracts nothing rather than answering half",
+          not partial_search.calls and not partial_extractor.calls,
+          f"search={partial_search.calls} extract={partial_extractor.calls}")
 
     # ── 3. explicit data request ──
     i = intents.parse(HER_DATA_ASK)
@@ -388,16 +540,19 @@ async def run_real_usage_checks(company_id: int) -> None:
           i.kind == "data_request", f"{i.kind}/{i.subject!r}")
 
     state._reset_for_tests()
-    gen3 = StubContentGenerator()
-    r = await build_reply(company_id, BROKER_PHONE, HER_DATA_ASK, gen3)
-    check("H9 it answers honestly about having no live data",
-          "don't have live transaction data" in r, r[:80])
+    data_search = StubSearchProvider({})
+    data_extractor = StubExtractionProvider(claims=[])
+    r = await build_reply(company_id, BROKER_PHONE, HER_DATA_ASK,
+                           search=data_search, extractor=data_extractor)
+    check("H9 it answers honestly: still no official DLD transaction data",
+          "official dld transaction data" in r.lower(), r[:100])
     check("H10 it does NOT ask her to confirm it's a real place (the old bug)",
           "recognise" not in r and "YES" not in r, r[:80])
-    check("H11 it generates nothing — no briefing dressed up as data",
-          not gen3.calls, str(gen3.calls))
-    check("H12 it offers the route to getting real data added",
-          "feature" in r.lower())
+    check("H11 it searches/extracts nothing — no briefing dressed up as data",
+          not data_search.calls and not data_extractor.calls)
+    check("H12 it now invites her to name an area to get real search-backed "
+          "figures, rather than flatly refusing",
+          "arjan" in r.lower() and "jvc" in r.lower() and "search" in r.lower(), r)
 
     # ── 4. the fixes must not swallow ordinary messages ──
     state._reset_for_tests()
@@ -442,6 +597,11 @@ async def run_isolation_checks(company_id: int) -> None:
         f"Forwarded: {STRANGER_NAME} {STRANGER_PHONE} is asking about "
         "Sobha Hartland, 2BR, budget 2.4M"
     )
+    # No search/extractor override here on purpose: this exercises the real
+    # get_search_provider()/get_extraction_provider() fallback path, which
+    # is why TAVILY_API_KEY/OPENAI_API_KEY are pinned to placeholders at the
+    # top of this file — this call resolves to the stubs and returns no
+    # sources, never a live network call.
     async with SessionLocal() as inner:
         spy = SpySession(inner)
         await process_incoming_message(spy, BROKER_PHONE, forwarded)

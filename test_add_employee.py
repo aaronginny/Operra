@@ -1,3 +1,19 @@
+import os
+
+# This file, unlike every other test_*.py here, runs against whatever
+# DATABASE_URL .env points at (the real local dev DB) rather than an
+# isolated throwaway one — a pre-existing gap, unrelated to this pin, that
+# is why it currently fails on a stale local schema (missing columns added
+# by later migrations) rather than on anything below.
+#
+# It DOES send messages like "Ryan pack 5 boxes by 6pm" through
+# process_incoming_message, which routes to ai_service.py's OpenAI-guarded
+# extraction. That must stay on the rule-based fallback regardless of what
+# real key sits in the local .env (kept there for broker_intel's live-
+# verification probes) or this file silently starts making live OpenAI
+# calls once the schema issue above is fixed.
+os.environ["OPENAI_API_KEY"] = "sk-your-openai-api-key-here"
+
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session

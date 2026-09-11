@@ -4,13 +4,17 @@ The vertical for a Dubai real-estate broker working from WhatsApp. Two
 features:
 
   1. Lead intel on demand. She forwards or types a project/area and gets a
-     scannable bulleted briefing — market context, why it appeals,
-     appreciation in qualitative terms, developer reputation, landmarks. She
+     scannable bulleted briefing built from real web search results — real
+     figures with cited sources, not the model's own general knowledge. She
      is asked which format she wants first (a quick read for herself, or
      polished text she can forward to a client verbatim) unless her message
-     already said.
+     already said. See briefing.py for the search -> extract -> assemble
+     pipeline, and extraction.py's docstring for why lead intel no longer
+     goes through free-text AI generation at all.
   2. A daily content nudge. Once a day she is offered an ARTICLE or a FUN
-     FACT; whichever she picks comes back as a ready-to-post caption.
+     FACT; whichever she picks comes back as a ready-to-post caption. This
+     one IS free-text AI generation (content.py) — a social caption makes
+     no factual claim a client would rely on, so it doesn't need sourcing.
 
 Registered with persist_inbound=False, like launch_matcher and for the same
 reason: what she forwards is lead material and can carry a third party's
@@ -33,8 +37,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User, UserRole
-from app.services.broker_intel import formatter, intents, state
+from app.services.broker_intel import briefing, formatter, intents, state
 from app.services.broker_intel.content import ContentGenerator, get_generator
+from app.services.broker_intel.extraction import ExtractionProvider
+from app.services.broker_intel.search import SearchProvider
 from app.verticals.registry import Vertical, register_vertical
 
 logger = logging.getLogger(__name__)
@@ -62,13 +68,19 @@ async def build_reply(
     sender: str,
     text: str,
     generator: ContentGenerator | None = None,
+    search: SearchProvider | None = None,
+    extractor: ExtractionProvider | None = None,
 ) -> str:
     """Work out the reply for one inbound message.
 
     Pure with respect to the database — it reads no tables and writes none,
-    which is what lets this vertical be stateless. `generator` is injected
-    by the tests; production resolves it per call so a key added to the
-    environment takes effect without a redeploy of this module's import.
+    which is what lets this vertical be stateless. `generator`, `search`
+    and `extractor` are injected by the tests; production resolves each
+    per call so a key added to the environment takes effect without a
+    redeploy of this module's import. `generator` backs only the daily
+    nudge's social captions now — lead intel and comparisons go through
+    briefing.py's search -> extract pipeline instead (see this module's
+    docstring).
     """
     gen = generator or get_generator()
     intent = intents.parse(text)
@@ -77,18 +89,18 @@ async def build_reply(
     if intent.kind == "greeting":
         return formatter.render_greeting()
 
-    # An explicit ask for real figures. Answered honestly rather than
-    # mis-parsed as a project name — this vertical has no live data source.
+    # An explicit ask for real figures with no subject named. Answered
+    # honestly about what's still not available (official DLD data) and
+    # pointed at what actually gets her real numbers now: naming an area.
     if intent.kind == "data_request":
         return formatter.render_no_live_data()
 
-    # Two or more areas: a real side-by-side, not a silent pick of the first.
+    # Two or more areas: a real side-by-side, sourced per area.
     if intent.kind == "comparison" and intent.subjects:
         audience = intent.audience or "self"
-        lines = await gen.compare_areas(intent.subjects, audience)
-        if not lines:
-            return formatter.render_unavailable()
-        return formatter.render_comparison(intent.subjects, lines, audience)
+        return await briefing.build_comparison_reply(
+            intent.subjects, audience, search=search, extractor=extractor
+        )
 
     # One area found where she clearly meant several — say so instead of
     # answering half the question.
@@ -109,10 +121,9 @@ async def build_reply(
         pending = state.take_pending(company_id, sender)
         if pending is None:
             return formatter.render_forgot_context()
-        lines = await gen.lead_intel(pending.subject, intent.value or "self")
-        if not lines:
-            return formatter.render_unavailable()
-        return formatter.render_lead_intel(pending.subject, lines, intent.value or "self")
+        return await briefing.build_lead_intel_reply(
+            pending.subject, intent.value or "self", search=search, extractor=extractor
+        )
 
     # She picked ARTICLE / FUN FACT — either answering the daily nudge or
     # asking cold. Both are handled identically, which is why losing the
@@ -135,10 +146,9 @@ async def build_reply(
 
         # Format already stated in the same message — no need to ask.
         if intent.audience:
-            lines = await gen.lead_intel(intent.subject, intent.audience)
-            if not lines:
-                return formatter.render_unavailable()
-            return formatter.render_lead_intel(intent.subject, lines, intent.audience)
+            return await briefing.build_lead_intel_reply(
+                intent.subject, intent.audience, search=search, extractor=extractor
+            )
 
         state.set_pending(company_id, sender, "audience", intent.subject)
         return formatter.render_format_question(intent.subject)

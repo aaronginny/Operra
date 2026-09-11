@@ -1,19 +1,25 @@
-"""Content generation for broker_intel — the AI seam.
+"""Content generation for broker_intel — the AI seam for its ungrounded
+content: the daily nudge's article/fun-fact captions.
 
 Same shape as launch_matcher's WhatsAppProvider: a Protocol, a real
 implementation, and a deterministic stand-in, so the whole vertical is
 testable without an API key and swapping the model later touches one class.
 
-SOURCING POLICY. Everything here is AI-generated general market commentary.
-There is no live DLD (Dubai Land Department) integration: no official
-real-time API exists at a latency this use case can rely on, so nothing this
-module returns may ever be presented as an official figure. This module is
-deliberately NOT where that promise is kept — see formatter.py, which appends
-the caveat to every content-bearing reply regardless of what came back from
-here. A generator that forgot to caveat itself still cannot produce an
-uncaveated reply.
+SOURCING POLICY. Everything here is AI-generated general commentary, with
+no search behind it — appropriate for a social caption, which isn't making
+a factual claim a client would rely on. Lead intel and comparisons, which
+ARE claims a client might rely on, no longer go through this module at all:
+they're built by briefing.py from real web search results via
+extraction.py's structured pipeline, precisely because free-text AI
+commentary about prices and yields turned out not to be trustworthy enough
+(see extraction.py's docstring for the bug that prompted the split).
 
-The prompts below ask the model to avoid stating precise figures as fact and
+This module is deliberately NOT where the caveat promise is kept — see
+formatter.py, which appends MARKET_CAVEAT to every reply built from
+`social_caption` regardless of what came back from here. A generator that
+forgot to caveat itself still cannot produce an uncaveated reply.
+
+The prompt below asks the model to avoid stating precise figures as fact and
 to stay qualitative, which reduces how often a hard number shows up at all.
 That is a second line of defence, not the primary one.
 """
@@ -46,31 +52,6 @@ _SHARED_RULES = (
     "- No emoji.\n"
 )
 
-_LEAD_INTEL_SYSTEM = (
-    "You are a Dubai real-estate market briefing assistant for a working broker.\n"
-    "Given a project or area, produce a briefing covering, in this order: "
-    "general market context for the area; why the project appeals (lifestyle, "
-    "amenities); appreciation potential in qualitative terms; developer "
-    "reputation if known; and nearby landmarks.\n"
-    + _SHARED_RULES
-)
-
-_AUDIENCE_RULES = {
-    # Her own eyes: shorthand is fine, she is scanning it while on a call.
-    "self": (
-        "Audience: the broker herself, reading privately mid-call. Terse "
-        "shorthand is fine. Fragments are fine."
-    ),
-    # Goes straight to a client untouched, so nothing internal may leak in.
-    "lead": (
-        "Audience: the broker's client, who will receive this text forwarded "
-        "verbatim. Write it so it can be sent as-is: polished, warm, complete "
-        "sentences. Never refer to the broker in the third person, never "
-        "include internal notes, next steps for the broker, or instructions "
-        "addressed to the broker."
-    ),
-}
-
 _ARTICLE_SYSTEM = (
     "You are a social-media copywriter for a Dubai real-estate broker.\n"
     "Write a short, punchy, ready-to-post social caption on a general Dubai "
@@ -86,29 +67,10 @@ _FUN_FACT_SYSTEM = (
 )
 
 
-_COMPARISON_SYSTEM = (
-    "You are a Dubai real-estate market briefing assistant for a working "
-    "broker.\n"
-    "Given two or more areas, produce a SIDE-BY-SIDE comparison. Cover each "
-    "area on its own terms and make the contrast explicit — who each one "
-    "suits, how they differ on lifestyle, tenant demand and longer-term "
-    "prospects.\n"
-    "Prefix every bullet with the area name in asterisks, e.g. "
-    "'- *JVC* affordable townhouses, strong family tenant demand'. Give each "
-    "area a comparable number of bullets, and end with one bullet starting "
-    "'- *In short*' summarising the trade-off.\n"
-    + _SHARED_RULES
-)
-
-
 class ContentGenerator(Protocol):
-    """Anything that can produce bullet lines for broker_intel."""
-
-    async def lead_intel(self, subject: str, audience: str) -> list[str] | None: ...
-
-    async def compare_areas(
-        self, subjects: list[str], audience: str
-    ) -> list[str] | None: ...
+    """Anything that can produce bullet lines for broker_intel's ungrounded
+    content. lead_intel/compare_areas used to live here too; they moved to
+    briefing.py's search-backed pipeline — see this module's docstring."""
 
     async def social_caption(self, kind: str) -> list[str] | None: ...
 
@@ -164,21 +126,6 @@ class OpenAIContentGenerator:
             logger.exception("broker_intel generation errored")
             return None
 
-    async def lead_intel(self, subject: str, audience: str) -> list[str] | None:
-        rules = _AUDIENCE_RULES.get(audience, _AUDIENCE_RULES["self"])
-        return await self._complete(
-            f"{_LEAD_INTEL_SYSTEM}\n{rules}",
-            f"Brief me on: {subject}",
-        )
-
-    async def compare_areas(self, subjects: list[str], audience: str) -> list[str] | None:
-        rules = _AUDIENCE_RULES.get(audience, _AUDIENCE_RULES["self"])
-        joined = " vs ".join(subjects)
-        return await self._complete(
-            f"{_COMPARISON_SYSTEM}\n{rules}",
-            f"Compare these areas for a client: {joined}",
-        )
-
     async def social_caption(self, kind: str) -> list[str] | None:
         system = _ARTICLE_SYSTEM if kind == "article" else _FUN_FACT_SYSTEM
         return await self._complete(system, "Write today's caption.")
@@ -195,25 +142,6 @@ class StubContentGenerator:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
-
-    async def lead_intel(self, subject: str, audience: str) -> list[str] | None:
-        self.calls.append(("lead_intel", f"{subject}|{audience}"))
-        return [
-            f"{subject} sits in an area that continues to draw steady investor interest.",
-            "Amenities and everyday conveniences are within easy reach.",
-            "Well-placed for tenants who want a short commute.",
-            "Developer has an established delivery record.",
-            "Longer-term appreciation prospects are viewed positively.",
-        ]
-
-    async def compare_areas(self, subjects: list[str], audience: str) -> list[str] | None:
-        self.calls.append(("compare_areas", f"{'|'.join(subjects)}|{audience}"))
-        lines = []
-        for s_ in subjects:
-            lines.append(f"{s_} draws steady interest from its own type of buyer.")
-            lines.append(f"{s_} has amenities and transport within easy reach.")
-        lines.append("In short, the right choice depends on the tenant profile you want.")
-        return lines
 
     async def social_caption(self, kind: str) -> list[str] | None:
         self.calls.append(("social_caption", kind))

@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
 
+    # ── Tavily (web search for broker_intel's sourced briefings) ──
+    # Optional: without it, broker_intel.search falls back to a stub that
+    # returns no results, which the pipeline reads as "nothing found" and
+    # answers honestly rather than failing — see search.py.
+    tavily_api_key: str | None = None
+
     # ── Twilio WhatsApp ───────────────────────────────────────
     twilio_account_sid: str | None = None
     twilio_auth_token: str | None = None
