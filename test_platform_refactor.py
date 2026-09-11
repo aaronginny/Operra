@@ -45,6 +45,14 @@ IS_SQLITE = TEST_DB_URL.startswith("sqlite")
 
 os.environ["DATABASE_URL"] = TEST_DB_URL
 
+# run_generic_control_checks below sends a real generic-pipeline command
+# through process_incoming_message, which routes to ai_service.py's OpenAI-
+# guarded extraction. That must stay on the rule-based fallback regardless
+# of what real key sits in the local .env (kept there for broker_intel's
+# live-verification probes — see search.py/extraction.py) or this suite
+# silently starts making live OpenAI calls.
+os.environ["OPENAI_API_KEY"] = "sk-your-openai-api-key-here"
+
 from sqlalchemy import select as sa_select, text as sa_text  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
