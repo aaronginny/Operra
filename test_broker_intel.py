@@ -214,16 +214,41 @@ def run_caveat_checks() -> None:
     src_text = inspect.getsource(formatter)
     check("B5 _bullets has exactly one definition",
           src_text.count("def _bullets(") == 1, str(src_text.count("def _bullets(")))
-    check("B6 _bullets is called from exactly two reply-assembly functions "
-          "(_content_reply and _sourced_reply) — a third path would need a "
-          "visible new call site here",
-          src_text.count("_bullets(") == 3,  # 1 def + 2 calls
-          f"_bullets referenced {src_text.count('_bullets(')}x")
+
+    # The invariant that matters is WHICH functions turn bullets into a
+    # body, not how many times the helper is called inside them (the
+    # grouped-sections layout added a second call site inside
+    # _sourced_reply). Walk the AST and confirm the only callers are still
+    # the two caveat-appending chokepoints.
+    import ast
+    tree = ast.parse(src_text)
+    callers = set()
+    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_bullets":
+                callers.add(fn.name)
+    check("B6 _bullets is called ONLY from the two caveat-appending "
+          "chokepoints — a third caller would be a reply path that could "
+          "skip the caveat",
+          callers == {"_content_reply", "_sourced_reply"}, str(sorted(callers)))
+
     check("B7 _content_reply takes no flag that could disable MARKET_CAVEAT",
           "def _content_reply(header: str, lines: list[str]) -> str:" in src_text)
-    check("B8 _sourced_reply takes no flag that could disable SOURCED_CAVEAT",
-          "def _sourced_reply(" in src_text
-          and "cited_sources: list[tuple[int, object]],\n) -> str:" in src_text)
+
+    # _sourced_reply may gain parameters (it took `sections` for the grouped
+    # layout) but none of them may be able to turn the caveat off: assert
+    # the caveat is appended unconditionally, outside any branch.
+    sourced_fn = next(n for n in ast.walk(tree)
+                      if isinstance(n, ast.FunctionDef) and n.name == "_sourced_reply")
+    appends_caveat_at_top_level = any(
+        isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call)
+        and getattr(stmt.value.func, "attr", None) == "append"
+        and any(getattr(a, "id", None) == "SOURCED_CAVEAT" for a in stmt.value.args)
+        for stmt in sourced_fn.body
+    )
+    check("B8 _sourced_reply appends SOURCED_CAVEAT unconditionally at its "
+          "top level — not inside an if, so no argument can skip it",
+          appends_caveat_at_top_level)
 
     # The lead-ready format is forwarded verbatim, so it must not address her.
     lead_body = contentful["render_lead_intel/lead"]

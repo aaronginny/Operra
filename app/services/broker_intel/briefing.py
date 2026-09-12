@@ -15,6 +15,8 @@ ContentGenerator uses.
 
 from __future__ import annotations
 
+import re
+
 from app.services.broker_intel import formatter
 from app.services.broker_intel.extraction import (
     Claim,
@@ -24,12 +26,18 @@ from app.services.broker_intel.extraction import (
     remap_claims,
     render_bullets,
     render_comparison_bullets,
+    render_comparison_sections,
 )
 from app.services.broker_intel.search import (
     SearchProvider,
     SourceResult,
     get_search_provider,
 )
+
+# Comparison layout. False = one interleaved list, metric by metric across
+# both areas; True = a block per area under its own sub-header. Both are
+# built and tested; this flag is the single place the default is chosen.
+COMPARISON_GROUPED = True
 
 
 async def build_lead_intel_reply(
@@ -63,6 +71,7 @@ async def build_comparison_reply(
     audience: str,
     search: SearchProvider | None = None,
     extractor: ExtractionProvider | None = None,
+    grouped: bool = COMPARISON_GROUPED,
 ) -> str:
     search = search or get_search_provider()
     extractor = extractor or get_extraction_provider()
@@ -96,11 +105,33 @@ async def build_comparison_reply(
     if not per_area_facts:
         return formatter.render_thin_sources(" vs ".join(subjects))
 
-    bullets = render_comparison_bullets(per_area_facts, audience)
     all_ranges = [r for ranges, _q in per_area_facts.values() for r in ranges]
     all_qual = [q for _r, qualitative in per_area_facts.values() for q in qualitative]
+
+    if grouped:
+        sections = render_comparison_sections(per_area_facts, audience)
+        # Only the facts that actually made it into a section may be cited.
+        shown = _shown_in_sections(sections, all_ranges, all_qual)
+        cited_sources = _cited(combined_sources, *shown)
+        return formatter.render_comparison(
+            subjects, [], audience, cited_sources, sections=sections
+        )
+
+    bullets = render_comparison_bullets(per_area_facts, audience)
     cited_sources = _cited(combined_sources, all_ranges, all_qual)
     return formatter.render_comparison(subjects, bullets, audience, cited_sources)
+
+
+def _shown_in_sections(sections, all_ranges, all_qual):
+    """Narrow the citation list to the markers that actually appear in the
+    rendered sections — a source that got trimmed by a per-area cap must not
+    still be listed under Sources:."""
+    rendered = " ".join(line for _name, lines in sections for line in lines)
+    used = {int(n) for n in re.findall(r"\[(\d+)\]", rendered)}
+    return (
+        [r for r in all_ranges if set(r.source_indices) & used],
+        [q for q in all_qual if q.source_index in used],
+    )
 
 
 def _cited(sources: list[SourceResult], ranges, qualitative) -> list[tuple[int, SourceResult]]:

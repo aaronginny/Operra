@@ -74,14 +74,28 @@ def _sourced_reply(
     header: str,
     lines: list[str],
     cited_sources: list[tuple[int, object]],
+    sections: list[tuple[str, list[str]]] | None = None,
 ) -> str:
     """Bullets-to-body path for content built from real search results —
     the counterpart to _content_reply. Always caveated with SOURCED_CAVEAT,
     and lists exactly which sources were actually cited (each `[n]` marker
     that reached this reply's bullets, resolved to its domain) — never the
     full search result set, only what got used.
+
+    `sections` renders a grouped body (a bold sub-header per area, its own
+    bullets beneath) instead of one flat list; `lines` is used when it is
+    absent. Both shapes are assembled HERE rather than by the caller, so
+    there is still exactly one function in this package that turns sourced
+    content into a message body, and it still appends the caveat with no
+    way to switch it off.
     """
-    parts = [p for p in (header, _bullets(lines)) if p]
+    if sections:
+        body_parts = [f"*{name}*\n{_bullets(section_lines)}"
+                      for name, section_lines in sections if section_lines]
+        body = "\n\n".join(body_parts)
+    else:
+        body = _bullets(lines)
+    parts = [p for p in (header, body) if p]
     if cited_sources:
         parts.append("Sources: " + "  ".join(f"[{i}] {s.domain}" for i, s in cited_sources))
     parts.append(SOURCED_CAVEAT)
@@ -139,10 +153,18 @@ def render_comparison(
     lines: list[str],
     audience: str,
     cited_sources: list[tuple[int, object]] | None = None,
+    sections: list[tuple[str, list[str]]] | None = None,
 ) -> str:
     """A genuine side-by-side, built from real search results per area —
     see briefing.py. Goes through _sourced_reply like render_lead_intel, so
-    the caveat and source list still cannot be skipped."""
+    the caveat and source list still cannot be skipped.
+
+    `sections` selects the grouped layout (a block per area) over the flat
+    interleaved one; the header is dropped in grouped mode because each
+    block already names its area.
+    """
+    if sections:
+        return _sourced_reply("", [], cited_sources or [], sections=sections)
     header = "" if audience == "lead" else "*" + " vs ".join(subjects) + "*"
     return _sourced_reply(header, lines, cited_sources or [])
 
