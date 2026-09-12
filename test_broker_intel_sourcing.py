@@ -28,13 +28,18 @@ import sys
 
 from app.services.broker_intel import briefing, formatter
 from app.services.broker_intel.extraction import (
+    MAX_QUALITATIVE_SINGLE,
     Claim,
+    QualitativeFact,
     StubExtractionProvider,
     _parse_claims,
     assemble_ranges,
+    is_plausible,
+    is_substantive_note,
     remap_claims,
     render_bullets,
     render_comparison_bullets,
+    render_comparison_sections,
 )
 from app.services.broker_intel.search import (
     REPUTABLE_DOMAINS,
@@ -351,14 +356,15 @@ def run_audience_checks() -> None:
         ], "JVC"),
     }
     comp = render_comparison_bullets(crowded, "self")
-    check("G7 a qualifier-heavy area contributes at most ONE bullet per "
-          "metric to a comparison, not one per qualifier variant",
-          sum(1 for b in comp if "*Arjan*" in b and "Price/sqft" in b) == 1, str(comp))
+    check("G7 a qualifier-heavy area is capped at VARIANTS_PER_METRIC "
+          "bullets for one metric, not one per qualifier variant "
+          "(4 variants in, at most 2 out)",
+          sum(1 for b in comp if "*Arjan*" in b and "Price/sqft" in b) <= 2, str(comp))
     check("G8 ...so the other area's DIFFERENT metric still makes it into "
           "the comparison rather than being crowded out",
           any("*JVC*" in b and "Rental yield" in b for b in comp), str(comp))
-    check("G9 the representative Arjan figure is the unqualified one, "
-          "not an arbitrary unit-type variant",
+    check("G9 the unqualified figure is preferred over a unit-type variant, "
+          "so the general area number is never the one dropped",
           any("*Arjan*" in b and "Price/sqft:" in b and "1,500" in b for b in comp), str(comp))
 
 
@@ -461,6 +467,107 @@ async def run_briefing_checks() -> None:
           tracked.calls == ["Arjan", "JVC"], str(tracked.calls))
 
 
+# ── J. substance pass: plausibility, filler filter, layout ───
+
+def run_substance_checks() -> None:
+    """Client feedback: the briefings read thin next to plain ChatGPT, and
+    some bullets were marketing filler. These cover the three fixes."""
+    print("\n== J. substance pass — plausibility, filler filter, layouts ==")
+
+    # 1. Metric mislabelling. Live testing produced "Typical unit prices run
+    #    AED 693 for studio units" — a price/sqft figure filed as a total
+    #    price. Grouping can't catch that; the plausibility bound must.
+    mislabelled = ('{"claims": [{"metric": "total_price", "scope_area": "JVC", '
+                    '"value": 693, "qualifier": "studio", "note": "", '
+                    '"source_index": 1}]}')
+    check("J1 a price/sqft value mislabelled as total_price is dropped",
+          _parse_claims(mislabelled, 3) == [], str(_parse_claims(mislabelled, 3)))
+    check("J2 the SAME value is kept when filed under the right metric",
+          len(_parse_claims(mislabelled.replace("total_price", "price_per_sqft"), 3)) == 1)
+
+    for metric, bad in (("rental_yield_pct", 400), ("down_payment_pct", 900),
+                         ("days_on_market", 99999), ("service_charge", 50000),
+                         ("annual_rent", 12), ("price_per_sqft", 1)):
+        raw = ('{"claims": [{"metric": "%s", "scope_area": "X", "value": %s, '
+               '"qualifier": "", "note": "", "source_index": 1}]}' % (metric, bad))
+        check(f"J3 an impossible {metric} ({bad}) is dropped",
+              _parse_claims(raw, 3) == [])
+
+    check("J4 plausible values for every metric survive",
+          all(is_plausible(m, v) for m, v in (
+              ("price_per_sqft", 1568), ("total_price", 1_000_000),
+              ("rental_yield_pct", 8.4), ("annual_rent", 66_531),
+              ("yoy_change_pct", 4.1), ("transaction_count", 135),
+              ("days_on_market", 45), ("service_charge", 11),
+              ("down_payment_pct", 20))))
+
+    # 2. The filler filter — her actual complaint, verbatim.
+    check("J5 'JVC is popular for strong rental yields' is rejected as filler",
+          not is_substantive_note("JVC is popular for strong rental yields"))
+    for filler in ("A vibrant community with modern amenities",
+                    "A sought-after area for investors",
+                    "Ideal for families and young professionals",
+                    "An excellent investment opportunity",
+                    "Accessible community with growing amenities"):
+        check(f"J6 filler rejected: {filler[:40]!r}", not is_substantive_note(filler))
+
+    for real in ("Circle Mall and Al Khail Road sit inside the community",
+                  "Served by the Dubai Metro red line at Mall of the Emirates",
+                  "Developed by Nakheel with handover scheduled for phase two",
+                  "Arjan offers full freehold ownership rights"):
+        check(f"J7 substantive kept: {real[:40]!r}", is_substantive_note(real))
+
+    check("J8 filler is dropped at parse time, not just at render time",
+          _parse_claims('{"claims": [{"metric": "qualitative", "scope_area": "JVC", '
+                         '"value": null, "qualifier": "", "note": "a vibrant community", '
+                         '"source_index": 1}]}', 3) == [])
+
+    # 3. Numeric facts always outrank colour commentary for the budget.
+    ranges, _ = assemble_ranges(
+        [Claim("price_per_sqft", "JVC", 1500, "", "", 1),
+         Claim("rental_yield_pct", "JVC", 7.5, "", "", 1)], "JVC")
+    many_qual = [QualitativeFact(f"Circle Mall sits in district {i}", 1) for i in range(5)]
+    bullets = render_bullets("JVC", ranges, many_qual, "self", max_bullets=10)
+    check("J9 qualitative bullets are capped so numbers dominate",
+          sum(1 for b in bullets if "Circle Mall" in b) <= MAX_QUALITATIVE_SINGLE,
+          str(bullets))
+    check("J10 ...and every numeric fact still made it in",
+          sum(1 for b in bullets if "AED" in b or "%" in b) == 2, str(bullets))
+
+    # 4. New metrics render with the right units.
+    for metric, value, expect in (
+        ("transaction_count", 135, "135"),
+        ("days_on_market", 45, "45 days"),
+        ("service_charge", 11, "AED 11/sqft/yr"),
+        ("down_payment_pct", 20, "20%"),
+    ):
+        r, _ = assemble_ranges([Claim(metric, "JVC", value, "", "", 1)], "JVC")
+        line = render_bullets("JVC", r, [], "self")[0]
+        check(f"J11 {metric} renders with its unit ({expect})", expect in line, line)
+
+    # 5. The grouped layout.
+    per_area = {
+        "Arjan": assemble_ranges([
+            Claim("price_per_sqft", "Arjan", 1568, "", "", 1),
+            Claim("rental_yield_pct", "Arjan", 8.4, "", "", 2)], "Arjan"),
+        "JVC": assemble_ranges([
+            Claim("service_charge", "JVC", 11, "", "", 3)], "JVC"),
+    }
+    sections = render_comparison_sections(per_area, "self")
+    check("J12 grouped layout returns one section per area, in order",
+          [name for name, _ in sections] == ["Arjan", "JVC"], str(sections))
+    check("J13 bullets under a sub-header don't repeat the area name",
+          all("Arjan" not in ln for ln in dict(sections)["Arjan"]), str(sections))
+
+    lead_sections = render_comparison_sections(per_area, "lead")
+    lead_lines = dict(lead_sections)["Arjan"]
+    check("J14 LEAD bullets under a sub-header read as whole phrases, "
+          "not sentences beginning mid-clause (the 'is currently trading' bug)",
+          not any(ln[0].islower() for ln in lead_lines), str(lead_lines))
+    check("J15 price/sqft is not double-united ('AED 1,568/sqft per square foot')",
+          not any("/sqft per square" in ln for ln in lead_lines), str(lead_lines))
+
+
 async def main() -> None:
     print("=" * 68)
     print("  broker_intel sourcing pipeline verification")
@@ -474,6 +581,7 @@ async def main() -> None:
     run_remap_checks()
     run_audience_checks()
     run_allowlist_checks()
+    run_substance_checks()
     await run_briefing_checks()
 
     print("\n" + "=" * 68)
