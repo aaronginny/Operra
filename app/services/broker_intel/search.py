@@ -34,18 +34,44 @@ logger = logging.getLogger(__name__)
 _TIMEOUT = 45.0
 _MAX_RESULTS_GENERAL = 8
 _MAX_RESULTS_NEWS = 6
+_MAX_RESULTS_HEADLINES = 8
 
-# Portals with real listing inventory, international agencies with research
-# desks, the DLD's own data properties, and mainstream UAE/regional business
-# press. No social platforms — see the module docstring.
-REPUTABLE_DOMAINS: tuple[str, ...] = (
-    "bayut.com", "propertyfinder.ae", "dubizzle.com", "propertymonitor.ae",
-    "dxbinteract.com", "dubailand.gov.ae", "dubaipulse.gov.ae",
-    "knightfrank.ae", "knightfrank.com", "cbre.ae", "cbre.com", "jll-mena.com",
-    "savills.ae", "corelogic.com", "engelvoelkers.com", "betterhomes.ae",
-    "arabianbusiness.com", "thenationalnews.com", "gulfnews.com",
-    "khaleejtimes.com", "zawya.com", "reuters.com", "bloomberg.com",
-)
+# Every domain a source may come from, with the trust tier it is shown
+# under. This one table is both the allowlist (REPUTABLE_DOMAINS is derived
+# from it, below) and the tier map, so a domain cannot be allowed in without
+# also being given a tier. No social platforms — see the module docstring.
+#
+#   verified — official government/regulatory data (DLD and its data
+#              properties). Shown 🟢.
+#   market   — established portals, and agencies/analytics firms with
+#              research desks. Shown 🟡.
+#   news     — general news and business press. Shown 🔴.
+TIER_VERIFIED, TIER_MARKET, TIER_NEWS = "verified", "market", "news"
+
+DOMAIN_TIERS: dict[str, str] = {
+    "dubailand.gov.ae": TIER_VERIFIED, "dubaipulse.gov.ae": TIER_VERIFIED,
+    "dxbinteract.com": TIER_VERIFIED,
+    "bayut.com": TIER_MARKET, "propertyfinder.ae": TIER_MARKET,
+    "dubizzle.com": TIER_MARKET, "propertymonitor.ae": TIER_MARKET,
+    "knightfrank.ae": TIER_MARKET, "knightfrank.com": TIER_MARKET,
+    "cbre.ae": TIER_MARKET, "cbre.com": TIER_MARKET, "jll-mena.com": TIER_MARKET,
+    "savills.ae": TIER_MARKET, "corelogic.com": TIER_MARKET,
+    "engelvoelkers.com": TIER_MARKET, "betterhomes.ae": TIER_MARKET,
+    "arabianbusiness.com": TIER_NEWS, "thenationalnews.com": TIER_NEWS,
+    "thenational.ae": TIER_NEWS, "gulfnews.com": TIER_NEWS,
+    "khaleejtimes.com": TIER_NEWS, "zawya.com": TIER_NEWS,
+    "reuters.com": TIER_NEWS, "bloomberg.com": TIER_NEWS,
+}
+
+REPUTABLE_DOMAINS: tuple[str, ...] = tuple(DOMAIN_TIERS)
+
+# Any UAE government host (e.g. a RERA or ministry page) is both allowed and
+# 🟢, without having to be listed one by one.
+_GOV_SUFFIX = ".gov.ae"
+
+TIER_EMOJI: dict[str, str] = {
+    TIER_VERIFIED: "🟢", TIER_MARKET: "🟡", TIER_NEWS: "🔴",
+}
 
 
 @dataclass(frozen=True)
@@ -66,13 +92,47 @@ def domain_of(url: str) -> str:
         return url
 
 
+def _listed_as(domain: str) -> str | None:
+    """The DOMAIN_TIERS key `domain` falls under (itself, or a parent of a
+    subdomain), or None."""
+    for d in DOMAIN_TIERS:
+        if domain == d or domain.endswith("." + d):
+            return d
+    return None
+
+
 def on_allowlist(url: str) -> bool:
     domain = domain_of(url)
-    return any(domain == d or domain.endswith("." + d) for d in REPUTABLE_DOMAINS)
+    return _listed_as(domain) is not None or domain.endswith(_GOV_SUFFIX)
+
+
+def tier_of(domain: str) -> str:
+    """The trust tier a cited source is shown under.
+
+    A domain with no tier falls back to TIER_MARKET rather than failing or
+    going unlabelled — but logs a warning, so a new domain that somehow
+    reaches a reply gets noticed and categorised properly. (With the
+    allowlist derived from DOMAIN_TIERS that should not happen through
+    search; the fallback is for anything that bypasses it.)
+    """
+    domain = (domain or "").lower().removeprefix("www.")
+    listed = _listed_as(domain)
+    if listed is not None:
+        return DOMAIN_TIERS[listed]
+    if domain.endswith(_GOV_SUFFIX):
+        return TIER_VERIFIED
+    logger.warning("broker_intel: source domain %r has no trust tier — showing as market data", domain)
+    return TIER_MARKET
+
+
+def tier_emoji(domain: str) -> str:
+    return TIER_EMOJI[tier_of(domain)]
 
 
 class SearchProvider(Protocol):
     async def search_area(self, area: str) -> list[SourceResult]: ...
+
+    async def search_news(self) -> list[SourceResult]: ...
 
 
 def _dedup_and_filter(payloads: list[dict]) -> list[SourceResult]:
@@ -141,19 +201,53 @@ class TavilySearchProvider:
             payloads.extend(resp.json().get("results", []))
         return _dedup_and_filter(payloads)
 
+    async def search_news(self) -> list[SourceResult]:
+        """This week's Dubai property headlines, for the daily brief. One
+        news-topic call, allowlist-filtered like every other result."""
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+                resp = await client.post(
+                    "https://api.tavily.com/search",
+                    headers={"Authorization": f"Bearer {settings.tavily_api_key}"},
+                    json={
+                        "query": "Dubai real estate property market news",
+                        "search_depth": "advanced",
+                        "max_results": _MAX_RESULTS_HEADLINES,
+                        "topic": "news",
+                        "time_range": "week",
+                        "include_domains": list(REPUTABLE_DOMAINS),
+                    },
+                )
+        except Exception:
+            logger.exception("broker_intel news search errored")
+            return []
+        if resp.status_code != 200:
+            logger.warning("broker_intel news search HTTP %s", resp.status_code)
+            return []
+        return _dedup_and_filter(resp.json().get("results", []))
+
 
 class StubSearchProvider:
     """Deterministic stand-in for tests. Constructed with canned results
     per area (case-insensitive); an area with no entry returns none, which
     is exactly the "nothing found" case the pipeline must handle honestly."""
 
-    def __init__(self, by_area: dict[str, list[SourceResult]] | None = None) -> None:
+    def __init__(
+        self,
+        by_area: dict[str, list[SourceResult]] | None = None,
+        news: list[SourceResult] | None = None,
+    ) -> None:
         self._by_area = {k.lower(): v for k, v in (by_area or {}).items()}
+        self._news = list(news or [])
         self.calls: list[str] = []
 
     async def search_area(self, area: str) -> list[SourceResult]:
         self.calls.append(area)
         return list(self._by_area.get(area.lower(), []))
+
+    async def search_news(self) -> list[SourceResult]:
+        self.calls.append("<news>")
+        return list(self._news)
 
 
 def search_configured() -> bool:

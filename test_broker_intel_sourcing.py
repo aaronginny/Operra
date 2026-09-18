@@ -18,6 +18,8 @@ Sections:
   H  the allowlist — search.py's domain filter
   I  briefing.py end to end, with stub search/extraction — thin/failed
      cases answer honestly, partial-area comparisons degrade gracefully
+  K  source trust tiers — the tier map, the fallback, the Sources line
+  L  the daily brief — drop-if-nothing, scope, numbering, the post idea
 """
 
 from __future__ import annotations
@@ -42,11 +44,18 @@ from app.services.broker_intel.extraction import (
     render_comparison_sections,
 )
 from app.services.broker_intel.search import (
+    DOMAIN_TIERS,
     REPUTABLE_DOMAINS,
+    TIER_EMOJI,
+    TIER_MARKET,
+    TIER_NEWS,
+    TIER_VERIFIED,
     SourceResult,
     StubSearchProvider,
     domain_of,
     on_allowlist,
+    tier_emoji,
+    tier_of,
 )
 
 PASS, FAIL = "PASS", "FAIL"
@@ -568,6 +577,177 @@ def run_substance_checks() -> None:
           not any("/sqft per square" in ln for ln in lead_lines), str(lead_lines))
 
 
+# ── K. source trust tiers ─────────────────────────────────────
+
+def run_tier_checks() -> None:
+    print("\n== K. source trust tiers ==")
+    import logging
+
+    check("K1 DLD is 🟢 verified", tier_of("dubailand.gov.ae") == TIER_VERIFIED)
+    check("K2 DXBinteract is 🟢 verified", tier_of("dxbinteract.com") == TIER_VERIFIED)
+    check("K3 any other UAE government host is 🟢 verified, and allowed",
+          tier_of("rera.gov.ae") == TIER_VERIFIED
+          and on_allowlist("https://www.rera.gov.ae/x"))
+    for d in ("propertyfinder.ae", "bayut.com", "dubizzle.com", "engelvoelkers.com"):
+        check(f"K4 {d} is 🟡 market data", tier_of(d) == TIER_MARKET)
+    for d in ("gulfnews.com", "khaleejtimes.com", "arabianbusiness.com", "thenational.ae"):
+        check(f"K5 {d} is 🔴 news/opinion", tier_of(d) == TIER_NEWS)
+    check("K6 subdomains and www. inherit their parent's tier",
+          tier_of("www.gulfnews.com") == TIER_NEWS
+          and tier_of("blog.propertyfinder.ae") == TIER_MARKET)
+    check("K7 every allowlisted domain has a tier — the allowlist IS the tier map",
+          set(REPUTABLE_DOMAINS) == set(DOMAIN_TIERS)
+          and set(DOMAIN_TIERS.values()) <= set(TIER_EMOJI), str(set(DOMAIN_TIERS.values())))
+    check("K8 no social platform crept in via the tier map",
+          not any(d in DOMAIN_TIERS for d in ("instagram.com", "linkedin.com", "facebook.com")))
+
+    # Unknown domain: 🟡 fallback, never a crash, and a warning is logged.
+    records: list[logging.LogRecord] = []
+
+    class _Grab(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    lg = logging.getLogger("app.services.broker_intel.search")
+    grab = _Grab(level=logging.WARNING)
+    lg.addHandler(grab)
+    try:
+        tier = tier_of("some-new-portal.ae")
+    finally:
+        lg.removeHandler(grab)
+    check("K9 an uncategorised domain falls back to 🟡 market data",
+          tier == TIER_MARKET and tier_emoji("some-new-portal.ae") == "🟡")
+    check("K10 ...and logs a warning naming it, so it gets categorised",
+          any("some-new-portal.ae" in r.getMessage() for r in records),
+          str([r.getMessage() for r in records]))
+
+    # The Sources line format, exactly as specified.
+    body = formatter.render_lead_intel(
+        "Arjan", ["Price/sqft: AED 1,500 [1][2][8]"], "self",
+        [(1, src("propertyfinder.ae")), (2, src("dubailand.gov.ae")), (8, src("gulfnews.com"))],
+    )
+    check("K11 Sources line shows each source's tier emoji",
+          "Sources: [1] 🟡 propertyfinder.ae  [2] 🟢 dubailand.gov.ae  [8] 🔴 gulfnews.com" in body,
+          body)
+    check("K12 SOURCED_CAVEAT carries the legend for all three tiers",
+          all(s in formatter.SOURCED_CAVEAT
+              for s in ("🟢 official", "🟡 market data", "🔴 news/opinion")))
+    check("K13 ...and still says anything not 🟢 is not official DLD data",
+          "not 🟢 is not official DLD data" in formatter.SOURCED_CAVEAT)
+
+
+# ── L. the daily brief's honesty rules ────────────────────────
+
+async def run_daily_brief_checks() -> None:
+    print("\n== L. daily brief: drop-if-nothing, scope, numbering, idea ==")
+    from datetime import date
+
+    day = date(2026, 9, 18)
+    area = briefing.area_for(day)
+    nxt = briefing.DAILY_AREAS[(briefing.DAILY_AREAS.index(area) + 1) % len(briefing.DAILY_AREAS)]
+
+    class Gen:
+        def __init__(self, idea):
+            self.idea, self.topics = idea, []
+
+        async def post_idea(self, topic):
+            self.topics.append(topic)
+            return self.idea
+
+    news = [SourceResult(url="https://gulfnews.com/a", domain="gulfnews.com",
+                         title="Dubai rents cool in prime areas | Gulf News", content="",
+                         published_date="Wed, 17 Sep 2026 08:00:00 GMT")]
+
+    # Nothing sourced anywhere -> None (handler falls back to the offer),
+    # and no idea is even asked for.
+    gen = Gen("Talk about the market.")
+    r = await briefing.build_daily_brief(
+        search=StubSearchProvider({}), extractor=StubExtractionProvider(claims=[]),
+        generator=gen, today=day)
+    check("L1 nothing sourced found -> no brief at all (None), not an idea alone",
+          r is None and gen.topics == [], repr(r))
+
+    # News only: brief without a data section; not fabricated.
+    r = await briefing.build_daily_brief(
+        search=StubSearchProvider({}, news=news), extractor=StubExtractionProvider(claims=[]),
+        generator=Gen("Ask followers where they would rent next."), today=day)
+    check("L2 news but no data -> brief with news, and NO data section",
+          r is not None and "🔥 Top news" in r and "📊" not in r, r)
+    check("L3 the headline is verbatim with the ' | Gulf News' suffix trimmed",
+          r is not None and "Dubai rents cool in prime areas [1]" in r
+          and "| Gulf News" not in r, r)
+
+    # Data only, and scope isolation: a citywide claim for today's area is
+    # dropped, so a data point only appears from an area-scoped claim.
+    citywide_only = StubExtractionProvider(claims=lambda s, srcs: [
+        Claim("price_per_sqft", "citywide", 1700, "", "", 1)])
+    r = await briefing.build_daily_brief(
+        search=StubSearchProvider({area: [src("bayut.com")], nxt: [src("bayut.com")]}),
+        extractor=citywide_only, generator=Gen("x"), today=day)
+    check("L4 a Dubai-wide figure never becomes an area's data point",
+          r is None, repr(r))
+
+    # Today's area has nothing; the next area in the rotation is tried.
+    second = StubExtractionProvider(claims=lambda s, srcs: [
+        Claim("rental_yield_pct", s, 7.2, "", "", 1)] if s == nxt else [])
+    r = await briefing.build_daily_brief(
+        search=StubSearchProvider({area: [src("bayut.com")], nxt: [src("propertyfinder.ae")]}),
+        extractor=second, generator=Gen("Break down what landlords earn here."), today=day)
+    check("L5 an empty day's area falls through to the next area in the rotation",
+          r is not None and f"📊 Market data — {nxt}" in r and "7.2%" in r, r)
+    check("L6 with no headline, the data point is [1] and cites its own source",
+          r is not None and "[1] 🟡 propertyfinder.ae" in r and "[1]" in r.split("Sources:")[0], r)
+
+    # Mixed units: the data point is one metric, chosen by priority.
+    mixed = StubExtractionProvider(claims=lambda s, srcs: [
+        Claim("total_price", s, 1_000_000, "", "", 1),
+        Claim("price_per_sqft", s, 1_564, "", "", 1),
+        Claim("yoy_change_pct", s, 9.5, "", "", 2)])
+    r = await briefing.build_daily_brief(
+        search=StubSearchProvider({area: [src("bayut.com"), src("dubailand.gov.ae")]}, news=news),
+        extractor=mixed, generator=Gen("x"), today=day)
+    data_line = next((ln for ln in (r or "").splitlines() if ln.startswith("• ") and "%" in ln), "")
+    check("L7 the data point prefers price movement, and is a single metric",
+          "YoY change: 9.5% [3]" in data_line and "1,564" not in (r or "")
+          and "1,000,000" not in (r or ""), r)
+    check("L8 area sources are numbered after the headline, each with its tier",
+          r is not None and "[1] 🔴 gulfnews.com" in r and "[3] 🟢 dubailand.gov.ae" in r
+          and "bayut.com" not in r, r)
+
+    # The post idea: dropped, never edited, if it smuggles in a figure.
+    for bad in ("Explain why JVC rents rose 12% this year.", "", None,
+                " ".join(["word"] * 40)):
+        r = await briefing.build_daily_brief(
+            search=StubSearchProvider({}, news=news), extractor=StubExtractionProvider(claims=[]),
+            generator=Gen(bad), today=day)
+        check(f"L9 an unusable idea ({(bad or 'empty')[:25]!r}) is dropped, brief still sent",
+              r is not None and "💡" not in r and "🔥 Top news" in r, r)
+    gen = Gen('"Ask your followers: rent or buy in this market?"')
+    r = await briefing.build_daily_brief(
+        search=StubSearchProvider({}, news=news), extractor=StubExtractionProvider(claims=[]),
+        generator=gen, today=day)
+    check("L10 a clean idea is kept (quotes stripped) and seeded from the headline",
+          r is not None and "• Ask your followers: rent or buy in this market? " not in r
+          and "• Ask your followers: rent or buy in this market?" in r
+          and gen.topics == ["Dubai rents cool in prime areas"], f"{gen.topics} {r}")
+
+    # Headline picking and cleaning.
+    old = SourceResult(url="https://gulfnews.com/o", domain="gulfnews.com",
+                       title="Old story", content="", published_date="2026-08-01")
+    fresh = SourceResult(url="https://khaleejtimes.com/f", domain="khaleejtimes.com",
+                         title="Fresh story - Khaleej Times", content="",
+                         published_date="2026-09-17T09:00:00Z")
+    check("L11 a fresh headline beats a higher-ranked stale one",
+          briefing.pick_headline([old, fresh], day) is fresh)
+    check("L12 with nothing fresh, the top-ranked titled result is used",
+          briefing.pick_headline([old], day) is old)
+    check("L13 a dash that isn't the site name is left alone",
+          briefing.clean_headline("Dubai Hills - a decade on", "gulfnews.com")
+          == "Dubai Hills - a decade on")
+    check("L14 the rotation moves day to day",
+          briefing.area_for(day) != briefing.area_for(date(2026, 9, 19)))
+
+
 async def main() -> None:
     print("=" * 68)
     print("  broker_intel sourcing pipeline verification")
@@ -583,6 +763,8 @@ async def main() -> None:
     run_allowlist_checks()
     run_substance_checks()
     await run_briefing_checks()
+    run_tier_checks()
+    await run_daily_brief_checks()
 
     print("\n" + "=" * 68)
     passed = sum(1 for r in results if r[0] == PASS)

@@ -16,7 +16,7 @@ Sections:
   A  intent parsing — how she names a project/area (design question 1)
   B  the two caveats — enforced over EVERY reply-producing entry point
   C  feature 1, lead intel, both formats, end to end (stub search+extraction)
-  D  feature 2, the daily nudge and its reply
+  D  feature 2, the daily brief, its fallback offer, and ARTICLE/FUN FACT
   E  isolation — nothing written, generic pipeline never reached (session spy)
   F  other verticals unaffected
   G  polish: greetings and unrecognised subjects
@@ -61,6 +61,7 @@ from app.models.company import Company  # noqa: E402
 from app.models.message_log import MessageLog  # noqa: E402
 from app.models.user import User, UserRole  # noqa: E402
 from app.services.broker_intel import formatter, intents, state  # noqa: E402
+from app.services.broker_intel.briefing import DAILY_AREAS  # noqa: E402
 from app.services.broker_intel.content import StubContentGenerator  # noqa: E402
 from app.services.broker_intel.extraction import Claim, StubExtractionProvider  # noqa: E402
 from app.services.broker_intel.handler import (  # noqa: E402
@@ -88,6 +89,11 @@ def check(name: str, condition: bool, detail: str = "") -> None:
 
 def src(domain: str, content: str = "search result text") -> SourceResult:
     return SourceResult(url=f"https://{domain}/x", domain=domain, title="x", content=content)
+
+
+def src_titled(domain: str, title: str, date: str | None = None) -> SourceResult:
+    return SourceResult(url=f"https://{domain}/{abs(hash(title))}", domain=domain,
+                        title=title, content="", published_date=date)
 
 
 def install_recorder() -> RecordingProvider:
@@ -371,15 +377,72 @@ async def run_lead_intel_checks(company_id: int) -> None:
 # ── D. feature 2 ─────────────────────────────────────────────
 
 async def run_daily_checks(company_id: int) -> None:
-    print("\n== D. feature 2 — daily content nudge ==")
+    print("\n== D. feature 2 — daily brief (and its fallback offer) ==")
     rec = install_recorder()
+    # Placeholder keys (see top of file) -> the stub search finds nothing,
+    # so this exercises the nothing-sourced fallback: the old offer.
     async with SessionLocal() as db:
         sent = await send_daily_nudge(db, company_id)
     check("D1 the nudge is sent to her number", sent == 1 and len(rec.sent) == 1, str(rec.sent[:1]))
     body = rec.sent[0][1] if rec.sent else ""
-    check("D2 it offers both choices", "ARTICLE" in body and "FUN FACT" in body, body[:80])
+    check("D2 with nothing sourced found, it falls back to offering both choices",
+          "ARTICLE" in body and "FUN FACT" in body
+          and formatter.DAILY_BRIEF_TITLE not in body, body[:80])
     check("D3 the offer itself makes no market claim (so needs no caveat)",
           formatter.MARKET_CAVEAT not in body and formatter.SOURCED_CAVEAT not in body)
+
+    # The brief itself, through the real daily hook, with stub providers.
+    # Every rotation area has sources, so the check holds whichever day it runs.
+    brief_search = StubSearchProvider(
+        {area: [src("bayut.com"), src("propertyfinder.ae")] for area in DAILY_AREAS},
+        news=[src_titled("gulfnews.com", "Dubai off-plan sales hit new high - Gulf News")],
+    )
+    brief_extractor = StubExtractionProvider(claims=lambda subject, sources: [
+        Claim("price_per_sqft", subject, 1400, "", "", 1),
+        Claim("price_per_sqft", subject, 1550, "", "", 2),
+        Claim("total_price", subject, 1_000_000, "", "", 1),
+    ])
+    rec = install_recorder()
+    async with SessionLocal() as db:
+        sent = await send_daily_nudge(db, company_id, generator=StubContentGenerator(),
+                                      search=brief_search, extractor=brief_extractor)
+    brief = rec.sent[0][1] if rec.sent else ""
+    check("D3b the daily hook sends the brief when sources are found",
+          sent == 1 and formatter.DAILY_BRIEF_TITLE in brief, brief[:120])
+    check("D3c it has all three parts: news, data point, post idea",
+          all(h in brief for h in ("🔥 Top news", "📊 Market data", "💡 Post idea")), brief)
+    check("D3d the headline is the publisher's own title, site suffix trimmed, cited [1]",
+          "Dubai off-plan sales hit new high [1]" in brief and "- Gulf News" not in brief, brief)
+    check("D3e the data point is one metric, never price mixed with price/sqft",
+          any("/sqft" in ln and "1,400-1,550" in ln for ln in brief.splitlines())
+          and "1,000,000" not in brief, brief)
+    check("D3f the data point's markers are renumbered after the headline "
+          "([2][3], not a second [1])",
+          "[2][3]" in brief, brief)
+    check("D3g every cited source carries its tier (🔴 news, 🟡 portals)",
+          "[1] 🔴 gulfnews.com" in brief and "[2] 🟡 bayut.com" in brief
+          and "[3] 🟡 propertyfinder.ae" in brief, brief)
+    check("D3h the brief carries SOURCED_CAVEAT", formatter.SOURCED_CAVEAT in brief)
+    check("D3i the post idea is labelled as the unsourced AI part",
+          formatter.IDEA_SECTION in brief)
+    check("D3j no out-of-scope sections were built",
+          not any(w in brief.lower() for w in ("question of the day", "#", "reel", "linkedin")),
+          brief)
+
+    class ExplodingSearch:
+        async def search_news(self):
+            raise RuntimeError("boom")
+
+        async def search_area(self, area):
+            raise RuntimeError("boom")
+
+    rec = install_recorder()
+    async with SessionLocal() as db:
+        sent = await send_daily_nudge(db, company_id, generator=StubContentGenerator(),
+                                      search=ExplodingSearch(), extractor=brief_extractor)
+    body = rec.sent[0][1] if rec.sent else ""
+    check("D3k a bug inside the brief still sends her the fallback offer",
+          sent == 1 and "ARTICLE" in body and "FUN FACT" in body, body[:80])
 
     gen = StubContentGenerator()
     r1 = await build_reply(company_id, BROKER_PHONE, "ARTICLE", gen)
@@ -545,6 +608,17 @@ async def run_real_usage_checks(company_id: int) -> None:
           r)
     check("H5c the Dubai-wide yield figure (6.68) is dropped from JVC's briefing",
           "6.68" not in r, r)
+
+    # Source tiering, on her real Arjan/JVC comparison's sources. Arjan
+    # cites [1] propertyfinder and [2] bayut; JVC's claims cite only its own
+    # first source, renumbered [3] bayut (engelvoelkers, uncited, stays off
+    # the list). All portals, so all 🟡.
+    sources_line = next((ln for ln in lines_in_r if ln.startswith("Sources:")), "")
+    check("H5d every cited source carries its trust tier",
+          sources_line == "Sources: [1] 🟡 propertyfinder.ae  [2] 🟡 bayut.com  [3] 🟡 bayut.com",
+          sources_line)
+    check("H5e ...and the tier legend rides along in the caveat",
+          all(e in r for e in ("🟢 official", "🟡 market data", "🔴 news")), r[-260:])
 
     # ── 2. partial comparison: say so, don't answer half ──
     state._reset_for_tests()

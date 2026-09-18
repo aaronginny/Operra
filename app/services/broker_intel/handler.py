@@ -11,10 +11,13 @@ features:
      already said. See briefing.py for the search -> extract -> assemble
      pipeline, and extraction.py's docstring for why lead intel no longer
      goes through free-text AI generation at all.
-  2. A daily content nudge. Once a day she is offered an ARTICLE or a FUN
-     FACT; whichever she picks comes back as a ready-to-post caption. This
-     one IS free-text AI generation (content.py) — a social caption makes
-     no factual claim a client would rely on, so it doesn't need sourcing.
+  2. A daily brief. Once a day she gets one sourced headline, one sourced
+     market data point and a one-line post idea (briefing.build_daily_brief),
+     through the same search -> extract pipeline and caveat chokepoint as
+     lead intel. On a day nothing sourced turns up, she is offered an
+     ARTICLE or a FUN FACT instead, as before. Those captions, asked for any
+     time, are still free-text AI generation (content.py) — a social caption
+     makes no factual claim a client would rely on, so it isn't sourced.
 
 Registered with persist_inbound=False, like launch_matcher and for the same
 reason: what she forwards is lead material and can carry a third party's
@@ -174,13 +177,21 @@ async def handle_broker_message(
     return {"status": "broker_intel", "sent": bool(result.ok), "reply": reply}
 
 
-async def send_daily_nudge(db: AsyncSession, company_id: int) -> int:
-    """Daily hook: offer today's content choice.
+async def send_daily_nudge(
+    db: AsyncSession,
+    company_id: int,
+    generator: ContentGenerator | None = None,
+    search: SearchProvider | None = None,
+    extractor: ExtractionProvider | None = None,
+) -> int:
+    """Daily hook: send today's brief, or the ARTICLE / FUN FACT offer when
+    the brief found nothing sourced.
 
     Same contract as real_estate's send_broker_pulse — "what to do for one
     company" — with company enumeration, the per-company pulse toggle and
     the per-company try/except all handled generically by
-    _send_vertical_daily_hooks in reminder_service.
+    _send_vertical_daily_hooks in reminder_service. The providers are
+    injectable for the tests, as in build_reply.
     """
     from app.services.launch_matcher.providers import get_provider
 
@@ -189,7 +200,18 @@ async def send_daily_nudge(db: AsyncSession, company_id: int) -> int:
         logger.info("broker_intel daily nudge: no recipients for company=%s", company_id)
         return 0
 
-    body = formatter.render_daily_nudge()
+    # Built once per company, not per recipient: same brief for everyone,
+    # and one set of search/extraction calls.
+    try:
+        body = await briefing.build_daily_brief(
+            search=search, extractor=extractor, generator=generator
+        )
+    except Exception:
+        # A bug in the brief must not cost her the morning message.
+        logger.exception("broker_intel daily brief failed for company=%s", company_id)
+        body = None
+    if body is None:
+        body = formatter.render_daily_nudge()
     provider = get_provider()
     sent = 0
     for number in numbers:

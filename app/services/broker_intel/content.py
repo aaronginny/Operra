@@ -1,5 +1,6 @@
 """Content generation for broker_intel — the AI seam for its ungrounded
-content: the daily nudge's article/fun-fact captions.
+content: the ARTICLE / FUN FACT captions, and the daily brief's one-line
+post idea.
 
 Same shape as launch_matcher's WhatsAppProvider: a Protocol, a real
 implementation, and a deterministic stand-in, so the whole vertical is
@@ -67,12 +68,28 @@ _FUN_FACT_SYSTEM = (
 )
 
 
+_POST_IDEA_SYSTEM = (
+    "You suggest social-media post ideas for a Dubai real-estate broker.\n"
+    "Given today's topic, reply with ONE line: a hook or angle she could "
+    "post about today. Not a script, not a caption, no hashtags.\n"
+    "Rules you must follow:\n"
+    "- One line, under 20 words, no preamble.\n"
+    "- Contain NO digits and no figures of any kind — the numbers in her "
+    "brief come from cited sources, and an idea must not restate or invent "
+    "one.\n"
+    "- Never claim anything comes from the Dubai Land Department.\n"
+    "- No emoji.\n"
+)
+
+
 class ContentGenerator(Protocol):
-    """Anything that can produce bullet lines for broker_intel's ungrounded
-    content. lead_intel/compare_areas used to live here too; they moved to
+    """Anything that can produce broker_intel's ungrounded content.
+    lead_intel/compare_areas used to live here too; they moved to
     briefing.py's search-backed pipeline — see this module's docstring."""
 
     async def social_caption(self, kind: str) -> list[str] | None: ...
+
+    async def post_idea(self, topic: str) -> str | None: ...
 
 
 def _clean_bullets(raw: str) -> list[str]:
@@ -130,6 +147,10 @@ class OpenAIContentGenerator:
         system = _ARTICLE_SYSTEM if kind == "article" else _FUN_FACT_SYSTEM
         return await self._complete(system, "Write today's caption.")
 
+    async def post_idea(self, topic: str) -> str | None:
+        lines = await self._complete(_POST_IDEA_SYSTEM, f"Today's topic: {topic}")
+        return lines[0] if lines else None
+
 
 class StubContentGenerator:
     """Deterministic stand-in used by the tests, and by any environment
@@ -156,6 +177,10 @@ class StubContentGenerator:
             "Neighbourhoods planned around walkability keep drawing families.",
             "The city keeps rewarding people who look one district ahead.",
         ]
+
+    async def post_idea(self, topic: str) -> str | None:
+        self.calls.append(("post_idea", topic))
+        return "Explain what today's market news means for a first-time buyer."
 
 
 def ai_configured() -> bool:
