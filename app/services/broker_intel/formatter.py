@@ -11,9 +11,9 @@ this module has exactly two entry points for it:
     no search behind it (the daily nudge's article/fun-fact captions).
     Appends MARKET_CAVEAT.
   * `_sourced_reply` — for reply content built from real web search results
-    via extraction.py's structured pipeline (lead intel, comparisons).
-    Appends SOURCED_CAVEAT, and also lists which sources were actually
-    cited.
+    via extraction.py's structured pipeline (lead intel, comparisons, the
+    daily brief). Appends SOURCED_CAVEAT, and also lists which sources were
+    actually cited, each with its trust tier (search.DOMAIN_TIERS).
 
 Both take the caller's text and append their caveat unconditionally, with
 no parameter to switch it off — so a new content feature cannot ship an
@@ -30,8 +30,10 @@ read like an internal note to the broker.
 
 from __future__ import annotations
 
-# Appended to replies with NO search behind them — currently only the daily
-# nudge's article/fun-fact captions, which remain general AI commentary by
+from app.services.broker_intel.search import tier_emoji
+
+# Appended to replies with NO search behind them — currently only the
+# ARTICLE / FUN FACT captions, which remain general AI commentary by
 # design (see content.py's docstring on the sourcing policy for those).
 MARKET_CAVEAT = (
     "_General market context, AI-generated — indicative only, "
@@ -41,13 +43,20 @@ MARKET_CAVEAT = (
 # Appended to replies built from real web search results (lead intel,
 # comparisons). Deliberately does NOT say "AI-generated" — the figures in
 # these replies come from cited sources, not from the model's own
-# knowledge — but is equally explicit that they are not DLD transaction
-# records: search mostly surfaces portal LISTING prices, which run above
+# knowledge — but is equally explicit that only 🟢-tier sources are
+# official: search mostly surfaces portal LISTING prices, which run above
 # what a unit actually sells for, and nothing here is guaranteed current.
+#
+# It opens with the tier legend for the emoji on the Sources line. That is
+# permanent rather than a one-time explainer on purpose: this vertical keeps
+# no conversation history (see state.py), so "first time she sees it" isn't
+# knowable — and the LEAD format is forwarded to a client, who has never
+# seen the legend and needs it in the message itself.
 SOURCED_CAVEAT = (
-    "_From real published sources (portals, agencies, press) — not "
-    "official DLD data. Often listing prices, which run above sale "
-    "prices. Not guaranteed current — verify before quoting a client._"
+    "_🟢 official/registry · 🟡 market data (portals, agencies) · "
+    "🔴 news/opinion. Anything not 🟢 is not official DLD data — often "
+    "listing prices, which run above sale prices. Not guaranteed current "
+    "— verify before quoting a client._"
 )
 
 _FORMAT_PROMPT = (
@@ -88,6 +97,10 @@ def _sourced_reply(
     there is still exactly one function in this package that turns sourced
     content into a message body, and it still appends the caveat with no
     way to switch it off.
+
+    Each cited source is shown with its trust-tier emoji (see
+    search.DOMAIN_TIERS; unknown domains fall back to 🟡 with a logged
+    warning), and SOURCED_CAVEAT opens with the legend for those emoji.
     """
     if sections:
         body_parts = [f"*{name}*\n{_bullets(section_lines)}"
@@ -97,7 +110,9 @@ def _sourced_reply(
         body = _bullets(lines)
     parts = [p for p in (header, body) if p]
     if cited_sources:
-        parts.append("Sources: " + "  ".join(f"[{i}] {s.domain}" for i, s in cited_sources))
+        parts.append("Sources: " + "  ".join(
+            f"[{i}] {tier_emoji(s.domain)} {s.domain}" for i, s in cited_sources
+        ))
     parts.append(SOURCED_CAVEAT)
     return "\n\n".join(parts)
 
@@ -128,11 +143,43 @@ def render_lead_intel(
     return _sourced_reply(header, lines, cited_sources or [])
 
 
-# ── Feature 2: daily content nudge ───────────────────────────
+# ── Feature 2: the daily brief ──────────────────────────────
+
+DAILY_BRIEF_TITLE = "🏠 *UAE PROPERTY INTELLIGENCE*"
+IDEA_SECTION = "💡 Post idea (AI suggestion)"
+
+
+def render_daily_brief(
+    date_label: str,
+    news_line: str | None,
+    data_area: str | None,
+    data_line: str | None,
+    idea_line: str | None,
+    cited_sources: list[tuple[int, object]],
+) -> str:
+    """The proactive morning brief — see briefing.build_daily_brief.
+
+    Any section that found nothing is left out, never filled with a
+    placeholder. Built through _sourced_reply like every other sourced
+    reply, so the tiered Sources line and SOURCED_CAVEAT cannot be skipped.
+    The post idea is the one unsourced part; its section header says so
+    outright, since SOURCED_CAVEAT deliberately doesn't say AI-generated.
+    """
+    sections: list[tuple[str, list[str]]] = []
+    if news_line:
+        sections.append(("🔥 Top news", [news_line]))
+    if data_line:
+        sections.append((f"📊 Market data — {data_area}", [data_line]))
+    if idea_line:
+        sections.append((IDEA_SECTION, [idea_line]))
+    header = f"{DAILY_BRIEF_TITLE} — {date_label}"
+    return _sourced_reply(header, [], cited_sources, sections=sections)
+
 
 def render_daily_nudge() -> str:
-    """The proactive morning message. Carries no generated content itself,
-    so it needs no caveat — it only offers a choice."""
+    """The fallback morning message, sent when the daily brief found nothing
+    sourced to report (see briefing.build_daily_brief). Carries no generated
+    content itself, so it needs no caveat — it only offers a choice."""
     return (
         "Morning! Want something to post today?\n\n"
         "- *ARTICLE* — a short market insight\n"
