@@ -38,7 +38,9 @@ from typing import Protocol
 import httpx
 
 from app.config import settings
+from app.services.broker_intel import focus as focus_topics
 from app.services.broker_intel.search import SourceResult
+from app.services.geo.uae import EMIRATES
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,10 @@ MAX_COMPARISON_BULLETS = 12     # interleaved comparison (both areas)
 MAX_COMPARISON_PER_AREA = 5     # per-area block in the grouped comparison
 MAX_QUALITATIVE_SINGLE = 2      # colour commentary never dominates a briefing
 MAX_QUALITATIVE_COMPARISON = 1
+# ...unless it IS the answer: she asked about landmarks, schools, transport
+# and the like (focus.PLACE_TOPICS), where named places are the content.
+MAX_QUALITATIVE_FOCUSED = 8
+MAX_QUALITATIVE_FOCUSED_COMPARISON = 4
 VARIANTS_PER_METRIC = 2         # per area, in a comparison — see _representative_facts
 
 # The only metric types a claim may carry. assemble_ranges groups on this
@@ -113,6 +119,21 @@ def is_plausible(metric: str, value: float) -> bool:
 # Scope labels that never count as area-specific, however they're spelled.
 _CITYWIDE_LABELS = {"citywide", "city-wide", "city wide", "dubai", "dubai-wide",
                      "dubai wide", "uae", "national", ""}
+
+# The reverse case: a briefing on a whole EMIRATE ("what are the top
+# landmarks in Dubai"). There, the emirate-wide claims are the on-subject
+# ones and an area's are not. Matching "Dubai" by substring instead did the
+# opposite of both — it dropped every genuinely Dubai-wide figure (their
+# scope is a citywide label) and kept "Dubai Marina"'s and "Dubai Hills"'s
+# figures, which then went out under a *Dubai* header as if they were the
+# city's. The extractor's "citywide" means Dubai-wide (its prompt is
+# Dubai-centric), so only Dubai accepts it.
+_EMIRATE_SCOPES: dict[str, set[str]] = {}
+for _alias, _canonical in EMIRATES.items():
+    _EMIRATE_SCOPES.setdefault(_canonical.lower(), {_canonical.lower()}).update(
+        {_alias, f"{_alias}-wide", f"{_alias} wide"}
+    )
+_EMIRATE_SCOPES["dubai"] |= {"citywide", "city-wide", "city wide"}
 
 _DIGIT = re.compile(r"\d")
 
@@ -188,6 +209,7 @@ class Claim:
     qualifier: str          # short lowercase tag, e.g. "studio"; "" if none
     note: str               # the qualitative text; "" for numeric claims
     source_index: int       # 1-based index into the source list given to the model
+    topic: str = ""         # qualitative only: a focus.PLACE_TOPICS key, "other", or "" (untagged)
 
 
 @dataclass(frozen=True)
@@ -209,11 +231,12 @@ class RangeFact:
 class QualitativeFact:
     note: str
     source_index: int
+    topic: str = ""
 
 
 class ExtractionProvider(Protocol):
     async def extract_claims(
-        self, subject: str, sources: list[SourceResult]
+        self, subject: str, sources: list[SourceResult], focus: tuple[str, ...] = ()
     ) -> list[Claim] | None: ...
 
 
@@ -221,7 +244,7 @@ _SYSTEM = (
     "You extract structured facts about Dubai real estate from numbered "
     "source excerpts. Output ONLY a JSON object of the shape "
     '{"claims": [{"metric": "...", "scope_area": "...", "value": ..., '
-    '"qualifier": "...", "note": "...", "source_index": ...}]}.\n'
+    '"qualifier": "...", "note": "...", "topic": "...", "source_index": ...}]}.\n'
     "Rules, all mandatory:\n"
     f"- metric must be exactly one of: {', '.join(METRICS)}.\n"
     "- value is a plain number with no currency symbol, no percent sign, "
@@ -245,6 +268,9 @@ _SYSTEM = (
     "investors', 'strong rental yields', 'vibrant community', 'great "
     "investment' or 'family-friendly'. 'Circle Mall and Al Khail Road sit "
     "inside the community' is useful; 'a sought-after area' is not.\n"
+    "- topic, for metric=qualitative only, is exactly one of: "
+    f"{', '.join(focus_topics.PLACE_TOPICS)}, other — what the note is "
+    "about. Empty string for every numeric claim.\n"
     "- Extract EVERY metric the sources support, not just prices and "
     "yields. Actively look for transaction_count (how many deals "
     "registered in a period), days_on_market, service_charge (AED per sqft "
@@ -307,6 +333,12 @@ def _parse_claims(raw: str, max_index: int) -> list[Claim]:
 
         if metric == "qualitative":
             note = str(c.get("note") or "").strip()
+            # Kept as tagged when it's a known tag ("other" included — that
+            # is the extractor saying it is NOT about any asked topic);
+            # anything else is treated as untagged. See focus.narrow.
+            topic = str(c.get("topic") or "").strip().lower()
+            if topic not in (*focus_topics.PLACE_TOPICS, "other"):
+                topic = ""
             # A qualitative claim carrying a digit is exactly the ambiguity
             # this schema exists to prevent — drop it rather than let an
             # uncited-looking figure slip through as prose.
@@ -317,7 +349,7 @@ def _parse_claims(raw: str, max_index: int) -> list[Claim]:
                 continue
             out.append(Claim(metric=metric, scope_area=scope or "citywide",
                               value=None, qualifier=qualifier, note=note,
-                              source_index=idx))
+                              source_index=idx, topic=topic))
             continue
 
         try:
@@ -337,11 +369,29 @@ def _parse_claims(raw: str, max_index: int) -> list[Claim]:
     return out
 
 
+def user_message(subject: str, sources: list[SourceResult], focus: tuple[str, ...] = ()) -> str:
+    """The extraction request for one subject. A focused question adds what
+    she asked — as curated topic labels only, never her words; see focus.py
+    for why her message itself is never sent to a third party."""
+    parts = [f"Area/subject: {subject}"]
+    if focus:
+        parts.append(
+            f"She asked specifically about: {focus_topics.label(focus)}. Extract "
+            "the claims that answer that first. For landmarks, schools, "
+            "transport, amenities or healthcare, give each specific named "
+            "place as its own qualitative claim."
+        )
+    parts.append(f"Sources:\n{_source_block(sources)}")
+    return "\n\n".join(parts)
+
+
 class OpenAIExtractionProvider:
     """Real extraction via the same chat-completions endpoint the rest of
     the app uses, in JSON mode."""
 
-    async def extract_claims(self, subject: str, sources: list[SourceResult]) -> list[Claim] | None:
+    async def extract_claims(
+        self, subject: str, sources: list[SourceResult], focus: tuple[str, ...] = ()
+    ) -> list[Claim] | None:
         if not sources:
             return []
         try:
@@ -353,8 +403,7 @@ class OpenAIExtractionProvider:
                         "model": settings.openai_model,
                         "messages": [
                             {"role": "system", "content": _SYSTEM},
-                            {"role": "user", "content":
-                                f"Area/subject: {subject}\n\nSources:\n{_source_block(sources)}"},
+                            {"role": "user", "content": user_message(subject, sources, focus)},
                         ],
                         "response_format": {"type": "json_object"},
                         "max_tokens": _MAX_TOKENS,
@@ -378,9 +427,13 @@ class StubExtractionProvider:
     def __init__(self, claims=None) -> None:
         self._claims = claims
         self.calls: list[tuple[str, int]] = []
+        self.focus_calls: list[tuple[str, tuple[str, ...]]] = []
 
-    async def extract_claims(self, subject: str, sources: list[SourceResult]) -> list[Claim] | None:
+    async def extract_claims(
+        self, subject: str, sources: list[SourceResult], focus: tuple[str, ...] = ()
+    ) -> list[Claim] | None:
         self.calls.append((subject, len(sources)))
+        self.focus_calls.append((subject, tuple(focus)))
         result = self._claims(subject, sources) if callable(self._claims) else self._claims
         return list(result) if result is not None else []
 
@@ -411,9 +464,11 @@ def remap_claims(claims: list[Claim], offset: int) -> list[Claim]:
 
 def _area_matches(scope_area: str, target: str) -> bool:
     scope = scope_area.strip().lower()
+    t = target.strip().lower()
+    if t in _EMIRATE_SCOPES:
+        return scope in _EMIRATE_SCOPES[t]
     if scope in _CITYWIDE_LABELS:
         return False
-    t = target.strip().lower()
     return scope == t or t in scope or scope in t
 
 
@@ -440,7 +495,8 @@ def assemble_ranges(
         if not _area_matches(c.scope_area, target_area):
             continue
         if c.metric == "qualitative":
-            qualitative.append(QualitativeFact(note=c.note, source_index=c.source_index))
+            qualitative.append(QualitativeFact(note=c.note, source_index=c.source_index,
+                                               topic=c.topic))
             continue
         key = (c.metric, c.scope_area.strip().lower(), c.qualifier)
         numeric.setdefault(key, []).append(c)
@@ -603,6 +659,7 @@ def render_bullets(
     audience: str,
     max_bullets: int = MAX_BRIEFING_BULLETS,
     max_qualitative: int = MAX_QUALITATIVE_SINGLE,
+    places_first: bool = False,
 ) -> list[str]:
     """Single-area bullets. ME is terse with inline citation markers; LEAD
     reads as complete sentences naming the area, since it may be forwarded
@@ -614,11 +671,19 @@ def render_bullets(
     budget is left, capped separately: a briefing that is mostly colour
     commentary is the thin-feeling output the client complained about, so
     real figures always get first claim on the space.
+
+    places_first reverses that for a question ABOUT places (landmarks,
+    schools, ... — see focus.narrow): there the named places are the
+    answer, so they lead, up to max_qualitative, and any figures follow.
     """
     lines: list[str] = []
     for fact in ranges[:max_bullets]:
         body = _me_line(subject, fact) if audience != "lead" else _lead_line(subject, fact)
         lines.append(f"{body} {_markers(fact.source_indices)}".rstrip())
+    if places_first:
+        places = [f"{q.note} [{q.source_index}]"
+                  for q in qualitative[:min(max_qualitative, max_bullets)]]
+        return (places + lines)[:max_bullets]
     remaining = min(max_qualitative, max_bullets - len(lines))
     for q in qualitative[:max(0, remaining)]:
         lines.append(f"{q.note} [{q.source_index}]")
@@ -658,6 +723,7 @@ def render_comparison_sections(
     audience: str,
     max_per_area: int = MAX_COMPARISON_PER_AREA,
     max_qualitative_per_area: int = MAX_QUALITATIVE_COMPARISON,
+    places_first: bool = False,
 ) -> list[tuple[str, list[str]]]:
     """A comparison grouped under one sub-header per area, as
     [(area, [bullet, ...]), ...].
@@ -668,6 +734,9 @@ def render_comparison_sections(
     of which area a bullet belongs to — with a sub-header above each block,
     the bullets no longer each have to name their own area, so they read
     shorter even as there are more of them.
+
+    places_first puts each area's named places ahead of its figures, for a
+    question about places — same reasoning as render_bullets.
     """
     order = {m: i for i, m in enumerate(METRICS)}
     representative = _representative_facts(per_area)
@@ -682,10 +751,9 @@ def render_comparison_sections(
             # voices use their area-free phrasing.
             body = _lead_bare_line(fact) if audience == "lead" else _me_line(area, fact)
             lines.append(f"{body} {_markers(fact.source_indices)}".rstrip())
-        for q in qualitative[:max_qualitative_per_area]:
-            if len(lines) >= max_per_area + max_qualitative_per_area:
-                break
-            lines.append(f"{q.note} [{q.source_index}]")
+        places = [f"{q.note} [{q.source_index}]"
+                  for q in qualitative[:max_qualitative_per_area]]
+        lines = places + lines if places_first else lines + places
         if lines:
             sections.append((area, lines))
     return sections

@@ -20,10 +20,15 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
+from app.services.broker_intel import focus as focus_topics
 from app.services.broker_intel import formatter
 from app.services.broker_intel.content import ContentGenerator, get_generator
 from app.services.broker_intel.extraction import (
     _DIGIT,
+    MAX_QUALITATIVE_COMPARISON,
+    MAX_QUALITATIVE_FOCUSED,
+    MAX_QUALITATIVE_FOCUSED_COMPARISON,
+    MAX_QUALITATIVE_SINGLE,
     Claim,
     ExtractionProvider,
     RangeFact,
@@ -48,30 +53,50 @@ logger = logging.getLogger(__name__)
 COMPARISON_GROUPED = True
 
 
+def _focus_kw(focus: tuple[str, ...]) -> dict:
+    """`focus=` for search/extraction only when there is one, so a plain
+    briefing makes exactly the calls it always made."""
+    return {"focus": focus} if focus else {}
+
+
 async def build_lead_intel_reply(
     subject: str,
     audience: str,
     search: SearchProvider | None = None,
     extractor: ExtractionProvider | None = None,
+    focus: tuple[str, ...] = (),
 ) -> str:
+    """`focus` is what she asked about the subject (see focus.py): it steers
+    the search, tells the extractor what to look for, and decides what the
+    reply leads with. Empty means the plain briefing, unchanged."""
     search = search or get_search_provider()
     extractor = extractor or get_extraction_provider()
 
-    sources = await search.search_area(subject)
+    sources = await search.search_area(subject, **_focus_kw(focus))
     if not sources:
-        return formatter.render_thin_sources(subject)
+        return formatter.render_thin_sources(subject, focus)
 
-    claims = await extractor.extract_claims(subject, sources)
+    claims = await extractor.extract_claims(subject, sources, **_focus_kw(focus))
     if claims is None:
         return formatter.render_unavailable()
 
     ranges, qualitative = assemble_ranges(claims, subject)
+    ranges, qualitative, places_first = focus_topics.narrow(ranges, qualitative, focus)
     if not ranges and not qualitative:
-        return formatter.render_thin_sources(subject)
+        return formatter.render_thin_sources(subject, focus)
+    missing = focus_topics.unanswered(focus, ranges, qualitative)
+    answered = tuple(k for k in focus if k not in missing)
 
-    bullets = render_bullets(subject, ranges, qualitative, audience)
-    cited_sources = _cited(sources, ranges, qualitative)
-    return formatter.render_lead_intel(subject, bullets, audience, cited_sources)
+    bullets = render_bullets(
+        subject, ranges, qualitative, audience,
+        max_qualitative=MAX_QUALITATIVE_FOCUSED if places_first else MAX_QUALITATIVE_SINGLE,
+        places_first=places_first,
+    )
+    # Cite only what reached a bullet: the caps above can leave facts out,
+    # and a source listed under Sources: must have a marker in the reply.
+    cited_sources = _cited(sources, *_shown([("", bullets)], ranges, qualitative))
+    return formatter.render_lead_intel(subject, bullets, audience, cited_sources,
+                                       answered, missing)
 
 
 async def build_comparison_reply(
@@ -80,16 +105,17 @@ async def build_comparison_reply(
     search: SearchProvider | None = None,
     extractor: ExtractionProvider | None = None,
     grouped: bool = COMPARISON_GROUPED,
+    focus: tuple[str, ...] = (),
 ) -> str:
     search = search or get_search_provider()
     extractor = extractor or get_extraction_provider()
 
     per_area_sources: dict[str, list[SourceResult]] = {}
     for area in subjects:
-        per_area_sources[area] = await search.search_area(area)
+        per_area_sources[area] = await search.search_area(area, **_focus_kw(focus))
 
     if not any(per_area_sources.values()):
-        return formatter.render_thin_sources(" vs ".join(subjects))
+        return formatter.render_thin_sources(" vs ".join(subjects), focus)
 
     combined_sources: list[SourceResult] = []
     combined_claims: list[Claim] = []
@@ -98,42 +124,55 @@ async def build_comparison_reply(
         srcs = per_area_sources[area]
         if not srcs:
             continue
-        claims = await extractor.extract_claims(area, srcs)
+        claims = await extractor.extract_claims(area, srcs, **_focus_kw(focus))
         if claims:
             combined_claims.extend(remap_claims(claims, offset))
         combined_sources.extend(srcs)
         offset += len(srcs)
 
     per_area_facts: dict[str, tuple[list, list]] = {}
+    places_first = focus_topics.asks_about_places(focus)
     for area in subjects:
         ranges, qualitative = assemble_ranges(combined_claims, area)
+        ranges, qualitative, _ = focus_topics.narrow(ranges, qualitative, focus)
         if ranges or qualitative:
             per_area_facts[area] = (ranges, qualitative)
 
     if not per_area_facts:
-        return formatter.render_thin_sources(" vs ".join(subjects))
+        return formatter.render_thin_sources(" vs ".join(subjects), focus)
+    max_qual = MAX_QUALITATIVE_FOCUSED_COMPARISON if places_first else MAX_QUALITATIVE_COMPARISON
 
     all_ranges = [r for ranges, _q in per_area_facts.values() for r in ranges]
     all_qual = [q for _r, qualitative in per_area_facts.values() for q in qualitative]
+    missing = focus_topics.unanswered(focus, all_ranges, all_qual)
+    answered = tuple(k for k in focus if k not in missing)
 
     if grouped:
-        sections = render_comparison_sections(per_area_facts, audience)
+        sections = render_comparison_sections(
+            per_area_facts, audience,
+            max_qualitative_per_area=max_qual, places_first=places_first,
+        )
         # Only the facts that actually made it into a section may be cited.
-        shown = _shown_in_sections(sections, all_ranges, all_qual)
+        shown = _shown(sections, all_ranges, all_qual)
         cited_sources = _cited(combined_sources, *shown)
         return formatter.render_comparison(
-            subjects, [], audience, cited_sources, sections=sections
+            subjects, [], audience, cited_sources, sections=sections,
+            focus=answered, unanswered=missing,
         )
 
-    bullets = render_comparison_bullets(per_area_facts, audience)
+    bullets = render_comparison_bullets(
+        per_area_facts, audience, max_qualitative_per_area=max_qual
+    )
     cited_sources = _cited(combined_sources, all_ranges, all_qual)
-    return formatter.render_comparison(subjects, bullets, audience, cited_sources)
+    return formatter.render_comparison(subjects, bullets, audience, cited_sources,
+                                       focus=answered, unanswered=missing)
 
 
-def _shown_in_sections(sections, all_ranges, all_qual):
+def _shown(sections, all_ranges, all_qual):
     """Narrow the citation list to the markers that actually appear in the
     rendered sections — a source that got trimmed by a per-area cap must not
-    still be listed under Sources:."""
+    still be listed under Sources:. A single-area briefing passes its
+    bullets as one unnamed section."""
     rendered = " ".join(line for _name, lines in sections for line in lines)
     used = {int(n) for n in re.findall(r"\[(\d+)\]", rendered)}
     return (

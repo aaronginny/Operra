@@ -20,6 +20,17 @@ A wrong guess here is worse than a question: it would produce a confident
 briefing about the wrong community, and under the 'lead' format she might
 forward it to a client before noticing.
 
+An emirate on its own is the weakest of the three, and must not beat a more
+specific name in the same message. "What landmarks are near JLT in Dubai?"
+used to become a briefing on *Dubai*, because JLT isn't in the curated table
+and "Dubai" is: the broad match won and the place she actually named was
+discarded. Now, when an emirate is the only geography found, whatever else
+names something is treated as the subject (low confidence, so she confirms
+it) and the emirate is kept only as context. See _specific_remainder.
+
+What she asked ABOUT the place — landmarks, schools, yields — is read
+separately into Intent.focus. See focus.py.
+
 Keyword intents (ARTICLE / FUN FACT / ME / LEAD) are checked before any of
 that, and are matched as whole words so a project called "Article Living"
 does not read as a content request.
@@ -30,6 +41,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from app.services.broker_intel import focus as focus_topics
 from app.services.geo.uae import AREA_DISPLAY, AREA_TO_EMIRATE, EMIRATES
 
 # Two vocabularies, deliberately different.
@@ -113,6 +125,102 @@ _LEAD_PREFIXES = (
 
 _NOISE = re.compile(r"[‘’“”\"'`*_~]+")
 
+# Words that frame a question rather than name a place. Trimmed off the two
+# ENDS of a candidate name — never out of its middle, so "Creek Vistas by
+# Sobha" keeps its "by" — so "what landmarks are near Sobha One" yields
+# "Sobha One" rather than the whole sentence as a project name. A word
+# missing from here degrades to the confirm question ("I don't recognise
+# X"), never to a wrong briefing; add to it when that happens.
+_FRAMING_WORDS = frozenset("""
+    what what's whats which where when who whose why how how's hows
+    is are was were be been do does did can could would will should may might
+    have has had get got there here it its it's this that these those them they
+    you your u ur i i'm im me my mine we us our she her he his
+    a an the and or but & + with without of in on at to from for by into within
+    inside near around about close closest nearest between than also too as
+    like just only all any some more most much many very really so then
+    please pls plz kindly thanks thank hi hello hey dear ok okay
+    tell give show share send list know find check look lookup need want wanted
+    looking explain describe suggest recommend think say mention provide
+    update updates brief briefing info information detail details overview
+    summary report insight insights article post caption fact facts trivia
+    news latest current currently now today recent recently new upcoming
+    year month week time
+    property properties real estate realestate market markets area areas
+    community communities location locations place places project projects
+    development developments launch launches apartment apartments apt apts
+    flat flats villa villas townhouse townhouses studio studios bedroom
+    bedrooms bed beds br bhk unit units home homes house houses penthouse plot
+    plots off-plan offplan secondary resale ready invest investing investment
+    investments investor investors buy buying sell selling client clients lead
+    leads buyer buyers tenant tenants
+    good great best top better worse bad nice safe famous popular important
+    main major key notable well-known worth option options opportunity
+    family families kids expats living live life trend trends growth outlook
+    forecast future demand supply situation status performance doing happening
+    going compared general overall generally whole entire city emirate uae
+    expensive cheap affordable luxury overpriced underpriced bubble crash
+    right still yet ever even again soon later lately days nowadays well lot
+    lots bit little enough exactly actually approx approximately roughly
+    average typical usual usually
+""".split()) | focus_topics.phrase_words()
+
+# A token that is only a number, or a number with a unit ("2br", "2026",
+# "1.5m") — framing, not part of a name, when it sits at an edge.
+_NUMERIC_TOKEN = re.compile(r"^\d[\d.,]*(?:br|bhk|bed|beds|m|k|mn|aed|%)?$")
+
+_EDGE_PUNCT = "?!.,;:()[]{}\"'‘’“”*_~-–—"
+
+_EMIRATE_ALIASES = re.compile(
+    r"(?<!\w)(?:" + "|".join(re.escape(a) for a in sorted(EMIRATES, key=len, reverse=True))
+    + r")(?!\w)",
+    re.IGNORECASE,
+)
+
+
+def _trim_framing(text: str) -> str:
+    """Strip framing words (and bare numbers, emoji, bullets) off both ends
+    of `text`, keeping everything between the first and last word that isn't
+    framing exactly as she typed it."""
+    tokens = text.split()
+
+    def framing(tok: str) -> bool:
+        norm = tok.strip(_EDGE_PUNCT).lower()
+        return (not re.search(r"\w", norm) or norm in _FRAMING_WORDS
+                or bool(_NUMERIC_TOKEN.match(norm)))
+
+    while tokens and framing(tokens[0]):
+        tokens.pop(0)
+    while tokens and framing(tokens[-1]):
+        tokens.pop()
+    return " ".join(tokens).strip(_EDGE_PUNCT + " ")
+
+
+def _specific_remainder(text: str) -> str | None:
+    """What names something in `text` once every emirate mention and all
+    framing is gone — "JLT" from "What landmarks are near JLT in Dubai?",
+    nothing from "what are the top landmarks in Dubai".
+
+    First line only, on purpose: an emirate-only message used to brief on
+    the emirate, and reaching further down a forwarded message for "the
+    real subject" would mostly find the broadcast's body text instead."""
+    first = next((ln for ln in (text or "").splitlines() if ln.strip()), "")
+    return extract_project(_EMIRATE_ALIASES.sub(" ", first))
+
+
+# A forwarded launch broadcast is full of topic words — "Payment plan
+# 60/40", "Handover Q4 2027", "Starting price AED 1.2M" — but forwarding one
+# means "brief me on this project", not "tell me only about its payment
+# plan". So a focus is read only from something shaped like a question she
+# typed: a line or two, not a wall of text.
+_FOCUS_MAX_LINES = 2
+_FOCUS_MAX_WORDS = 40
+
+
+def _reads_as_question(text: str) -> bool:
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    return len(lines) <= _FOCUS_MAX_LINES and len(text.split()) <= _FOCUS_MAX_WORDS
+
 
 def _has_word(text: str, phrase: str) -> bool:
     return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None
@@ -132,7 +240,12 @@ class Intent:
       audience  — she picked ME / LEAD (value holds "self" / "lead")
       lead_intel — she named a project/area (subject holds it; audience may
                    already be set if she said both in one message)
+      need_subject — she asked about a topic (focus) but named no place
       unknown   — nothing usable
+
+    focus, for lead_intel / comparison / need_subject: the topic keys she
+    asked about beyond the place itself ("landmarks", "yield", ...), in the
+    order she wrote them — see focus.py. Empty means a plain briefing.
 
     confidence, for lead_intel only:
       "high" — the subject matched the curated UAE geography tables, so it
@@ -156,6 +269,7 @@ class Intent:
     # comparison only: every recognised area, in the order she wrote them.
     subjects: list[str] | None = None
     emirates: list[str] | None = None
+    focus: tuple[str, ...] = ()
 
 
 def _match_audience(lowered: str, *, bare: bool) -> str | None:
@@ -226,12 +340,17 @@ def wants_comparison(text: str) -> bool:
     message, where "Arjan and Nakheel Heights" really is a list of two —
     which is the case worth catching, since the second name may be a project
     the curated tables don't know and so can't be detected directly.
+
+    An "and" joining two TOPICS is not a list of places: "landmarks and
+    schools near JVC" is one area asked two things. Topic phrases are masked
+    out (focus.mask) before the short-message rule looks for a conjunction.
     """
     lowered = text.lower()
     for marker in _COMPARISON_MARKERS:
         if _has_word(lowered, marker.strip()):
             return True
-    if len(text.split()) <= 6 and (_has_word(lowered, "and") or "&" in text):
+    masked = focus_topics.mask(text)
+    if len(text.split()) <= 6 and (_has_word(masked.lower(), "and") or "&" in masked):
         return True
     return False
 
@@ -275,6 +394,10 @@ def extract_project(text: str) -> str | None:
                 break
         # Drop a trailing question mark and any separator tail.
         line = re.split(r"\s*[|·•\n]\s*|\s+[-–—]\s+", line)[0].strip(" ?.,:-")
+        # ...and the question around the name: "what landmarks are near
+        # Sobha One" is asking about "Sobha One", not a project called that
+        # whole sentence.
+        line = _trim_framing(line)
         if len(line) < 3:
             continue
         # A line that is only digits/punctuation is not a name.
@@ -327,6 +450,9 @@ def parse(text: str) -> Intent:
     # Inside a longer message only an explicit phrase counts.
     audience = _match_audience(lowered, bare=False)
 
+    # What she asked about the place, as curated topic keys — see focus.py.
+    focus = focus_topics.detect(text) if _reads_as_question(text) else ()
+
     # Two or more recognised areas -> a genuine side-by-side, not a silent
     # pick of whichever matched first.
     all_areas = find_all_areas(text)
@@ -337,6 +463,7 @@ def parse(text: str) -> Intent:
             emirates=[em for em, _display in all_areas],
             audience=audience,
             confidence="high",
+            focus=focus,
         )
 
     # Exactly one area, but the wording clearly meant several. Say so rather
@@ -359,10 +486,16 @@ def parse(text: str) -> Intent:
     if not all_areas and emirate is None and wants_real_data(text):
         return Intent(kind="data_request")
 
-    # An area or emirate came from the curated tables, so it is definitely
-    # real. Anything else is a shape-based guess from her wording.
-    if area or emirate:
-        subject, confidence = (area or emirate), "high"
+    # An area from the curated tables is definitely real. An emirate is too,
+    # but it is the broadest possible answer to "which place?", so it only
+    # becomes the subject when nothing more specific was named alongside it
+    # (see the module docstring). Anything else is a shape-based guess from
+    # her wording, and is confirmed with her before it is briefed on.
+    if area:
+        subject, confidence = area, "high"
+    elif emirate:
+        specific = _specific_remainder(text)
+        subject, confidence = (specific, "low") if specific else (emirate, "high")
     else:
         subject, confidence = extract_project(text), "low"
 
@@ -374,6 +507,12 @@ def parse(text: str) -> Intent:
             emirate=emirate,
             area=area,
             confidence=confidence,
+            focus=focus,
         )
+
+    # A question with no place in it ("what are the rental yields?"): ask
+    # where, naming what she asked, rather than claim it was unreadable.
+    if focus:
+        return Intent(kind="need_subject", focus=focus)
 
     return Intent(kind="unknown")

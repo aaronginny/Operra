@@ -20,6 +20,8 @@ Sections:
      cases answer honestly, partial-area comparisons degrade gracefully
   K  source trust tiers — the tier map, the fallback, the Sources line
   L  the daily brief — drop-if-nothing, scope, numbering, the post idea
+  M  question focus — search/extraction requests, the topic tag, the
+     emirate-level scope, narrowing, rendering, citations
 """
 
 from __future__ import annotations
@@ -748,6 +750,209 @@ async def run_daily_brief_checks() -> None:
           briefing.area_for(day) != briefing.area_for(date(2026, 9, 19)))
 
 
+# ── M. question focus through the pipeline ────────────────────
+
+async def run_focus_checks() -> None:
+    """What she asked about a place — landmarks, schools, yields — used to
+    be discarded at parse time, so every question got the same price/yield
+    briefing. These pin the pipeline half of the fix: the focus reaches the
+    search and the extractor, and decides what the reply is made of. The
+    conversational half is section I of test_broker_intel.py."""
+    print("\n== M. question focus through the pipeline ==")
+    from app.services.broker_intel import focus as focus_topics
+    from app.services.broker_intel.extraction import (
+        MAX_QUALITATIVE_FOCUSED,
+        RangeFact,
+        user_message,
+    )
+    from app.services.broker_intel.search import area_searches
+
+    # ── search + extraction requests ──
+    plain_q = [(b["query"], b["topic"]) for b in area_searches("JVC")]
+    check("M1 an unfocused search is exactly as before: price/yield + the month's news",
+          plain_q == [("JVC Dubai apartment price per sqft rental yield 2026", "general"),
+                      ("JVC Dubai property market", "news")], str(plain_q))
+    q = area_searches("JVC", ("landmarks",))[0]["query"]
+    check("M2 a landmarks question searches for landmarks, not listing prices",
+          "landmarks" in q and "price" not in q, q)
+    two = [(b["query"], b["topic"]) for b in area_searches("Arjan", ("schools", "yield"))]
+    check("M2b a two-part question gets a general search per part (one mixed query "
+          "came back all schools, no yield, live)",
+          len(two) == 2 and all(t == "general" for _q, t in two)
+          and "schools" in two[0][0] and "yield" not in two[0][0]
+          and "yield" in two[1][0] and "school" not in two[1][0], str(two))
+    srcs = [src("bayut.com", "Circle Mall sits inside JVC")]
+    check("M3 an unfocused extraction request is byte-identical to before",
+          user_message("JVC", srcs) == f"Area/subject: JVC\n\nSources:\n[1] bayut.com (undated): Circle Mall sits inside JVC",
+          user_message("JVC", srcs))
+    msg = user_message("JVC", srcs, ("landmarks", "yield"))
+    check("M4 a focused request names the topics, as their curated labels",
+          "landmarks & rental yield" in msg, msg[:200])
+
+    # ── the extractor's topic tag ──
+    raw = ('{"claims": ['
+           '{"metric": "qualitative", "scope_area": "JVC", "value": null, "qualifier": "", '
+           '"note": "Circle Mall sits inside the community", "topic": "landmarks", "source_index": 1},'
+           '{"metric": "qualitative", "scope_area": "JVC", "value": null, "qualifier": "", '
+           '"note": "Nakheel is the master developer here", "topic": "other", "source_index": 1},'
+           '{"metric": "qualitative", "scope_area": "JVC", "value": null, "qualifier": "", '
+           '"note": "Jumeirah Village Circle Park is central", "topic": "made-up", "source_index": 1}'
+           ']}')
+    parsed = _parse_claims(raw, max_index=1)
+    check("M5 the topic tag is read, 'other' kept, an unknown tag treated as untagged",
+          [c.topic for c in parsed] == ["landmarks", "other", ""], str([c.topic for c in parsed]))
+
+    # ── an emirate-level subject ──
+    dubai_claims = [
+        Claim("price_per_sqft", "Dubai Marina", 2500, "", "", 1),
+        Claim("price_per_sqft", "citywide", 1600, "", "", 2),
+        Claim("rental_yield_pct", "Dubai", 6.9, "", "", 2),
+        Claim("rental_yield_pct", "UAE", 6.1, "", "", 3),
+        Claim("qualitative", "Dubai", None, "", "Burj Khalifa and Dubai Mall anchor Downtown", 3,
+              "landmarks"),
+    ]
+    ranges, qual = assemble_ranges(dubai_claims, "Dubai")
+    values = sorted(r.low for r in ranges)
+    check("M6 a Dubai briefing takes the Dubai-wide figures, not Dubai Marina's "
+          "(the substring match used to do the reverse)",
+          values == [6.9, 1600] and len(qual) == 1, f"{values} / {len(qual)}")
+    r_ad, _ = assemble_ranges([Claim("price_per_sqft", "citywide", 1600, "", "", 1),
+                               Claim("price_per_sqft", "Abu Dhabi", 1200, "", "", 1)], "Abu Dhabi")
+    check("M7 'citywide' means Dubai-wide, so an Abu Dhabi briefing does not take it",
+          [r.low for r in r_ad] == [1200], str([r.low for r in r_ad]))
+    r_dm, _ = assemble_ranges([Claim("price_per_sqft", "Dubai Marina", 2500, "", "", 1),
+                               Claim("price_per_sqft", "citywide", 1600, "", "", 1)], "Dubai Marina")
+    check("M8 an area whose name contains 'Dubai' is unaffected",
+          [r.low for r in r_dm] == [2500], str([r.low for r in r_dm]))
+
+    # ── narrow ──
+    price = RangeFact("price_per_sqft", "JVC", "", 1400, 1500, (1,), False)
+    yld = RangeFact("rental_yield_pct", "JVC", "", 7.0, 7.5, (2,), False)
+    mall = QualitativeFact("Circle Mall sits inside the community", 3, "landmarks")
+    dev = QualitativeFact("Nakheel is the master developer", 4, "other")
+    metro = QualitativeFact("The nearest metro station is at Dubai Internet City", 5, "")
+    r, q, first = focus_topics.narrow([price, yld], [mall, dev, metro], ())
+    check("M9 no focus -> facts pass through untouched",
+          r == [price, yld] and q == [mall, dev, metro] and not first)
+    r, q, first = focus_topics.narrow([price, yld], [mall, dev, metro], ("landmarks",))
+    check("M10 a landmarks question: no price padding, only on-topic notes, places first",
+          r == [] and q == [mall] and first, f"{r} / {[x.note for x in q]}")
+    r, q, first = focus_topics.narrow([price, yld], [mall, dev, metro], ("landmarks", "yield"))
+    check("M11 landmarks AND yields: the yield figure stays, the price doesn't",
+          r == [yld] and q == [mall], f"{[x.metric for x in r]}")
+    r, q, first = focus_topics.narrow([price, yld], [mall, dev, metro], ("transport",))
+    check("M12 an untagged note counts when it names the topic ('metro station')",
+          q == [metro], str([x.note for x in q]))
+    r, q, first = focus_topics.narrow([price, yld], [mall], ("yield",))
+    check("M13 a figures question leads with the asked figure, the rest follow",
+          r == [yld, price] and q == [mall] and not first, f"{[x.metric for x in r]}")
+
+    # ── rendering ──
+    notes = [QualitativeFact(f"Landmark Place{chr(65 + i)} is next to the community", i + 1,
+                             "landmarks") for i in range(10)]
+    lines = render_bullets("JVC", [yld], notes, "self",
+                           max_qualitative=MAX_QUALITATIVE_FOCUSED, places_first=True)
+    check("M14 places lead, capped, then the figure she also asked for",
+          lines[0].startswith("Landmark PlaceA") and len(lines) == MAX_QUALITATIVE_FOCUSED + 1
+          and lines[-1].startswith("Rental yield"), str(lines))
+
+    # ── end to end ──
+    jvc_sources = [src("bayut.com"), src("propertyfinder.ae"), src("gulfnews.com")]
+    search = StubSearchProvider({"JVC": jvc_sources})
+    extractor = StubExtractionProvider(claims=[
+        Claim("qualitative", "JVC", None, "", "Circle Mall sits inside the community", 1, "landmarks"),
+        Claim("qualitative", "JVC", None, "", "Dubai Miracle Garden is a short drive away", 2, "landmarks"),
+        Claim("price_per_sqft", "JVC", 1450, "", "", 3),
+    ])
+    r = await briefing.build_lead_intel_reply("JVC", "self", search=search, extractor=extractor,
+                                              focus=("landmarks",))
+    check("M15 the search and the extractor both receive the focus",
+          search.focus_calls == [("JVC", ("landmarks",))]
+          and extractor.focus_calls == [("JVC", ("landmarks",))],
+          f"{search.focus_calls} / {extractor.focus_calls}")
+    check("M16 the reply says what it answers, and answers it",
+          "*JVC* — landmarks" in r and "Circle Mall" in r and "Miracle Garden" in r, r)
+    check("M17 ...with no price briefing she didn't ask for, and its source not cited",
+          "Price/sqft" not in r and "gulfnews.com" not in r, r)
+    check("M18 ...still carrying SOURCED_CAVEAT", formatter.SOURCED_CAVEAT in r)
+
+    many = [src("bayut.com") for _ in range(10)]
+    capped = await briefing.build_lead_intel_reply(
+        "JVC", "self", search=StubSearchProvider({"JVC": many}),
+        extractor=StubExtractionProvider(claims=[
+            Claim("qualitative", "JVC", None, "", f"Landmark Place{chr(65 + i)} is nearby", i + 1,
+                  "landmarks") for i in range(10)
+        ]),
+        focus=("landmarks",),
+    )
+    sources_line = next((ln for ln in capped.splitlines() if ln.startswith("Sources:")), "")
+    check("M19 a fact cut by the cap takes its source off the Sources line with it",
+          "[8]" in sources_line and "[9]" not in sources_line and "[10]" not in sources_line,
+          sources_line)
+
+    plain = StubSearchProvider({"JVC": jvc_sources})
+    plain_ex = StubExtractionProvider(claims=[Claim("price_per_sqft", "JVC", 1450, "", "", 1)])
+    r = await briefing.build_lead_intel_reply("JVC", "self", search=plain, extractor=plain_ex)
+    check("M20 an unfocused briefing is unchanged: plain header, no focus passed",
+          r.startswith("*JVC*\n") and plain.focus_calls == [("JVC", ())], r[:40])
+
+    class LegacySearch:
+        """A search double from before focus existed — the unfocused path
+        must not pass it a keyword it doesn't take."""
+        async def search_area(self, area):
+            return [src("bayut.com")]
+
+    r = await briefing.build_lead_intel_reply("JVC", "self", search=LegacySearch(),
+                                              extractor=plain_ex)
+    check("M21 an unfocused call passes no focus keyword at all", "Price/sqft" in r, r[:60])
+
+    comp_search = StubSearchProvider({"Arjan": [src("bayut.com")], "JVC": [src("propertyfinder.ae")]})
+    comp_ex = StubExtractionProvider(claims=lambda subject, sources: [
+        Claim("price_per_sqft", subject, 1400, "", "", 1),
+        Claim("qualitative", subject, None, "", f"GEMS school campus serves {subject}", 1, "schools"),
+    ])
+    r = await briefing.build_comparison_reply(["Arjan", "JVC"], "self", search=comp_search,
+                                              extractor=comp_ex, focus=("schools",))
+    check("M22 a focused comparison is headed with what was compared",
+          r.startswith("*Arjan vs JVC* — schools"), r[:60])
+    check("M23 ...and answers it per area, without the price padding",
+          "GEMS school campus serves Arjan" in r and "GEMS school campus serves JVC" in r
+          and "Price/sqft" not in r, r)
+    check("M24 ...having searched both areas for schools",
+          comp_search.focus_calls == [("Arjan", ("schools",)), ("JVC", ("schools",))],
+          str(comp_search.focus_calls))
+
+    thin = formatter.render_thin_sources("JVC", ("schools",))
+    check("M25 a focused question that finds nothing says which topic, and offers "
+          "the general briefing", "schools" in thin and "*JVC* on its own" in thin, thin)
+
+    # ── half an answer never passes for a whole one ──
+    half_search = StubSearchProvider({"Arjan": [src("bayut.com"), src("propertyfinder.ae")]})
+    half_ex = StubExtractionProvider(claims=[
+        Claim("qualitative", "Arjan", None, "", "Happy Bees Early Learning Center is in Arjan",
+              1, "schools"),
+        Claim("price_per_sqft", "Arjan", 1300, "", "", 2),
+    ])
+    r = await briefing.build_lead_intel_reply("Arjan", "self", search=half_search,
+                                              extractor=half_ex, focus=("schools", "yield"))
+    check("M26 schools found, yield not: the header claims only what the reply covers",
+          r.startswith("*Arjan* — schools\n") and "Happy Bees" in r, r[:60])
+    check("M27 ...and it says the yield part came up empty",
+          "Couldn't find anything sourced on rental yield for Arjan" in r, r)
+    check("M28 ...that line sits above Sources and the caveat is still last",
+          r.index("Couldn't find") < r.index("Sources:") and r.endswith(formatter.SOURCED_CAVEAT))
+    r = await briefing.build_lead_intel_reply("Arjan", "lead", search=half_search,
+                                              extractor=half_ex, focus=("schools", "yield"))
+    check("M29 the forwardable format drops that note (it's to her, not the client)",
+          "Couldn't find" not in r and r.startswith("*Arjan* — schools\n"), r[:80])
+    r = await briefing.build_lead_intel_reply("Arjan", "self", search=half_search,
+                                              extractor=half_ex, focus=("yield",))
+    check("M30 a figures question whose figure isn't found: the other figures, "
+          "under a plain header, with the gap named",
+          r.startswith("*Arjan*\n") and "Price/sqft" in r
+          and "Couldn't find anything sourced on rental yield" in r, r)
+
+
 async def main() -> None:
     print("=" * 68)
     print("  broker_intel sourcing pipeline verification")
@@ -765,6 +970,7 @@ async def main() -> None:
     await run_briefing_checks()
     run_tier_checks()
     await run_daily_brief_checks()
+    await run_focus_checks()
 
     print("\n" + "=" * 68)
     passed = sum(1 for r in results if r[0] == PASS)

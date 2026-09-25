@@ -14,7 +14,8 @@ ship correctly and impossible to get wrong later.
 But both features are two-step conversations ("which format?" / "article or
 fun fact?"), so something has to bridge one message to the next. That
 bridge is this module: a process-local dict with a short TTL, holding only
-what she typed as the subject and which question is outstanding. It never
+what she typed as the subject, the topic keys she asked about it, and which
+question is outstanding. It never
 touches the DB, so "stateless" stays true of persistence, which is the part
 that carries the PII risk.
 
@@ -50,11 +51,16 @@ class Pending:
     """The outstanding question for one phone number.
 
     kind: "audience" — she has been asked ME/LEAD about `subject`.
+
+    focus is what she asked about the subject (curated topic keys — see
+    focus.py), held across the question so "what landmarks are near JVC" ->
+    "ME" still answers the landmarks question.
     """
 
     kind: str
     subject: str
     created_at: float
+    focus: tuple[str, ...] = ()
 
 
 _PENDING: dict[tuple[int, str], Pending] = {}
@@ -64,9 +70,11 @@ def _key(company_id: int, phone: str) -> tuple[int, str]:
     return (company_id, phone)
 
 
-def set_pending(company_id: int, phone: str, kind: str, subject: str) -> None:
+def set_pending(
+    company_id: int, phone: str, kind: str, subject: str, focus: tuple[str, ...] = ()
+) -> None:
     _PENDING[_key(company_id, phone)] = Pending(
-        kind=kind, subject=subject, created_at=time.time()
+        kind=kind, subject=subject, created_at=time.time(), focus=tuple(focus)
     )
 
 

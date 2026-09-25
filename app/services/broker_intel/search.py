@@ -28,6 +28,7 @@ from typing import Protocol
 import httpx
 
 from app.config import settings
+from app.services.broker_intel import focus as focus_topics
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ def tier_emoji(domain: str) -> str:
 
 
 class SearchProvider(Protocol):
-    async def search_area(self, area: str) -> list[SourceResult]: ...
+    async def search_area(self, area: str, focus: tuple[str, ...] = ()) -> list[SourceResult]: ...
 
     async def search_news(self) -> list[SourceResult]: ...
 
@@ -153,37 +154,48 @@ def _dedup_and_filter(payloads: list[dict]) -> list[SourceResult]:
     return results
 
 
+def area_searches(area: str, focus: tuple[str, ...] = ()) -> list[dict]:
+    """The Tavily request bodies for one area — pure, so the tests can pin
+    exactly what gets searched.
+
+    Unfocused: the general price/yield search plus the month's news, as
+    always. A focused question searches for what she asked (curated topic
+    terms — see focus.py for why never her own words) in place of the
+    price/yield terms, so a landmarks question retrieves area guides rather
+    than listing-price pages. A question with a place part AND a figures
+    part ("schools near Arjan and what are the rental yields") gets one
+    general search per part instead of the news leg: a single query mixing
+    the two, tried live, came back all school pages and no yield at all.
+    """
+    def general(terms: str) -> dict:
+        return {"query": f"{area} Dubai {terms}", "search_depth": "advanced",
+                "max_results": _MAX_RESULTS_GENERAL, "topic": "general",
+                "include_domains": list(REPUTABLE_DOMAINS)}
+
+    news = {"query": f"{area} Dubai property market", "search_depth": "advanced",
+            "max_results": _MAX_RESULTS_NEWS, "topic": "news", "time_range": "month",
+            "include_domains": list(REPUTABLE_DOMAINS)}
+
+    if not focus:
+        return [general("apartment price per sqft rental yield 2026"), news]
+    places = tuple(k for k in focus if k in focus_topics.PLACE_TOPICS)
+    figures = tuple(k for k in focus if k not in focus_topics.PLACE_TOPICS)
+    if places and figures:
+        return [general(focus_topics.query_terms(places)),
+                general(focus_topics.query_terms(figures))]
+    return [general(focus_topics.query_terms(focus)), news]
+
+
 class TavilySearchProvider:
     """Real search via the Tavily API."""
 
-    async def search_area(self, area: str) -> list[SourceResult]:
+    async def search_area(self, area: str, focus: tuple[str, ...] = ()) -> list[SourceResult]:
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
                 headers = {"Authorization": f"Bearer {settings.tavily_api_key}"}
-                general, news = await asyncio.gather(
-                    client.post(
-                        "https://api.tavily.com/search",
-                        headers=headers,
-                        json={
-                            "query": f"{area} Dubai apartment price per sqft rental yield 2026",
-                            "search_depth": "advanced",
-                            "max_results": _MAX_RESULTS_GENERAL,
-                            "topic": "general",
-                            "include_domains": list(REPUTABLE_DOMAINS),
-                        },
-                    ),
-                    client.post(
-                        "https://api.tavily.com/search",
-                        headers=headers,
-                        json={
-                            "query": f"{area} Dubai property market",
-                            "search_depth": "advanced",
-                            "max_results": _MAX_RESULTS_NEWS,
-                            "topic": "news",
-                            "time_range": "month",
-                            "include_domains": list(REPUTABLE_DOMAINS),
-                        },
-                    ),
+                responses = await asyncio.gather(
+                    *(client.post("https://api.tavily.com/search", headers=headers, json=body)
+                      for body in area_searches(area, focus)),
                     return_exceptions=True,
                 )
         except Exception:
@@ -191,7 +203,7 @@ class TavilySearchProvider:
             return []
 
         payloads: list[dict] = []
-        for resp in (general, news):
+        for resp in responses:
             if isinstance(resp, BaseException):
                 logger.warning("broker_intel search leg failed for area=%s: %s", area, resp)
                 continue
@@ -240,9 +252,13 @@ class StubSearchProvider:
         self._by_area = {k.lower(): v for k, v in (by_area or {}).items()}
         self._news = list(news or [])
         self.calls: list[str] = []
+        # (area, focus) per search_area call — kept apart from `calls` so
+        # the many existing assertions on the plain area list stand as-is.
+        self.focus_calls: list[tuple[str, tuple[str, ...]]] = []
 
-    async def search_area(self, area: str) -> list[SourceResult]:
+    async def search_area(self, area: str, focus: tuple[str, ...] = ()) -> list[SourceResult]:
         self.calls.append(area)
+        self.focus_calls.append((area, tuple(focus)))
         return list(self._by_area.get(area.lower(), []))
 
     async def search_news(self) -> list[SourceResult]:
