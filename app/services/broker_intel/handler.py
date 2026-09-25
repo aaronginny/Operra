@@ -98,11 +98,16 @@ async def build_reply(
     if intent.kind == "data_request":
         return formatter.render_no_live_data()
 
+    # A topic with no place named ("what are the rental yields?").
+    if intent.kind == "need_subject":
+        return formatter.render_need_subject(intent.focus)
+
     # Two or more areas: a real side-by-side, sourced per area.
     if intent.kind == "comparison" and intent.subjects:
         audience = intent.audience or "self"
         return await briefing.build_comparison_reply(
-            intent.subjects, audience, search=search, extractor=extractor
+            intent.subjects, audience, search=search, extractor=extractor,
+            focus=intent.focus,
         )
 
     # One area found where she clearly meant several — say so instead of
@@ -116,16 +121,19 @@ async def build_reply(
         pending = state.take_pending(company_id, sender)
         if pending is None or pending.kind != "confirm_subject":
             return formatter.render_forgot_context()
-        state.set_pending(company_id, sender, "audience", pending.subject)
-        return formatter.render_format_question(pending.subject)
+        state.set_pending(company_id, sender, "audience", pending.subject, pending.focus)
+        return formatter.render_format_question(pending.subject, pending.focus)
 
-    # She answered ME / LEAD to a question we asked earlier.
+    # She answered ME / LEAD to a question we asked earlier. The focus of
+    # her original question rides along in the pending state, so the answer
+    # is still to what she asked, not a generic briefing on the place.
     if intent.kind == "audience":
         pending = state.take_pending(company_id, sender)
         if pending is None:
             return formatter.render_forgot_context()
         return await briefing.build_lead_intel_reply(
-            pending.subject, intent.value or "self", search=search, extractor=extractor
+            pending.subject, intent.value or "self", search=search, extractor=extractor,
+            focus=pending.focus,
         )
 
     # She picked ARTICLE / FUN FACT — either answering the daily nudge or
@@ -144,17 +152,18 @@ async def build_reply(
         # confirm before briefing — see Intent.confidence for why a question
         # beats a confident answer here.
         if intent.confidence == "low":
-            state.set_pending(company_id, sender, "confirm_subject", intent.subject)
-            return formatter.render_confirm_subject(intent.subject)
+            state.set_pending(company_id, sender, "confirm_subject", intent.subject, intent.focus)
+            return formatter.render_confirm_subject(intent.subject, intent.focus)
 
         # Format already stated in the same message — no need to ask.
         if intent.audience:
             return await briefing.build_lead_intel_reply(
-                intent.subject, intent.audience, search=search, extractor=extractor
+                intent.subject, intent.audience, search=search, extractor=extractor,
+                focus=intent.focus,
             )
 
-        state.set_pending(company_id, sender, "audience", intent.subject)
-        return formatter.render_format_question(intent.subject)
+        state.set_pending(company_id, sender, "audience", intent.subject, intent.focus)
+        return formatter.render_format_question(intent.subject, intent.focus)
 
     return formatter.render_unreadable()
 

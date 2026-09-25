@@ -21,6 +21,8 @@ Sections:
   F  other verticals unaffected
   G  polish: greetings and unrecognised subjects
   H  real-usage regressions (from Manju's actual conversation)
+  I  her question survives: the focus of a question, and "Dubai" no longer
+     overriding the place she named
 """
 
 import asyncio
@@ -668,6 +670,178 @@ async def run_real_usage_checks(company_id: int) -> None:
           intents.parse("give me actual numbers").kind)
 
 
+# ── I. her question survives, not just the place in it ───────
+
+async def run_focus_checks(company_id: int) -> None:
+    """Live feedback: asking something specific got a generic overview.
+    Two separate causes, both reproduced here in her kind of phrasing:
+
+      1. The question itself was thrown away at parse time — "what
+         landmarks are near JVC" became "JVC" and got the standard
+         price/yield briefing, landmarks nowhere in it.
+      2. "Dubai" beat the place she named. Any place missing from the
+         curated table (JLT, a new launch) lost to the emirate in the same
+         sentence, so the reply was a Dubai overview.
+    """
+    print("\n== I. her question survives, not just the place in it ==")
+
+    def landmark_claims(subject: str, sources) -> list[Claim]:
+        return [
+            Claim("qualitative", subject, None, "", "Circle Mall sits inside the community", 1,
+                  "landmarks"),
+            Claim("qualitative", subject, None, "", "Dubai Miracle Garden is a short drive away",
+                  2, "landmarks"),
+            Claim("qualitative", subject, None, "", "Nakheel is the master developer", 1, "other"),
+            Claim("price_per_sqft", subject, 1450, "", "", 1),
+            Claim("rental_yield_pct", subject, 7.2, "", "", 2),
+        ]
+
+    # ── 1. the question is kept, carried across ME/LEAD, and answered ──
+    state._reset_for_tests()
+    search = StubSearchProvider({"JVC": [src("bayut.com"), src("propertyfinder.ae")]})
+    extractor = StubExtractionProvider(claims=landmark_claims)
+    r = await build_reply(company_id, BROKER_PHONE, "what landmarks are near JVC",
+                          search=search, extractor=extractor)
+    check("I1 'what landmarks are near JVC' -> the format question echoes the question",
+          "*JVC* — landmarks" in r and "ME" in r and not search.calls, r[:80])
+    r = await build_reply(company_id, BROKER_PHONE, "ME", search=search, extractor=extractor)
+    check("I2 ...and after ME, the answer is about landmarks",
+          "*JVC* — landmarks" in r and "Circle Mall" in r and "Miracle Garden" in r, r)
+    check("I3 ...not the generic price/yield briefing, and not the off-topic note",
+          "Price/sqft" not in r and "Rental yield" not in r and "Nakheel" not in r, r)
+    check("I4 ...because the search and extractor were told what she asked",
+          search.focus_calls == [("JVC", ("landmarks",))]
+          and extractor.focus_calls == [("JVC", ("landmarks",))], str(search.focus_calls))
+
+    # ── 2. "Dubai" no longer overrides the place she named ──
+    state._reset_for_tests()
+    jlt_search = StubSearchProvider({"JLT": [src("bayut.com"), src("propertyfinder.ae")]})
+    jlt_extractor = StubExtractionProvider(claims=landmark_claims)
+    r = await build_reply(company_id, BROKER_PHONE, "What landmarks are near JLT in Dubai?",
+                          search=jlt_search, extractor=jlt_extractor)
+    check("I5 'near JLT in Dubai' is about JLT, not a Dubai overview",
+          "*JLT*" in r and "*Dubai*" not in r, r[:90])
+    check("I6 ...and since JLT isn't in the curated table, she's asked to confirm "
+          "it, with nothing searched yet",
+          "recognise" in r and "landmarks" in r and not jlt_search.calls, r[:140])
+    r = await build_reply(company_id, BROKER_PHONE, "yes", search=jlt_search, extractor=jlt_extractor)
+    check("I7 YES keeps both the place and the question",
+          "*JLT* — landmarks" in r and "LEAD" in r, r[:80])
+    r = await build_reply(company_id, BROKER_PHONE, "LEAD", search=jlt_search, extractor=jlt_extractor)
+    check("I8 ...and LEAD answers the landmarks question for JLT",
+          jlt_search.focus_calls == [("JLT", ("landmarks",))] and "Circle Mall" in r
+          and formatter.SOURCED_CAVEAT in r, f"{jlt_search.focus_calls} / {r[:80]}")
+
+    i = intents.parse("schools near Sobha One in Dubai")
+    check("I9 an unlisted project beats the emirate too",
+          i.subject == "Sobha One" and i.focus == ("schools",) and i.emirate == "Dubai",
+          f"{i.subject}/{i.focus}")
+    i = intents.parse("what landmarks are near Sobha One")
+    check("I10 with no geography at all, the name is lifted out of the question "
+          "rather than the whole sentence becoming the project name",
+          i.subject == "Sobha One" and i.focus == ("landmarks",), repr(i.subject))
+
+    # When Dubai genuinely IS the subject, it still is — and the reply is
+    # Dubai's, not whichever "Dubai X" area the sources happened to mention.
+    for text in ("what are the top landmarks in Dubai", "Dubai", "dubai market update",
+                 "is dubai overpriced right now", "latest news in dubai real estate"):
+        i = intents.parse(text)
+        check(f"I11 {text!r} is still about Dubai itself",
+              i.subject == "Dubai" and i.confidence == "high", f"{i.subject}/{i.confidence}")
+    state._reset_for_tests()
+    dubai_search = StubSearchProvider({"Dubai": [src("bayut.com"), src("gulfnews.com")]})
+    dubai_extractor = StubExtractionProvider(claims=[
+        Claim("qualitative", "citywide", None, "", "Burj Khalifa and Dubai Mall anchor Downtown",
+              1, "landmarks"),
+        Claim("qualitative", "Dubai Marina", None, "", "Pier Seven overlooks the marina", 2,
+              "landmarks"),
+    ])
+    r = await build_reply(company_id, BROKER_PHONE, "top landmarks in Dubai, for me",
+                          search=dubai_search, extractor=dubai_extractor)
+    check("I12 a Dubai-level question gets Dubai-wide facts, not one area's labelled as Dubai",
+          "Burj Khalifa" in r and "Pier Seven" not in r, r)
+
+    # ── 3. multi-part questions ──
+    state._reset_for_tests()
+    mp_search = StubSearchProvider({"JVC": [src("bayut.com"), src("propertyfinder.ae")]})
+    mp_extractor = StubExtractionProvider(claims=landmark_claims)
+    r = await build_reply(company_id, BROKER_PHONE,
+                          "what landmarks are near JVC and what are the rental yields, for me",
+                          search=mp_search, extractor=mp_extractor)
+    check("I13 two questions in one message: both are answered",
+          "*JVC* — landmarks & rental yield" in r and "Circle Mall" in r
+          and "Rental yield: 7.2%" in r, r)
+    check("I14 ...and the price figure nobody asked for stays out", "Price/sqft" not in r, r)
+
+    i = intents.parse("landmarks and schools near JVC")
+    check("I15 'landmarks and schools near JVC' is one area asked two things, "
+          "not a half-recognised comparison",
+          i.kind == "lead_intel" and i.focus == ("landmarks", "schools"), f"{i.kind}/{i.focus}")
+    i = intents.parse("Is JVC good for rental yield and what's the service charge")
+    check("I16 figures questions are read too", i.focus == ("yield", "service_charge"), str(i.focus))
+    i = intents.parse("schools in Arjan vs JVC")
+    check("I17 a comparison carries its question",
+          i.kind == "comparison" and i.focus == ("schools",), f"{i.kind}/{i.focus}")
+    i = intents.parse(HER_COMPARISON_TEXT)
+    check("I18 her original comparison now also knows she asked for rates and ROI",
+          i.kind == "comparison" and i.focus == ("prices", "yield"), str(i.focus))
+
+    # ── 4. a question with no place in it ──
+    state._reset_for_tests()
+    none_search = StubSearchProvider({})
+    r = await build_reply(company_id, BROKER_PHONE, "what are the rental yields",
+                          search=none_search)
+    check("I19 a question with no place asks where, naming what she asked",
+          "rental yield" in r and "which area" in r and not none_search.calls, r)
+
+    # ── 5. what must NOT change ──
+    state._reset_for_tests()
+    r = await build_reply(company_id, BROKER_PHONE, "tell me about JVC")
+    check("I20 a plain request is exactly as before", r.startswith("Got it — *JVC*.\n"), r[:40])
+    check("I21 project names containing topic-ish words are not mangled",
+          intents.parse("tell me about Park Views").subject == "Park Views"
+          and intents.parse("tell me about Park Views").focus == ()
+          and intents.parse("Creek Vistas by Sobha").subject == "Creek Vistas by Sobha",
+          f"{intents.parse('tell me about Park Views')}")
+    broadcast = ("NEW LAUNCH\nSobha One by Sobha Realty\nPrices from AED 1.2M\n"
+                 "Payment plan 60/40\nHandover Q4 2027\nAmenities: pool, gym")
+    i = intents.parse(broadcast)
+    check("I22 a forwarded launch broadcast is a request for the general briefing, "
+          "not a payment-plan question",
+          i.kind == "lead_intel" and i.focus == (), f"{i.kind}/{i.focus}/{i.subject}")
+
+    # ── 6. privacy: only curated topic keys ever leave, never her words ──
+    state._reset_for_tests()
+    priv_search = StubSearchProvider({"Sobha Hartland": [src("bayut.com")]})
+    priv_extractor = StubExtractionProvider(claims=[
+        Claim("qualitative", "Sobha Hartland", None, "", "Hartland International School is inside",
+              1, "schools"),
+    ])
+    forwarded = (f"Forwarded: {STRANGER_NAME} {STRANGER_PHONE} asking about schools "
+                 "near Sobha Hartland")
+    await build_reply(company_id, BROKER_PHONE, forwarded, search=priv_search,
+                      extractor=priv_extractor)
+    await build_reply(company_id, BROKER_PHONE, "ME", search=priv_search, extractor=priv_extractor)
+    from app.services.broker_intel import focus as focus_topics
+    from app.services.broker_intel.extraction import user_message
+    from app.services.broker_intel.search import area_searches
+    sent_out = " ".join(
+        [b["query"] for a, f in priv_search.focus_calls for b in area_searches(a, f)]
+        + [user_message(s, [src("bayut.com")], f) for s, f in priv_extractor.focus_calls]
+    )
+    check("I23 a forwarded lead's question is answered by topic...",
+          priv_search.focus_calls == [("Sobha Hartland", ("schools",))],
+          str(priv_search.focus_calls))
+    check("I24 ...and the stranger's name and number reach neither search nor "
+          "the extractor", STRANGER_NAME not in sent_out and STRANGER_PHONE not in sent_out
+          and "Forwarded" not in sent_out, sent_out[:200])
+    check("I25 every focus that leaves is a curated topic key",
+          all(k in focus_topics.BY_KEY for _a, f in priv_search.focus_calls for k in f))
+
+
+HER_COMPARISON_TEXT = "Compare Arjan and JVC in terms of real estate rates and ROI"
+
+
 # ── E. isolation ─────────────────────────────────────────────
 
 async def run_isolation_checks(company_id: int) -> None:
@@ -757,6 +931,7 @@ async def main() -> None:
     await run_daily_checks(ctx["company_id"])
     await run_polish_checks(ctx["company_id"])
     await run_real_usage_checks(ctx["company_id"])
+    await run_focus_checks(ctx["company_id"])
     await run_isolation_checks(ctx["company_id"])
     await run_other_vertical_checks()
 
