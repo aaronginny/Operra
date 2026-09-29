@@ -146,10 +146,30 @@ def _sanitize_parsed(parsed: dict, raw_text: str, employee_names: list[str]) -> 
 # reach one account, so a duplicate still means one of the two rows is wrong
 # and wants cleaning up. This makes the failure deterministic and sane rather
 # than silently dependent on row order.
+#
+# Superseded as the real fix by one-number-one-user (app.services.
+# whatsapp_identity, migration 037): once that index exists no lookup can
+# match two rows and this ordering never decides anything. It stays for a
+# database that still holds a legacy duplicate — where it also turned out to
+# be wrong: real_estate is non-generic but has no inbound handler, so a
+# real_estate duplicate beat a broker_intel client and the generic pipeline
+# answered her (2026-09-25). _warn_if_shared makes any such lookup loud.
 _ROUTING_ORDER = (
     case((Company.vertical == "generic", 1), else_=0),
     User.id.asc(),
 )
+
+
+def _warn_if_shared(matches: list) -> None:
+    """Log when one lookup matched several users — the routing fault the
+    unique index exists to prevent, so seeing this means the index is not in
+    force. Ids only; the number itself is already in the caller's log line."""
+    if len(matches) > 1:
+        logger.error(
+            "get_ceo_user: %d users share this WhatsApp number (user_ids=%s); routing "
+            "to %s by tie-break. See whatsapp_identity.",
+            len(matches), [u.id for u in matches], matches[0].id,
+        )
 
 
 async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
@@ -172,8 +192,9 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
         .where(User.whatsapp_number == normalized)
         .order_by(*_ROUTING_ORDER)
     )
-    result = await db.execute(stmt)
-    user = result.scalars().first()
+    matches = (await db.execute(stmt)).scalars().all()
+    _warn_if_shared(matches)
+    user = matches[0] if matches else None
     if user:
         logger.info("get_ceo_user: exact match user_id=%s role=%s", user.id, user.role)
         return user
@@ -187,8 +208,9 @@ async def get_ceo_user(db: AsyncSession, sender_phone: str) -> User | None:
             .where(User.whatsapp_number.like(f"%{suffix}"))
             .order_by(*_ROUTING_ORDER)
         )
-        result2 = await db.execute(stmt2)
-        user2 = result2.scalars().first()
+        matches2 = (await db.execute(stmt2)).scalars().all()
+        _warn_if_shared(matches2)
+        user2 = matches2[0] if matches2 else None
         if user2:
             logger.info("get_ceo_user: suffix match user_id=%s role=%s", user2.id, user2.role)
             return user2

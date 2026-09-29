@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -14,6 +15,7 @@ from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.company import Company
 from app.schemas.auth_schema import UserCreate, UserLogin, Token
+from app.services import whatsapp_identity
 from app.services.auth_service import get_password_hash, verify_password, create_access_token, get_current_user
 
 logger = logging.getLogger(__name__)
@@ -60,6 +62,12 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     if existing_user:
         return {"success": False, "error": "Email already registered. Please log in instead."}
 
+    # One WhatsApp number, one user — checked before the company row exists,
+    # so a rejected signup leaves nothing behind. See whatsapp_identity.
+    whatsapp_number = _normalize_whatsapp(payload.whatsapp_number)
+    if await whatsapp_identity.find_holder(db, whatsapp_number):
+        return {"success": False, "error": whatsapp_identity.NUMBER_IN_USE}
+
     # Create company (set 7-day trial immediately)
     company = Company(
         name=payload.company_name,
@@ -75,11 +83,17 @@ async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
         password_hash=get_password_hash(payload.password),
         company_id=company.id,
         role=UserRole.ceo,
-        whatsapp_number=_normalize_whatsapp(payload.whatsapp_number),
+        whatsapp_number=whatsapp_number,
         is_verified=True,
     )
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # The unique index caught what find_holder didn't — a concurrent
+        # signup with the same number. Roll back the company row too.
+        await db.rollback()
+        return {"success": False, "error": whatsapp_identity.NUMBER_IN_USE}
     await db.refresh(user)
 
     logger.info("[PhantomPilot] Signup OK for: %s  |  company_id=%s", email, company.id)
@@ -156,7 +170,17 @@ async def update_profile(
 ):
     """Update the current user's profile (WhatsApp number, name/username)."""
     if payload.whatsapp_number is not None:
-        current_user.whatsapp_number = _normalize_whatsapp(payload.whatsapp_number)
+        new_number = _normalize_whatsapp(payload.whatsapp_number)
+        # Re-saving the number you already hold is not a conflict, even on a
+        # database that still carries a legacy duplicate of it.
+        unchanged = (whatsapp_identity.routing_key(new_number)
+                     == whatsapp_identity.routing_key(current_user.whatsapp_number))
+        if not unchanged and await whatsapp_identity.find_holder(
+            db, new_number, exclude_user_id=current_user.id
+        ):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail=whatsapp_identity.NUMBER_IN_USE)
+        current_user.whatsapp_number = new_number
         logger.info(
             "User %s updated whatsapp_number to %r",
             current_user.email, current_user.whatsapp_number,
@@ -167,7 +191,12 @@ async def update_profile(
         current_user.name = new_name
         logger.info("User %s updated name to %r", current_user.email, new_name)
 
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=whatsapp_identity.NUMBER_IN_USE)
 
     # Issue a fresh token so the new name is reflected immediately
     new_token = create_access_token({

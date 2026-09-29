@@ -28,6 +28,7 @@ from app.routes import department_routes as department_router
 from app.routes import real_estate as real_estate_router
 from app.routes import launch_matcher as launch_matcher_router
 from app.migrations import run_migrations
+from app.services import whatsapp_identity
 from app.services.reminder_service import start_scheduler, stop_scheduler
 from app.services.messaging_service import subscribe_waba_webhook
 
@@ -54,6 +55,15 @@ async def lifespan(application: FastAPI):
         raise
 
     await run_migrations(engine)
+
+    # One WhatsApp number, one user: prove the unique index migration 037
+    # creates is really there, since run_migrations swallows its failure
+    # while duplicates exist. Reports rather than raising — see
+    # whatsapp_identity.check_uniqueness.
+    try:
+        await whatsapp_identity.check_uniqueness(engine)
+    except Exception:
+        logger.exception("WhatsApp routing uniqueness check could not run")
 
     start_scheduler()
     logger.info("Reminder scheduler started.")
@@ -144,5 +154,10 @@ def terms_page():
 
 @app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
 async def health_check():
-    """Simple liveness probe — accepts HEAD for UptimeRobot."""
-    return {"status": "ok"}
+    """Simple liveness probe — accepts HEAD for UptimeRobot.
+
+    `whatsapp_unique` is the boot-time result of whatsapp_identity.
+    check_uniqueness: true once the one-number-one-user index is in force,
+    false while it is missing or a duplicate remains, null if the check could
+    not run. A boolean only — it says nothing about which numbers."""
+    return {"status": "ok", "whatsapp_unique": whatsapp_identity.last_check_ok()}
