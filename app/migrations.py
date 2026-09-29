@@ -689,6 +689,35 @@ _MIGRATIONS = [
         ADD COLUMN IF NOT EXISTS name VARCHAR(120);
         """,
     ),
+    # ---------------------------------------------------------------------
+    # 037 -- one WhatsApp number, one user. See
+    #        app/services/whatsapp_identity.py for why this is a routing
+    #        fault rather than a data-quality one, and for the key: the last
+    #        10 digits, the same key get_ceo_user's suffix fallback matches
+    #        on, so format variants of one number collide here exactly as
+    #        they do in routing.
+    #
+    #        An index, not a column: nothing new to keep in sync, and create_all
+    #        never builds indexes on an existing table anyway (the two-path
+    #        rule), so this statement is the only source on BOTH paths —
+    #        run_migrations runs on fresh databases too.
+    #
+    #        EXPECTED TO FAIL while any duplicate exists — a unique index
+    #        cannot be created over rows that violate it — and run_migrations
+    #        swallows the failure. That is what whatsapp_identity.
+    #        check_uniqueness is for: it runs straight after this on every
+    #        boot and logs CRITICAL (and reports whatsapp_unique=false on
+    #        /health) until the index exists. Once the duplicates are
+    #        resolved, the next boot creates it.
+    # ---------------------------------------------------------------------
+    (
+        "037_users.whatsapp_key_unique",
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_users_whatsapp_key
+        ON users (right(regexp_replace(whatsapp_number, '[^0-9]', '', 'g'), 10))
+        WHERE whatsapp_number IS NOT NULL AND whatsapp_number <> '';
+        """,
+    ),
 ]
 
 
@@ -919,6 +948,16 @@ _SQLITE_MIGRATIONS = [
     (
         "sqlite.investor_criteria.name",
         "ALTER TABLE investor_criteria ADD COLUMN name VARCHAR(120);",
+    ),
+    # Mirror of migration 037. SQLite has no regexp_replace, so the digits are
+    # isolated by stripping the characters a stored number can actually
+    # contain; the key is the same last-10-digits as on Postgres.
+    (
+        "sqlite.users.whatsapp_key_unique",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_whatsapp_key ON users ("
+        "substr(replace(replace(replace(replace(replace(whatsapp_number,"
+        " '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), -10)"
+        ") WHERE whatsapp_number IS NOT NULL AND whatsapp_number <> '';",
     ),
 ]
 
